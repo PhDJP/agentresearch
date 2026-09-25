@@ -1,0 +1,9 @@
+# Normalizar texto a LF en el repositorio
+* text=auto eol=lf
+
+# Binarios
+*.pdf binary
+*.png binary
+*.jpg binary
+*.xlsx binary
+*.docx binary
