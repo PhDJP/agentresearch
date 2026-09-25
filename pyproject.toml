@@ -1,7 +1,7 @@
 [project]
 name = "agentresearch"
 version = "0.0.1"
-description = "Agente investigador para estudios de mapeo sistematico de la literatura, con Kitchenham, Petersen y PRISMA-ScR."
+description = "Agente investigador para estudios de mapeo sistemático de la literatura, con Kitchenham, Petersen y PRISMA-ScR."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

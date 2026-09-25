@@ -1,1 +1,1 @@
-"""Agente investigador para estudios de mapeo sistematico de la literatura."""
+"""Agente investigador para estudios de mapeo sistemático de la literatura."""

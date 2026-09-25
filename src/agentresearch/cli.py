@@ -1,4 +1,4 @@
-"""Interfaz de linea de comandos de agentresearch."""
+"""Interfaz de línea de comandos de agentresearch."""
 
 import argparse
 from importlib.metadata import version
