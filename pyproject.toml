@@ -4,6 +4,7 @@ version = "0.0.1"
 description = "Agente investigador para estudios de mapeo sistematico de la literatura, con Kitchenham, Petersen y PRISMA-ScR."
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Juan Pablo Gomez Ballesteros", email = "juangomezb@unicauca.edu.co" }
 ]
