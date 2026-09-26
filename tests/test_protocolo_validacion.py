@@ -301,7 +301,8 @@ def test_cada_caso_dispara_exactamente_su_regla(
 def test_cada_regla_de_contenido_tiene_al_menos_un_caso() -> None:
     cubiertas = {regla for _nombre, _mutacion, esperados in CASOS for regla in esperados}
 
-    assert cubiertas == set(REGLAS) - {"P-E00"}
+    # P-E09 y P-E10 leen el directorio del estudio; se prueban en test_protocolo_ciclo_de_vida.py.
+    assert cubiertas == set(REGLAS) - {"P-E00", "P-E09", "P-E10"}
 
 
 def test_sin_revisores_humanos_no_duplica_la_advertencia_del_segundo_revisor(
@@ -380,7 +381,7 @@ def test_referencias_del_catalogo(id_regla: str, referencia: str) -> None:
 
 
 def test_el_catalogo_tiene_los_ids_estables_y_su_severidad() -> None:
-    errores = [f"P-E0{n}" for n in range(9)]
+    errores = [f"P-E{n:02d}" for n in range(11)]
     advertencias = [f"P-A0{n}" for n in range(1, 10)]
 
     assert list(REGLAS) == errores + advertencias
@@ -534,6 +535,9 @@ def test_como_dict_incluye_version_del_agente_y_hash() -> None:
         "errores",
         "advertencias",
         "hallazgos",
+        "registro",
     }
     assert datos["hash_archivo"].startswith("sha256:")
     assert datos["version_esquema"] == 1
+    assert datos["registro"]["ruta"] == "datos/eventos.jsonl"
+    assert datos["registro"]["existe"] is False

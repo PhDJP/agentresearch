@@ -18,3 +18,12 @@ _datos_sinteticos: dict[str, Any] = YAML(typ="safe").load(
 def datos_sinteticos() -> dict[str, Any]:
     """Protocolo sintético válido como diccionario de Python, listo para modificar."""
     return copy.deepcopy(_datos_sinteticos)
+
+
+@pytest.fixture
+def protocolo_de_estudio(tmp_path: Path) -> Path:
+    """Estudio sintético con el protocolo en borrador en `estudio/protocolo/protocolo.yaml`."""
+    ruta = tmp_path / "estudio" / "protocolo" / "protocolo.yaml"
+    ruta.parent.mkdir(parents=True)
+    ruta.write_bytes(RUTA_PROTOCOLO_SINTETICO.read_bytes())
+    return ruta

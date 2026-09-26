@@ -100,15 +100,28 @@ def leer_protocolo(ruta: Path | str) -> DocumentoProtocolo:
     Lanza `ErrorLecturaProtocolo` si el archivo no existe, no es UTF-8, no es
     YAML válido o no cumple el esquema.
     """
+    return decodificar_protocolo(leer_bytes_protocolo(ruta))
+
+
+def leer_bytes_protocolo(ruta: Path | str) -> bytes:
+    """Lee los bytes del archivo del protocolo, una sola vez.
+
+    Los comandos del ciclo de vida validan, calculan el diff y calculan el
+    hash sobre estos mismos bytes (ADR-0008, punto 3).
+    """
     ruta = Path(ruta)
     try:
-        contenido = ruta.read_bytes()
+        return ruta.read_bytes()
     except FileNotFoundError:
         raise ErrorLecturaProtocolo([ProblemaLectura(f"el archivo no existe: {ruta}")]) from None
     except OSError as error:
         raise ErrorLecturaProtocolo(
             [ProblemaLectura(f"no se pudo leer el archivo {ruta}: {error.strerror}")]
         ) from None
+
+
+def decodificar_protocolo(contenido: bytes) -> DocumentoProtocolo:
+    """Decodifica en UTF-8, analiza y valida contra el esquema los bytes de un protocolo."""
     try:
         texto = contenido.decode("utf-8")
     except UnicodeDecodeError:
@@ -290,6 +303,14 @@ _MENSAJES_POR_TIPO = {
     "model_type": "se esperaba un mapa de claves y valores",
     "dict_type": "se esperaba un mapa de claves y valores",
 }
+
+
+def describir_error_de_esquema(detalle: ErrorDetails) -> str:
+    """Describe en español un error de pydantic, con su ubicación: `opciones[0].pros: …`."""
+    ruta = [paso for paso in detalle["loc"] if isinstance(paso, str | int)]
+    ubicacion = formatear_ubicacion(ruta)
+    mensaje = _mensaje_de_esquema(detalle)
+    return f"{ubicacion}: {mensaje}" if ubicacion else mensaje
 
 
 def _mensaje_de_esquema(detalle: ErrorDetails) -> str:
