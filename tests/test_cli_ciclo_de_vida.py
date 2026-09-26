@@ -11,6 +11,8 @@ import pytest
 
 from agentresearch.cli import (
     construir_analizador,
+    ejecutar_decision_confirmar,
+    ejecutar_decision_registrar,
     ejecutar_protocolo_aprobar,
     ejecutar_protocolo_enmendar,
     main,
@@ -332,6 +334,184 @@ def test_main_enmendar_simulado(
 
     assert salida.value.code == 0
     assert "versión siguiente: 1.1.0 si es menor" in capsys.readouterr().out
+
+
+# --- protocolo decision registrar | confirmar ------------------------------------------
+
+
+def _archivo_decision(tmp_path: Path, **cambios: Any) -> Path:
+    opcion = {"descripcion": "d", "pros": ["p"], "contras": ["c"], "referencias": ["r"]}
+    decision: dict[str, Any] = {
+        "id_decision": "O1",
+        "tema": "Tema",
+        "pregunta": "¿Pregunta?",
+        "opciones": [{"id": "A", **opcion}, {"id": "B", **opcion}],
+        "elegida": "A",
+        "justificacion": "Justificación",
+        "propuesto_por": {"tipo": "llm", "modelo": "claude-opus-5-5"},
+        "decidido_por": {"tipo": "humano", "id": "investigador-1"},
+    }
+    decision.update(cambios)
+    archivo = tmp_path / f"{decision['id_decision']}.json"
+    archivo.write_text(json.dumps(decision, ensure_ascii=False), encoding="utf-8")
+    return archivo
+
+
+def test_decision_registrar_imprime_el_resultado(
+    protocolo_de_estudio: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    codigo = ejecutar_decision_registrar(_archivo_decision(tmp_path), protocolo_de_estudio)
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "decisión O1 registrada como propuesta (evt-000001); queda pendiente de confirmar" in (
+        salida
+    )
+    assert "decision confirmar --confirmado-por <id>" in salida
+
+
+def test_decision_registrar_en_json(
+    protocolo_de_estudio: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    codigo = ejecutar_decision_registrar(
+        _archivo_decision(tmp_path), protocolo_de_estudio, como_json=True
+    )
+
+    datos = _json(capsys)
+    assert codigo == 0
+    assert datos["comando"] == "protocolo decision registrar"
+    assert datos["resultado"]["estado"] == "pendiente"
+    assert datos["resultado"]["datos"]["decision"]["id_decision"] == "O1"
+
+
+def test_decision_registrar_rechazada_devuelve_uno(
+    protocolo_de_estudio: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    archivo = _archivo_decision(tmp_path, decidido_por={"tipo": "llm", "id": "claude"})
+
+    codigo = ejecutar_decision_registrar(archivo, protocolo_de_estudio, como_json=True)
+
+    datos = _json(capsys)
+    assert codigo == 1
+    assert datos["exito"] is False
+    assert datos["errores"] == [
+        "decidido_por debe ser un humano: el LLM propone, pero decide el investigador "
+        "(CLAUDE.md, regla 1)"
+    ]
+
+
+def test_decision_confirmar_imprime_el_resultado(
+    protocolo_de_estudio: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    ejecutar_decision_registrar(_archivo_decision(tmp_path), protocolo_de_estudio)
+    ejecutar_decision_registrar(
+        _archivo_decision(tmp_path, id_decision="O1b", reemplaza="O1"), protocolo_de_estudio
+    )
+    ejecutar_decision_registrar(
+        _archivo_decision(
+            tmp_path, id_decision="O2", decidido_por={"tipo": "humano", "id": "investigador-2"}
+        ),
+        protocolo_de_estudio,
+    )
+    capsys.readouterr()
+    terminal = TerminalSimulada(["confirmar 1"])
+
+    codigo = ejecutar_decision_confirmar(
+        "investigador-1", protocolo_de_estudio, terminal=terminal, reloj=reloj_incremental()
+    )
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "decisiones confirmadas por investigador-1: O1b" in salida
+    assert "anclaje: evt-000004@sha256:" in salida
+    assert "pendientes de otros revisores: O2" in salida
+    assert "  reemplaza a: O1" in terminal.texto
+
+
+def test_decision_confirmar_sin_pendientes(
+    protocolo_de_estudio: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    codigo = ejecutar_decision_confirmar(
+        "investigador-1", protocolo_de_estudio, terminal=TerminalSimulada(interactiva=False)
+    )
+
+    assert codigo == 0
+    assert capsys.readouterr().out == "no hay decisiones pendientes de investigador-1\n"
+
+
+def test_decision_confirmar_en_json(
+    protocolo_de_estudio: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    ejecutar_decision_registrar(_archivo_decision(tmp_path), protocolo_de_estudio)
+    capsys.readouterr()
+
+    codigo = ejecutar_decision_confirmar(
+        "investigador-1",
+        protocolo_de_estudio,
+        como_json=True,
+        terminal=TerminalSimulada(["confirmar 1"]),
+    )
+
+    datos = _json(capsys)
+    assert codigo == 0
+    assert datos["comando"] == "protocolo decision confirmar"
+    assert datos["resultado"]["confirmadas"] == ["O1"]
+
+
+def test_el_analizador_de_decisiones(tmp_path: Path) -> None:
+    registrar = construir_analizador().parse_args(
+        ["protocolo", "decision", "registrar", "--archivo", "d.json", "--protocolo", "p.yaml"]
+    )
+    confirmar = construir_analizador().parse_args(
+        ["protocolo", "decision", "confirmar", "--confirmado-por", "investigador-1", "--json"]
+    )
+
+    assert registrar.accion == "registrar"
+    assert registrar.archivo == Path("d.json")
+    assert registrar.protocolo == Path("p.yaml")
+    assert confirmar.accion == "confirmar"
+    assert confirmar.confirmado_por == "investigador-1"
+    assert confirmar.protocolo == Path("protocolo") / "protocolo.yaml"
+    assert confirmar.como_json is True
+
+
+@pytest.mark.parametrize(
+    "argumentos",
+    [
+        ["protocolo", "decision"],
+        ["protocolo", "decision", "registrar"],
+        ["protocolo", "decision", "confirmar"],
+    ],
+)
+def test_el_analizador_exige_la_accion_y_sus_opciones(argumentos: list[str]) -> None:
+    with pytest.raises(SystemExit) as salida:
+        construir_analizador().parse_args(argumentos)
+
+    assert salida.value.code == 2
+
+
+def test_main_decision_registrar_y_confirmar_sin_terminal(
+    protocolo_de_estudio: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    archivo = _archivo_decision(tmp_path)
+    base = ["agentresearch", "protocolo", "decision"]
+    protocolo = ["--protocolo", str(protocolo_de_estudio)]
+
+    monkeypatch.setattr(sys, "argv", [*base, "registrar", "--archivo", str(archivo), *protocolo])
+    with pytest.raises(SystemExit) as registro:
+        main()
+    monkeypatch.setattr(
+        sys, "argv", [*base, "confirmar", "--confirmado-por", "investigador-1", *protocolo]
+    )
+    with pytest.raises(SystemExit) as confirmacion:
+        main()
+
+    assert registro.value.code == 0
+    assert confirmacion.value.code == 1
+    assert "exige una terminal interactiva" in capsys.readouterr().out
 
 
 # --- Subproceso: la barrera frente a las herramientas del LLM -----------------------

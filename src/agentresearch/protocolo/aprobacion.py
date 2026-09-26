@@ -135,7 +135,7 @@ def aprobar(
     investigador no confirma. En ambos casos no escribe nada.
     """
     rutas = RutasProtocolo.desde(ruta)
-    lectura, registro, validacion = _leer_y_validar(rutas)
+    lectura, registro, validacion = leer_y_validar(rutas)
     documento = _documento_sin_errores(lectura, validacion)
     protocolo = documento.protocolo
 
@@ -155,7 +155,7 @@ def aprobar(
             f"un borrador lleva una versión 0.y.z, y este tiene la {version_anterior}; la "
             f"aprobación fija la versión {VERSION_APROBADA}"
         )
-    errores += _problemas_de_persona(protocolo, aprobado_por, "--aprobado-por")
+    errores += problemas_de_persona(protocolo, aprobado_por, "--aprobado-por")
     errores += _problemas_de_pendientes(registro)
     justificadas: dict[tuple[str, str | None], str] = {}
     if justificaciones is not None:
@@ -168,7 +168,7 @@ def aprobar(
 
     contenido_nuevo = _nuevo_texto(documento, "vigente", VERSION_APROBADA)
     hash_protocolo = hash_bytes(contenido_nuevo)
-    _exigir_terminal(terminal)
+    exigir_terminal(terminal)
 
     terminal.mostrar(
         _resumen_aprobacion(
@@ -176,12 +176,12 @@ def aprobar(
         )
     )
     advertencias = _justificar_advertencias(terminal, validacion.advertencias, justificadas)
-    _confirmar_frase(terminal, f"aprobar {VERSION_APROBADA}")
+    confirmar_frase(terminal, f"aprobar {VERSION_APROBADA}")
 
     datos = DatosAprobado(
         version_anterior=version_anterior,
         version_protocolo=VERSION_APROBADA,
-        hash_revisado=_hash_leido(lectura),
+        hash_revisado=hash_leido(lectura),
         hash_protocolo=hash_protocolo,
         ruta_protocolo=rutas.relativa(rutas.protocolo),
         ruta_version=rutas.relativa(rutas.copia_de_version(VERSION_APROBADA)),
@@ -217,7 +217,7 @@ def _resumen_aprobacion(
             f"Aprobación del protocolo {rutas.relativa(rutas.protocolo)}",
             f"  título: {protocolo.metadatos.titulo}",
             f"  versión: {version_anterior} → {VERSION_APROBADA} (borrador → vigente)",
-            f"  hash del archivo revisado: {_hash_leido(lectura)}",
+            f"  hash del archivo revisado: {hash_leido(lectura)}",
             f"  hash del protocolo aprobado: {hash_protocolo}",
             f"  aprobado por: {aprobado_por}",
             f"  decisiones confirmadas: {', '.join(confirmadas) if confirmadas else 'ninguna'}",
@@ -388,7 +388,7 @@ def enmendar(
     if enmendado_por is None:
         errores.append("falta --enmendado-por")
     else:
-        errores += _problemas_de_persona(
+        errores += problemas_de_persona(
             enmienda.documento.protocolo, enmendado_por, "--enmendado-por"
         )
     textos: tuple[str, str] | None = None
@@ -405,7 +405,7 @@ def enmendar(
     version = propuesta.version_siguiente
     contenido_nuevo = _nuevo_texto(enmienda.documento, "vigente", version)
     hash_protocolo = hash_bytes(contenido_nuevo)
-    _exigir_terminal(terminal)
+    exigir_terminal(terminal)
 
     rutas = enmienda.rutas
     terminal.mostrar(
@@ -413,14 +413,14 @@ def enmendar(
             enmienda, hash_protocolo, enmendado_por, texto_justificacion, texto_efecto
         )
     )
-    _confirmar_frase(terminal, f"enmendar {version}")
+    confirmar_frase(terminal, f"enmendar {version}")
 
     datos = DatosEnmendado(
         version_anterior=enmienda.ultima.version,
         version_protocolo=version,
         nivel=propuesta.nivel,
         hash_protocolo_anterior=enmienda.ultima.hash_protocolo,
-        hash_revisado=_hash_leido(enmienda.lectura),
+        hash_revisado=hash_leido(enmienda.lectura),
         hash_protocolo=hash_protocolo,
         ruta_protocolo=rutas.relativa(rutas.protocolo),
         ruta_version=rutas.relativa(rutas.copia_de_version(version)),
@@ -454,7 +454,7 @@ def enmendar(
 
 
 def _preparar_enmienda(rutas: RutasProtocolo, nivel: NivelElegido | None) -> _Enmienda:
-    lectura, registro, validacion = _leer_y_validar(rutas)
+    lectura, registro, validacion = leer_y_validar(rutas)
     ultima = registro.ultima_version
     protocolo_rel = rutas.relativa(rutas.protocolo)
 
@@ -562,7 +562,7 @@ def _resumen_enmienda(
         f"  versión: {propuesta.version_registrada} → {propuesta.version_siguiente} "
         f"(nivel {propuesta.nivel})",
         f"  hash de la versión registrada: {enmienda.ultima.hash_protocolo}",
-        f"  hash del archivo revisado: {_hash_leido(enmienda.lectura)}",
+        f"  hash del archivo revisado: {hash_leido(enmienda.lectura)}",
         f"  hash del protocolo enmendado: {hash_protocolo}",
         f"  enmendado por: {enmendado_por}",
         f"  justificación: {justificacion}",
@@ -585,7 +585,7 @@ def texto_de_cambios(cambios: list[Cambio]) -> list[str]:
 # --- Piezas compartidas con la enmienda ---------------------------------------------
 
 
-def _leer_y_validar(
+def leer_y_validar(
     rutas: RutasProtocolo,
 ) -> tuple[LecturaProtocolo, EstadoRegistro, ResultadoValidacion]:
     lectura = leer_para_validar(rutas.protocolo)
@@ -605,12 +605,12 @@ def _documento_sin_errores(
     return lectura.documento
 
 
-def _hash_leido(lectura: LecturaProtocolo) -> str:
+def hash_leido(lectura: LecturaProtocolo) -> str:
     assert lectura.hash is not None  # hay documento, así que se leyeron los bytes
     return lectura.hash
 
 
-def _problemas_de_persona(protocolo: Protocolo, id_persona: str, opcion: str) -> list[str]:
+def problemas_de_persona(protocolo: Protocolo, id_persona: str, opcion: str) -> list[str]:
     """Exige que `id_persona` sea un revisor humano declarado en `seleccion.revisores`."""
     revisores = {revisor.id: revisor.tipo for revisor in protocolo.seleccion.revisores}
     humanos = [id_revisor for id_revisor, tipo in revisores.items() if tipo == "humano"]
@@ -656,12 +656,12 @@ def _nuevo_texto(documento: DocumentoProtocolo, estado: EstadoProtocolo, version
     return contenido
 
 
-def _exigir_terminal(terminal: Terminal) -> None:
+def exigir_terminal(terminal: Terminal) -> None:
     if not terminal.es_interactiva():
         raise ErrorCicloDeVida([MENSAJE_SIN_TERMINAL])
 
 
-def _confirmar_frase(terminal: Terminal, frase: str) -> None:
+def confirmar_frase(terminal: Terminal, frase: str) -> None:
     respuesta = terminal.preguntar(
         f"Escriba «{frase}» para confirmar, o cualquier otra cosa para cancelar: "
     )

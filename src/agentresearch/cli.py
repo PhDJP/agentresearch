@@ -21,6 +21,11 @@ from agentresearch.protocolo.aprobacion import (
     simular_enmienda,
     texto_de_cambios,
 )
+from agentresearch.protocolo.decisiones import (
+    ResultadoConfirmacion,
+    confirmar_decisiones,
+    registrar_decision,
+)
 from agentresearch.protocolo.terminal import Terminal, TerminalDelSistema
 from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
 
@@ -109,7 +114,46 @@ def construir_analizador() -> argparse.ArgumentParser:
     )
     _argumento_json(enmendar_parser)
 
+    decision = subcomandos_protocolo.add_parser(
+        "decision", help="Decisiones del protocolo: registrar la propuesta y confirmarla"
+    )
+    subcomandos_decision = decision.add_subparsers(dest="accion", required=True)
+    registrar = subcomandos_decision.add_parser(
+        "registrar", help="Registra una decisión como propuesta pendiente de confirmar"
+    )
+    registrar.add_argument(
+        "--archivo",
+        type=Path,
+        required=True,
+        metavar="ARCHIVO",
+        help="JSON con la decisión: opciones, elegida, justificación y quién propuso y decidió",
+    )
+    _argumento_protocolo(registrar)
+    _argumento_json(registrar)
+    confirmar = subcomandos_decision.add_parser(
+        "confirmar",
+        help="Confirma en lote las decisiones pendientes (exige una terminal interactiva)",
+    )
+    confirmar.add_argument(
+        "--confirmado-por",
+        required=True,
+        metavar="ID",
+        help="revisor humano que decidió; se confirman sus decisiones pendientes",
+    )
+    _argumento_protocolo(confirmar)
+    _argumento_json(confirmar)
+
     return analizador
+
+
+def _argumento_protocolo(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--protocolo",
+        type=Path,
+        default=RUTA_PROTOCOLO_POR_DEFECTO,
+        metavar="RUTA",
+        help=f"archivo del protocolo (por defecto, {RUTA_PROTOCOLO_POR_DEFECTO.as_posix()})",
+    )
 
 
 def _argumento_ruta(parser: argparse.ArgumentParser) -> None:
@@ -260,6 +304,57 @@ def _ejecutar_simulacion(ruta: Path, nivel: NivelElegido | None, como_json: bool
     return 0
 
 
+def ejecutar_decision_registrar(
+    archivo: Path,
+    protocolo: Path = RUTA_PROTOCOLO_POR_DEFECTO,
+    como_json: bool = False,
+    reloj: Reloj | None = None,
+) -> int:
+    """Registra una decisión del protocolo como propuesta pendiente de confirmar."""
+    return _ejecutar_operacion(
+        "protocolo decision registrar",
+        como_json,
+        lambda: registrar_decision(protocolo, archivo, reloj),
+        lambda resultado: [
+            f"decisión {resultado.id_decision} registrada como propuesta "
+            f"({resultado.evento.id}); queda pendiente de confirmar",
+            "el investigador la confirma en su terminal con: agentresearch protocolo decision "
+            "confirmar --confirmado-por <id>",
+            f"anclaje: {resultado.anclaje}",
+        ],
+    )
+
+
+def ejecutar_decision_confirmar(
+    confirmado_por: str,
+    protocolo: Path = RUTA_PROTOCOLO_POR_DEFECTO,
+    como_json: bool = False,
+    terminal: Terminal | None = None,
+    reloj: Reloj | None = None,
+) -> int:
+    """Confirma en lote las decisiones pendientes tras la confirmación interactiva."""
+    return _ejecutar_operacion(
+        "protocolo decision confirmar",
+        como_json,
+        lambda: confirmar_decisiones(protocolo, confirmado_por, _terminal(terminal), reloj),
+        _describir_confirmacion,
+    )
+
+
+def _describir_confirmacion(resultado: ResultadoConfirmacion) -> list[str]:
+    if not resultado.eventos:
+        lineas = [f"no hay decisiones pendientes de {resultado.confirmado_por}"]
+    else:
+        lineas = [
+            f"decisiones confirmadas por {resultado.confirmado_por}: "
+            f"{', '.join(resultado.confirmadas)}",
+            f"anclaje: {resultado.anclaje}",
+        ]
+    if resultado.pendientes_de_otros:
+        lineas.append(f"pendientes de otros revisores: {', '.join(resultado.pendientes_de_otros)}")
+    return lineas
+
+
 def _terminal(terminal: Terminal | None) -> Terminal:
     return terminal if terminal is not None else TerminalDelSistema()
 
@@ -381,6 +476,19 @@ def main() -> None:
                 argumentos.archivo_enmienda,
                 argumentos.simular,
                 argumentos.como_json,
+            )
+        )
+
+    if argumentos.comando == "protocolo" and argumentos.subcomando == "decision":
+        if argumentos.accion == "registrar":
+            sys.exit(
+                ejecutar_decision_registrar(
+                    argumentos.archivo, argumentos.protocolo, argumentos.como_json
+                )
+            )
+        sys.exit(
+            ejecutar_decision_confirmar(
+                argumentos.confirmado_por, argumentos.protocolo, argumentos.como_json
             )
         )
 
