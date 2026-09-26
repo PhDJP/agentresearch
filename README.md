@@ -2,7 +2,7 @@
 
 Agente investigador para estudios de mapeo sistemático de la literatura. Combina las guías de Kitchenham y de Petersen con el reporte PRISMA-ScR, y funciona con Claude Code y recursos gratuitos.
 
-> **Estado:** en construcción (hito 0). Todavía no debe usarse en estudios reales.
+> **Estado:** en construcción. El hito 0 (base técnica, versión 0.0.1) está completo. Las funciones de mapeo se incorporan hito a hito, y cada una se valida en un estudio real (el caso piloto) antes de darse por terminada. Mientras tanto, solo debe usarse lo que aparece en "Disponible hoy". Ver la [hoja de ruta](docs/hoja_de_ruta.md).
 
 ## Para quién
 
@@ -19,7 +19,15 @@ Para investigadores que quieren hacer un mapeo sistemático riguroso sin pagar A
 - Todo lo determinista lo hace código probado; el modelo de lenguaje interviene solo donde hace falta juicio.
 - Los reportes (diagrama de flujo y checklist PRISMA-ScR, declaración de uso de IA) se generan desde los datos, no a mano.
 
-## Cómo funciona
+## Disponible hoy
+
+- CLI mínima: `uv run agentresearch --version`.
+- Pruebas, estilo (ruff) y tipos (mypy estricto), verificados en integración continua sobre Windows y Ubuntu.
+- Documentación metodológica, de arquitectura y de decisiones (ADR).
+
+## Cómo funcionará (diseño en construcción)
+
+Este es el flujo previsto. Cada paso estará disponible cuando se cierre su hito.
 
 1. El investigador abre su repositorio de estudio en VS Code con Claude Code.
 2. El agente lo entrevista para construir el protocolo: preguntas, marco PCC (con equivalencia PICOC), ecuaciones de búsqueda y criterios. Cuando falta información, propone opciones fundamentadas.
@@ -41,7 +49,8 @@ Detalle en [docs/arquitectura.md](docs/arquitectura.md).
    winget install --id GitHub.cli
    gh auth login
    ```
-4. Cuando exista el código: `uv sync` para crear el entorno y `uv run pytest` para correr las pruebas.
+4. Clonar el repositorio y ejecutar `uv sync` para crear el entorno.
+5. Ejecutar siempre los comandos con `uv run` (por ejemplo `uv run agentresearch --version` o `uv run pytest`). Así se usa el entorno del proyecto con el paquete instalado; ejecutar los archivos de Python directamente no está soportado.
 
 ## Documentación
 
@@ -53,4 +62,4 @@ Detalle en [docs/arquitectura.md](docs/arquitectura.md).
 
 ## Licencia y cita
 
-El código se publicará con licencia MIT, y los datos y reportes de los estudios con CC BY 4.0. Los archivos `LICENSE` y `CITATION.cff` se agregan en el hito 0.
+El código se publica con licencia MIT ([LICENSE](LICENSE)), y los datos y reportes de los estudios con CC BY 4.0. Para citar el software, ver [CITATION.cff](CITATION.cff).
