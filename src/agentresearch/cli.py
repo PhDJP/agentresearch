@@ -8,7 +8,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from agentresearch.protocolo import validar_archivo
-from agentresearch.trazabilidad import RegistroEncadenado
+from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
 
 RUTA_PROTOCOLO_POR_DEFECTO = Path("protocolo") / "protocolo.yaml"
 
@@ -30,6 +30,11 @@ def construir_analizador() -> argparse.ArgumentParser:
         "verificar", help="Verifica la integridad de un registro encadenado"
     )
     verificar.add_argument("archivo", type=Path)
+    verificar.add_argument(
+        "--anclaje",
+        type=_anclaje_argumento,
+        help="exige que el registro cumpla este anclaje (evt-NNNNNN@sha256:<hex>)",
+    )
 
     protocolo = subcomandos.add_parser("protocolo", help="Operaciones sobre el protocolo")
     subcomandos_protocolo = protocolo.add_subparsers(dest="subcomando", required=True)
@@ -54,11 +59,22 @@ def construir_analizador() -> argparse.ArgumentParser:
     return analizador
 
 
-def ejecutar_registro_verificar(archivo: Path) -> int:
+def _anclaje_argumento(texto: str) -> Anclaje:
+    try:
+        return Anclaje.desde_texto(texto)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from None
+
+
+def ejecutar_registro_verificar(archivo: Path, anclaje: Anclaje | None = None) -> int:
     """Verifica un registro encadenado e imprime el resultado. Devuelve el código de salida."""
-    resultado = RegistroEncadenado(archivo).verificar()
+    registro = RegistroEncadenado(archivo)
+    resultado = registro.verificar(anclaje)
     if resultado.valido:
         print(f"íntegro: {archivo}")
+        if anclaje is not None:
+            print(f"cumple el anclaje: {anclaje}")
+        print(f"anclaje actual: {registro.anclaje()}")
         return 0
     if resultado.numero_linea_error is not None:
         print(f"inválido en la línea {resultado.numero_linea_error}: {resultado.mensaje}")
@@ -113,7 +129,7 @@ def main() -> None:
         return
 
     if argumentos.comando == "registro" and argumentos.subcomando == "verificar":
-        sys.exit(ejecutar_registro_verificar(argumentos.archivo))
+        sys.exit(ejecutar_registro_verificar(argumentos.archivo, argumentos.anclaje))
 
     if argumentos.comando == "protocolo" and argumentos.subcomando == "validar":
         sys.exit(ejecutar_protocolo_validar(argumentos.ruta, argumentos.como_json))

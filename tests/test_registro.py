@@ -1,13 +1,19 @@
 """Pruebas del registro encadenado de eventos."""
 
 import json
+import os
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from agentresearch.trazabilidad.registro import RegistroEncadenado, formatear_fecha_hora_utc
+from agentresearch.trazabilidad.registro import (
+    HASH_GENESIS,
+    Anclaje,
+    RegistroEncadenado,
+    formatear_fecha_hora_utc,
+)
 
 INICIO = datetime(2026, 9, 26, 12, 0, 0, tzinfo=UTC)
 
@@ -148,6 +154,47 @@ def test_verificar_detecta_json_invalido_o_linea_truncada(tmp_path: Path) -> Non
     assert resultado.numero_linea_error == 2
 
 
+def test_verificar_detecta_una_linea_json_que_no_es_un_objeto(tmp_path: Path) -> None:
+    ruta = tmp_path / "eventos.jsonl"
+    RegistroEncadenado(ruta, reloj=_reloj_incremental(INICIO)).agregar("uno", {})
+    with ruta.open("a", encoding="utf-8", newline="\n") as archivo:
+        archivo.write("[1, 2]\n")
+
+    resultado = RegistroEncadenado(ruta).verificar()
+
+    assert not resultado.valido
+    assert resultado.numero_linea_error == 2
+    assert "objeto JSON" in (resultado.mensaje or "")
+
+
+def test_verificar_ignora_las_lineas_vacias(tmp_path: Path) -> None:
+    ruta = tmp_path / "eventos.jsonl"
+    registro = RegistroEncadenado(ruta, reloj=_reloj_incremental(INICIO))
+    registro.agregar("uno", {})
+    with ruta.open("a", encoding="utf-8", newline="\n") as archivo:
+        archivo.write("\n")
+
+    assert registro.verificar().valido
+
+
+def test_verificar_detecta_un_hash_anterior_que_no_encadena(tmp_path: Path) -> None:
+    ruta = tmp_path / "eventos.jsonl"
+    registro = RegistroEncadenado(ruta, reloj=_reloj_incremental(INICIO))
+    registro.agregar("uno", {})
+    registro.agregar("dos", {})
+    lineas = ruta.read_text(encoding="utf-8").splitlines()
+    segundo = json.loads(lineas[1])
+    segundo["hash_anterior"] = "sha256:" + "0" * 64
+    lineas[1] = json.dumps(segundo, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    ruta.write_text("\n".join(lineas) + "\n", encoding="utf-8", newline="\n")
+
+    resultado = registro.verificar()
+
+    assert not resultado.valido
+    assert resultado.numero_linea_error == 2
+    assert "hash_anterior" in (resultado.mensaje or "")
+
+
 def test_serializacion_es_identica_en_ejecuciones_repetidas(tmp_path: Path) -> None:
     registro_a = RegistroEncadenado(tmp_path / "a.jsonl", reloj=_reloj_fijo(INICIO))
     registro_b = RegistroEncadenado(tmp_path / "b.jsonl", reloj=_reloj_fijo(INICIO))
@@ -258,3 +305,144 @@ def test_agregar_rechaza_si_el_archivo_no_termina_en_salto_de_linea(tmp_path: Pa
 
     with pytest.raises(ValueError, match="salto de línea"):
         registro.agregar("dos", {})
+
+
+# --- Anclaje (ADR-0006, punto 10; ADR-0008, puntos 19 a 21) --------------------
+
+
+def _registro_con_eventos(ruta: Path, cantidad: int) -> RegistroEncadenado:
+    registro = RegistroEncadenado(ruta, reloj=_reloj_incremental(INICIO))
+    for numero in range(cantidad):
+        registro.agregar(f"evento-{numero}", {"n": numero})
+    return registro
+
+
+def test_anclaje_de_un_registro_vacio_usa_el_hash_genesis(tmp_path: Path) -> None:
+    anclaje = RegistroEncadenado(tmp_path / "no_existe.jsonl").anclaje()
+
+    assert anclaje == Anclaje(0, HASH_GENESIS)
+    assert str(anclaje) == "evt-000000@sha256:genesis"
+
+
+def test_anclaje_tiene_el_numero_de_eventos_y_el_hash_del_ultimo(tmp_path: Path) -> None:
+    registro = _registro_con_eventos(tmp_path / "eventos.jsonl", 3)
+
+    anclaje = registro.anclaje()
+
+    assert anclaje.numero_eventos == 3
+    assert anclaje.hash_ultimo == registro.leer()[-1].hash
+    assert str(anclaje).startswith("evt-000003@sha256:")
+
+
+def test_anclaje_se_interpreta_desde_su_texto(tmp_path: Path) -> None:
+    anclaje = _registro_con_eventos(tmp_path / "eventos.jsonl", 2).anclaje()
+
+    assert Anclaje.desde_texto(str(anclaje)) == anclaje
+    assert Anclaje.desde_texto(f"  {anclaje}\n") == anclaje
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "",
+        "evt-3@sha256:" + "a" * 64,
+        "evt-000003:sha256:" + "a" * 64,
+        "evt-000003@sha256:" + "A" * 64,
+        "evt-000003@sha256:abc",
+        "evt-000003@sha256:genesis",
+        "evt-000000@sha256:" + "a" * 64,
+    ],
+)
+def test_anclaje_rechaza_textos_no_validos(texto: str) -> None:
+    with pytest.raises(ValueError):
+        Anclaje.desde_texto(texto)
+
+
+def test_anclaje_rechaza_un_numero_negativo() -> None:
+    with pytest.raises(ValueError, match="negativo"):
+        Anclaje(-1, HASH_GENESIS)
+
+
+def test_verificar_acepta_el_anclaje_actual(tmp_path: Path) -> None:
+    registro = _registro_con_eventos(tmp_path / "eventos.jsonl", 3)
+
+    assert registro.verificar(registro.anclaje()).valido
+
+
+def test_verificar_acepta_un_anclaje_anterior_como_prefijo(tmp_path: Path) -> None:
+    ruta = tmp_path / "eventos.jsonl"
+    registro = _registro_con_eventos(ruta, 2)
+    anclaje_anterior = registro.anclaje()
+    registro.agregar("posterior", {})
+
+    assert registro.verificar(anclaje_anterior).valido
+
+
+def test_verificar_con_anclaje_detecta_la_eliminacion_de_eventos_finales(
+    tmp_path: Path,
+) -> None:
+    ruta = tmp_path / "eventos.jsonl"
+    registro = _registro_con_eventos(ruta, 3)
+    anclaje = registro.anclaje()
+    lineas = ruta.read_text(encoding="utf-8").splitlines()
+    ruta.write_text("\n".join(lineas[:-1]) + "\n", encoding="utf-8", newline="\n")
+
+    assert registro.verificar().valido  # sin anclaje, el truncamiento pasa inadvertido
+    resultado = registro.verificar(anclaje)
+
+    assert not resultado.valido
+    assert resultado.numero_linea_error is None
+    assert "2 eventos" in (resultado.mensaje or "")
+    assert "se eliminaron eventos del final" in (resultado.mensaje or "")
+
+
+def test_verificar_con_anclaje_detecta_un_registro_reconstruido(tmp_path: Path) -> None:
+    """Un registro recalculado desde cero es íntegro, pero no cumple el anclaje original."""
+    ruta = tmp_path / "eventos.jsonl"
+    anclaje = _registro_con_eventos(ruta, 2).anclaje()
+    ruta.unlink()
+    registro = RegistroEncadenado(ruta, reloj=_reloj_fijo(INICIO))
+    registro.agregar("otro", {})
+    registro.agregar("otro", {})
+
+    resultado = registro.verificar(anclaje)
+
+    assert not resultado.valido
+    assert resultado.numero_linea_error == 2
+    assert "evt-000002" in (resultado.mensaje or "")
+
+
+def test_verificar_con_anclaje_vacio_acepta_cualquier_registro_integro(tmp_path: Path) -> None:
+    registro = _registro_con_eventos(tmp_path / "eventos.jsonl", 1)
+
+    assert registro.verificar(Anclaje(0, HASH_GENESIS)).valido
+
+
+def test_verificar_con_anclaje_informa_primero_la_cadena_rota(tmp_path: Path) -> None:
+    ruta = tmp_path / "eventos.jsonl"
+    registro = _registro_con_eventos(ruta, 2)
+    anclaje = registro.anclaje()
+    contenido = ruta.read_text(encoding="utf-8").replace('"evento-0"', '"otro"')
+    ruta.write_text(contenido, encoding="utf-8", newline="\n")
+
+    resultado = registro.verificar(anclaje)
+
+    assert not resultado.valido
+    assert resultado.numero_linea_error == 1
+
+
+def test_agregar_sincroniza_el_evento_a_disco(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sincronizados: list[int] = []
+    fsync_original = os.fsync
+
+    def _fsync(descriptor: int) -> None:
+        sincronizados.append(descriptor)
+        fsync_original(descriptor)
+
+    monkeypatch.setattr(os, "fsync", _fsync)
+
+    RegistroEncadenado(tmp_path / "eventos.jsonl").agregar("uno", {})
+
+    assert len(sincronizados) == 1
