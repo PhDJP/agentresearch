@@ -117,12 +117,13 @@ estrategias:
   criterio_parada: {tipo: umbral_nuevos, valor: 0, justificacion: ""}
 busqueda:                       # PRISMA-ScR 8
   bloques:                      # AND entre bloques, OR dentro de cada bloque
-    - {id: B1, nombre: "", terminos: []}
+    - {id: B1, nombre: "", componente: poblacion, terminos: []}   # poblacion | concepto | contexto | otro
   periodo: {desde: null, hasta: null, justificacion: ""}
-  idiomas: []
+  idiomas: {valores: [], justificacion: ""}
   tipos_documento: []
 criterios:                      # PRISMA-ScR 6
   inclusion: [{id: CI1, texto: "", fase: titulo_resumen, tipo: tema, ejemplos_si: [], ejemplos_no: []}]
+  # tipo: tema | lugar_publicacion | periodo | evaluacion_empirica | idioma | tipo_documento | otro
   exclusion: [{id: CE1, texto: "", fase: ambas, tipo: tema, ejemplos_si: [], ejemplos_no: []}]
 seleccion:                      # PRISMA-ScR 9
   revisores: [{id: investigador-1, tipo: humano}, {id: claude, tipo: llm}]
@@ -148,6 +149,7 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
 
 | ID | Regla |
 |---|---|
+| P-E00 | El archivo es legible, es YAML válido y cumple el esquema (en YAML mal formado, con línea y columna). Si falla, no se evalúan las demás reglas |
 | P-E01 | IDs únicos y con el patrón de su tipo: `PI`, `CI`, `CE`, `DE`, `F`, `B` seguidos de un número |
 | P-E02 | Toda referencia (`responde_con`, `derivada_de`, `preguntas`, `cruces`) apunta a un ID existente |
 | P-E03 | Cada pregunta descriptiva tiene al menos un dato que la responde; cada pregunta analítica declara de qué cruces se deriva |
@@ -170,6 +172,13 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
 | P-A07 | Acrónimo corto (4 letras o menos, en mayúsculas) suelto en un bloque, con riesgo de colisión (p. ej. "CBD") | Lección del ejercicio previo del caso piloto |
 | P-A08 | Sin un segundo revisor humano para el piloto de cribado | Petersen et al. (2015), §5.1.2 |
 
+Ajustes aprobados al implementar 1b (2026-09-26); el detalle está en el [ADR-0006](../decisiones/0006-formato-del-protocolo-y-registro-encadenado.md):
+
+- **Esquema.** El tipo de criterio es una enumeración (tipos a–e de Petersen et al., 2015, §5.1.2, más `tipo_documento` y `otro`). Cada bloque declara su componente PCC. `idiomas` tiene la forma `{valores, justificacion}`, y el periodo se expresa en años. Cada cruce tiene al menos dos IDs, y `version_protocolo` sigue la forma `X.Y.Z`.
+- **Referencias de los errores.** P-E01: CLAUDE.md, regla 2. P-E02: reglas metodológicas, §2. P-E03: Petersen et al. (2015), tabla 3. P-E04: PRISMA-ScR, ítems 4 y 8; Peters et al. (2024), JBI. P-E05: PRISMA-ScR, ítem 6. P-E06: Petersen et al. (2015), tabla 6. P-E07: CLAUDE.md, regla 1; declaración conjunta Cochrane, Campbell, JBI y CEE (2025). P-E08: Landis y Koch (1977).
+- **Precisiones de las advertencias.** P-A01 también salta con criterios de exclusión de tipo `evaluacion_empirica`. P-A02 detecta el contexto restrictivo, los bloques de componente `contexto` y los términos de contexto repetidos en otro bloque. P-A07 salta con o sin comillas. P-A08 salta con un solo revisor humano; sin ninguno, ya salta P-E07.
+- **Salida `--json`.** Incluye la versión del agente y el hash del archivo.
+
 ### CLI y pruebas
 
 - **CLI:** `agentresearch protocolo validar [ruta] [--json]`. Sale con código 1 si hay errores y 0 si solo hay advertencias. La salida en JSON sirve para que Claude Code la interprete.
@@ -180,6 +189,8 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
   - mensajes con ID de regla y referencia.
 
 ## 1c. Ciclo de vida del protocolo
+
+Las decisiones de este sub-hito (estados, eventos que se registran, P-E09 y anclaje del registro) se documentan en el ADR-0008, no en el ADR-0006, que quedó aceptado al cerrar 1b.
 
 **Estados:** `borrador` → `vigente`. Los eventos se registran en `protocolo/eventos.jsonl` con el registro encadenado de 1a.
 
@@ -212,6 +223,7 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
   - que `elegida` exista entre ellas;
   - que `decidido_por.tipo` sea `humano`.
 - **`agentresearch protocolo historial`** lista versiones, enmiendas y decisiones. Alimenta los ítems 5 (protocolo) y 20 (desviaciones) de PRISMA-ScR.
+- **Anclaje del registro** (punto 10 del ADR-0006): `protocolo historial` y los reportes muestran el número de eventos y el hash del último, para detectar la eliminación de eventos finales.
 - **Pruebas:** aprobar con errores falla; editar un protocolo vigente sin enmienda produce P-E09; una enmienda incrementa la versión y registra el diff; una decisión tomada por un LLM se rechaza.
 
 ## 1d. Ecuaciones de búsqueda por fuente
@@ -269,8 +281,9 @@ Se implementa como comando o *skill* de Claude Code, según lo que la versión a
 
 ## ADR que el hito 1 debe producir
 
-- **ADR-0006:** formato del protocolo (YAML, esquema pydantic y versión de esquema) y registro encadenado de eventos.
+- **ADR-0006:** formato del protocolo (YAML, esquema pydantic y versión de esquema) y registro encadenado de eventos. Aceptado al cerrar 1b.
 - **ADR-0007:** repositorio de estudio. Cubre su estructura, la instalación del agente fijada a una etiqueta, comando o *skill* de Claude Code, y la visibilidad privada hasta registrar el protocolo.
+- **ADR-0008:** ciclo de vida del protocolo. Cubre los estados, la aprobación, las enmiendas y su diff estructural, los eventos que se registran, las decisiones del protocolo, la regla P-E09 y el anclaje del registro encadenado.
 
 ## Criterio de terminado del hito 1
 
@@ -280,6 +293,6 @@ Se implementa como comando o *skill* de Claude Code, según lo que la versión a
   uv run coverage report --include="src/agentresearch/trazabilidad/*,src/agentresearch/protocolo/*" --fail-under=90
   ```
 - CI en verde en Windows y Ubuntu.
-- ADR 0006 y 0007, y `CHANGELOG.md` actualizado.
+- ADR 0006, 0007 y 0008, y `CHANGELOG.md` actualizado.
 - Etiqueta `v0.1.0`.
 - Protocolo del caso piloto aprobado.

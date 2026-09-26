@@ -21,7 +21,9 @@ Para investigadores que quieren hacer un mapeo sistemático riguroso sin pagar A
 
 ## Disponible hoy
 
-- CLI mínima: `uv run agentresearch --version`.
+- CLI: `uv run agentresearch --version`.
+- Verificación de un registro encadenado de eventos: `uv run agentresearch registro verificar <archivo.jsonl>`.
+- Validación de un protocolo en YAML contra su esquema y las reglas metodológicas (errores P-E00 a P-E08 y advertencias P-A01 a P-A08): `uv run agentresearch protocolo validar [ruta] [--json]`. La plantilla comentada del protocolo viene en el paquete.
 - Pruebas, estilo (ruff) y tipos (mypy estricto), verificados en integración continua sobre Windows y Ubuntu.
 - Documentación metodológica, de arquitectura y de decisiones (ADR).
 
