@@ -1,11 +1,16 @@
 """Interfaz de línea de comandos de agentresearch."""
 
 import argparse
+import io
+import json
 import sys
 from importlib.metadata import version
 from pathlib import Path
 
+from agentresearch.protocolo import validar_archivo
 from agentresearch.trazabilidad import RegistroEncadenado
+
+RUTA_PROTOCOLO_POR_DEFECTO = Path("protocolo") / "protocolo.yaml"
 
 
 def construir_analizador() -> argparse.ArgumentParser:
@@ -26,6 +31,26 @@ def construir_analizador() -> argparse.ArgumentParser:
     )
     verificar.add_argument("archivo", type=Path)
 
+    protocolo = subcomandos.add_parser("protocolo", help="Operaciones sobre el protocolo")
+    subcomandos_protocolo = protocolo.add_subparsers(dest="subcomando", required=True)
+
+    validar = subcomandos_protocolo.add_parser(
+        "validar", help="Valida el protocolo contra el esquema y las reglas metodológicas"
+    )
+    validar.add_argument(
+        "ruta",
+        type=Path,
+        nargs="?",
+        default=RUTA_PROTOCOLO_POR_DEFECTO,
+        help=f"archivo del protocolo (por defecto, {RUTA_PROTOCOLO_POR_DEFECTO.as_posix()})",
+    )
+    validar.add_argument(
+        "--json",
+        dest="como_json",
+        action="store_true",
+        help="imprime el resultado en JSON, para que lo interprete Claude Code",
+    )
+
     return analizador
 
 
@@ -42,6 +67,42 @@ def ejecutar_registro_verificar(archivo: Path) -> int:
     return 1
 
 
+def ejecutar_protocolo_validar(ruta: Path, como_json: bool = False) -> int:
+    """Valida un protocolo e imprime los hallazgos.
+
+    Devuelve 1 si hay errores y 0 si no los hay, aunque haya advertencias.
+    """
+    resultado = validar_archivo(ruta)
+    if como_json:
+        # ASCII escapado: JSON válido aunque la consola no use UTF-8.
+        print(json.dumps(resultado.como_dict(), ensure_ascii=True, indent=2))
+        return 0 if resultado.valido else 1
+
+    _tolerar_caracteres_no_representables()
+    descripcion = f"protocolo: {ruta}"
+    if resultado.estado is not None:
+        descripcion += f" ({resultado.estado}, versión {resultado.version_protocolo})"
+    print(descripcion)
+    for hallazgo in resultado.hallazgos:
+        print(hallazgo)
+    print(f"resultado: {_resumen(len(resultado.errores), len(resultado.advertencias))}")
+    return 0 if resultado.valido else 1
+
+
+def _resumen(errores: int, advertencias: int) -> str:
+    if errores == 0 and advertencias == 0:
+        return "sin errores ni advertencias"
+    texto_errores = f"{errores} error" + ("" if errores == 1 else "es")
+    texto_advertencias = f"{advertencias} advertencia" + ("" if advertencias == 1 else "s")
+    return f"{texto_errores}, {texto_advertencias}"
+
+
+def _tolerar_caracteres_no_representables() -> None:
+    """Evita que un carácter fuera de la codificación de la consola rompa la salida."""
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(errors="backslashreplace")
+
+
 def main() -> None:
     """Punto de entrada de la CLI."""
     analizador = construir_analizador()
@@ -53,6 +114,9 @@ def main() -> None:
 
     if argumentos.comando == "registro" and argumentos.subcomando == "verificar":
         sys.exit(ejecutar_registro_verificar(argumentos.archivo))
+
+    if argumentos.comando == "protocolo" and argumentos.subcomando == "validar":
+        sys.exit(ejecutar_protocolo_validar(argumentos.ruta, argumentos.como_json))
 
 
 if __name__ == "__main__":
