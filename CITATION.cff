@@ -5,6 +5,7 @@ type: software
 version: 0.0.1
 date-released: "2026-09-25"
 license: MIT
+repository-code: "https://github.com/PhDJP/agentresearch"
 authors:
   - family-names: "Gomez Ballesteros"
     given-names: "Juan Pablo"
