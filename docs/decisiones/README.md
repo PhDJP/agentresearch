@@ -12,6 +12,7 @@ Cada decisión de diseño relevante queda en un archivo numerado. Una decisión 
 | [0004](0004-trazabilidad-y-reproducibilidad.md) | Trazabilidad de decisiones y reproducibilidad | Aceptada | 2026-09-25 |
 | [0005](0005-ingenieria-idioma-y-publicacion.md) | Ingeniería, idioma y publicación | Aceptada | 2026-09-25 |
 | [0006](0006-formato-del-protocolo-y-registro-encadenado.md) | Formato del protocolo y registro encadenado de eventos | Aceptada | 2026-09-26 |
+| [0008](0008-ciclo-de-vida-del-protocolo.md) | Ciclo de vida del protocolo | Propuesta | 2026-09-26 |
 
 ## Plantilla
 
