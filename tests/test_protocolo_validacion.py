@@ -311,6 +311,18 @@ def test_varios_hallazgos_salen_en_orden_de_catalogo(datos_sinteticos: dict[str,
     assert _ids_de_regla(datos_sinteticos) == ["P-E05", "P-E08", "P-A02", "P-A07"]
 
 
+def test_mensajes_de_poblacion_y_concepto_vacios(datos_sinteticos: dict[str, Any]) -> None:
+    datos_sinteticos["marco"]["pcc"]["poblacion"]["descripcion"] = ""
+    datos_sinteticos["marco"]["pcc"]["concepto"]["descripcion"] = ""
+
+    mensajes = [h.mensaje for h in validar_protocolo(Protocolo.model_validate(datos_sinteticos))]
+
+    assert mensajes == [
+        "la descripción de la población está vacía",
+        "la descripción del concepto está vacía",
+    ]
+
+
 # --- Mensajes ------------------------------------------------------------------
 
 

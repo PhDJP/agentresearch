@@ -308,12 +308,14 @@ def _p_e03(protocolo: Protocolo) -> Iterator[_Resultado]:
 def _p_e04(protocolo: Protocolo) -> Iterator[_Resultado]:
     """Población y concepto con descripción; bloques de búsqueda con términos."""
     pcc = protocolo.marco.pcc
-    for nombre, componente in (("poblacion", pcc.poblacion), ("concepto", pcc.concepto)):
+    for nombre, texto, componente in (
+        ("poblacion", "de la población", pcc.poblacion),
+        ("concepto", "del concepto", pcc.concepto),
+    ):
         if _vacio(componente.descripcion):
             yield (
                 "P-E04",
-                f"la descripción de {'la población' if nombre == 'poblacion' else 'el concepto'} "
-                "está vacía",
+                f"la descripción {texto} está vacía",
                 ("marco", "pcc", nombre, "descripcion"),
             )
     if not protocolo.busqueda.bloques:
