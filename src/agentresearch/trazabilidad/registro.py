@@ -213,13 +213,9 @@ class RegistroEncadenado:
             try:
                 evento = json.loads(linea)
             except json.JSONDecodeError:
-                return ResultadoVerificacion(
-                    False, numero_linea, "JSON inválido o línea truncada"
-                )
+                return ResultadoVerificacion(False, numero_linea, "JSON inválido o línea truncada")
             if not isinstance(evento, dict):
-                return ResultadoVerificacion(
-                    False, numero_linea, "la línea no es un objeto JSON"
-                )
+                return ResultadoVerificacion(False, numero_linea, "la línea no es un objeto JSON")
 
             id_esperado = f"evt-{indice_evento:06d}"
             if evento.get("id") != id_esperado:
