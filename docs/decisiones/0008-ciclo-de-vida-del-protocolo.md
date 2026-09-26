@@ -58,7 +58,9 @@ consideradas".
 3. **Lectura única.** Cada comando lee los bytes de `protocolo.yaml` una sola
    vez, y sobre esos mismos bytes valida, calcula el diff y calcula el hash.
    Así no hay una ventana en la que el archivo cambie entre la validación y
-   el registro.
+   el registro. Justo antes de escribir, comprueba que el archivo conserva
+   esos bytes, por ejemplo que no se editó mientras el investigador
+   confirmaba. Si cambió, cancela sin escribir nada.
 
 ### Estados y versiones
 

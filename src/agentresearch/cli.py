@@ -4,10 +4,20 @@ import argparse
 import io
 import json
 import sys
+from collections.abc import Callable
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any, Protocol
 
 from agentresearch.protocolo import validar_archivo
+from agentresearch.protocolo.aprobacion import (
+    ErrorCicloDeVida,
+    OperacionCancelada,
+    Reloj,
+    ResultadoOperacion,
+    aprobar,
+)
+from agentresearch.protocolo.terminal import Terminal, TerminalDelSistema
 from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
 
 RUTA_PROTOCOLO_POR_DEFECTO = Path("protocolo") / "protocolo.yaml"
@@ -42,21 +52,48 @@ def construir_analizador() -> argparse.ArgumentParser:
     validar = subcomandos_protocolo.add_parser(
         "validar", help="Valida el protocolo contra el esquema y las reglas metodológicas"
     )
-    validar.add_argument(
+    _argumento_ruta(validar)
+    _argumento_json(validar)
+
+    aprobar_parser = subcomandos_protocolo.add_parser(
+        "aprobar",
+        help="Aprueba el borrador del protocolo (exige una terminal interactiva)",
+    )
+    _argumento_ruta(aprobar_parser)
+    aprobar_parser.add_argument(
+        "--aprobado-por",
+        required=True,
+        metavar="ID",
+        help="revisor humano declarado en seleccion.revisores que aprueba el protocolo",
+    )
+    aprobar_parser.add_argument(
+        "--justificaciones",
+        type=Path,
+        metavar="ARCHIVO",
+        help="JSON con la justificación de cada advertencia activa; las que falten se piden",
+    )
+    _argumento_json(aprobar_parser)
+
+    return analizador
+
+
+def _argumento_ruta(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "ruta",
         type=Path,
         nargs="?",
         default=RUTA_PROTOCOLO_POR_DEFECTO,
         help=f"archivo del protocolo (por defecto, {RUTA_PROTOCOLO_POR_DEFECTO.as_posix()})",
     )
-    validar.add_argument(
+
+
+def _argumento_json(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--json",
         dest="como_json",
         action="store_true",
         help="imprime el resultado en JSON, para que lo interprete Claude Code",
     )
-
-    return analizador
 
 
 def _anclaje_argumento(texto: str) -> Anclaje:
@@ -99,10 +136,101 @@ def ejecutar_protocolo_validar(ruta: Path, como_json: bool = False) -> int:
     if resultado.estado is not None:
         descripcion += f" ({resultado.estado}, versión {resultado.version_protocolo})"
     print(descripcion)
+    registro = resultado.registro
+    if registro is not None and registro["existe"]:
+        anclaje = f", anclaje {registro['anclaje']}" if registro["anclaje"] else ""
+        print(f"registro: {registro['ruta']} ({registro['numero_eventos']} eventos{anclaje})")
     for hallazgo in resultado.hallazgos:
         print(hallazgo)
     print(f"resultado: {_resumen(len(resultado.errores), len(resultado.advertencias))}")
     return 0 if resultado.valido else 1
+
+
+def ejecutar_protocolo_aprobar(
+    ruta: Path,
+    aprobado_por: str,
+    justificaciones: Path | None = None,
+    como_json: bool = False,
+    terminal: Terminal | None = None,
+    reloj: Reloj | None = None,
+) -> int:
+    """Aprueba el protocolo tras la confirmación interactiva del investigador."""
+    return _ejecutar_operacion(
+        "protocolo aprobar",
+        como_json,
+        lambda: aprobar(ruta, aprobado_por, _terminal(terminal), justificaciones, reloj),
+        _describir_operacion,
+    )
+
+
+def _terminal(terminal: Terminal | None) -> Terminal:
+    return terminal if terminal is not None else TerminalDelSistema()
+
+
+def _describir_operacion(resultado: ResultadoOperacion) -> list[str]:
+    operacion = "aprobado" if resultado.evento.tipo == "protocolo_aprobado" else "enmendado"
+    return [
+        f"protocolo {operacion}: {resultado.ruta_protocolo} "
+        f"(versión {resultado.version_anterior} → {resultado.version_protocolo})",
+        f"hash: {resultado.hash_protocolo}",
+        f"evento: {resultado.evento.id} ({resultado.evento.tipo})",
+        f"copia de la versión: {resultado.ruta_version}",
+        f"anclaje: {resultado.anclaje}",
+    ]
+
+
+class _ConDiccionario(Protocol):
+    def como_dict(self) -> dict[str, Any]: ...
+
+
+def _ejecutar_operacion[R: _ConDiccionario](
+    comando: str,
+    como_json: bool,
+    operacion: Callable[[], R],
+    describir: Callable[[R], list[str]],
+) -> int:
+    """Ejecuta una operación del ciclo de vida e imprime su resultado en texto o en JSON.
+
+    Devuelve 0 si se completó y 1 si se rechazó o se canceló (sin escribir nada).
+    """
+    _tolerar_caracteres_no_representables()
+    try:
+        resultado = operacion()
+    except ErrorCicloDeVida as error:
+        return _informar_fallo(comando, como_json, "no se pudo completar", error.errores)
+    except OperacionCancelada as error:
+        return _informar_fallo(comando, como_json, "cancelado", [f"cancelado: {error}"])
+    if como_json:
+        _imprimir_json(comando, True, [], resultado.como_dict())
+    else:
+        for linea in describir(resultado):
+            print(linea)
+    return 0
+
+
+def _informar_fallo(comando: str, como_json: bool, motivo: str, errores: list[str]) -> int:
+    if como_json:
+        _imprimir_json(comando, False, errores, None)
+    else:
+        print(f"{comando}: {motivo}")
+        for error in errores:
+            print(f"  - {error}")
+    return 1
+
+
+def _imprimir_json(
+    comando: str, exito: bool, errores: list[str], resultado: dict[str, Any] | None
+) -> None:
+    """Salida JSON común de los comandos del ciclo de vida (ADR-0008, punto 26)."""
+    datos = {
+        "comando": comando,
+        "exito": exito,
+        "errores": errores,
+        "version_agente": version("agentresearch"),
+        "resultado": resultado,
+    }
+    # ASCII escapado: JSON válido aunque la consola no use UTF-8.
+    print(json.dumps(datos, ensure_ascii=True, indent=2))
 
 
 def _resumen(errores: int, advertencias: int) -> str:
@@ -115,8 +243,9 @@ def _resumen(errores: int, advertencias: int) -> str:
 
 def _tolerar_caracteres_no_representables() -> None:
     """Evita que un carácter fuera de la codificación de la consola rompa la salida."""
-    if isinstance(sys.stdout, io.TextIOWrapper):
-        sys.stdout.reconfigure(errors="backslashreplace")
+    for flujo in (sys.stdout, sys.stderr):
+        if isinstance(flujo, io.TextIOWrapper):
+            flujo.reconfigure(errors="backslashreplace")
 
 
 def main() -> None:
@@ -133,6 +262,16 @@ def main() -> None:
 
     if argumentos.comando == "protocolo" and argumentos.subcomando == "validar":
         sys.exit(ejecutar_protocolo_validar(argumentos.ruta, argumentos.como_json))
+
+    if argumentos.comando == "protocolo" and argumentos.subcomando == "aprobar":
+        sys.exit(
+            ejecutar_protocolo_aprobar(
+                argumentos.ruta,
+                argumentos.aprobado_por,
+                argumentos.justificaciones,
+                argumentos.como_json,
+            )
+        )
 
 
 if __name__ == "__main__":
