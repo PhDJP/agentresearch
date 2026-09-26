@@ -1,6 +1,6 @@
 # ADR-0008: Ciclo de vida del protocolo
 
-- Estado: Propuesta
+- Estado: Aceptada
 - Fecha: 2026-09-26
 - Participantes: investigador doctoral y Claude Code
 
@@ -263,7 +263,9 @@ consideradas".
 ### Decisiones del protocolo, en dos pasos
 
 16. **`agentresearch protocolo decision registrar --archivo decision.json [--protocolo ruta] [--json]`**
-    registra `decision_propuesta`. El esquema es el de la especificación,
+    registra `decision_propuesta`. Solo la impiden P-E00 y P-E10: los demás
+    errores no, porque un borrador está incompleto mientras se construye. El
+    esquema es el de la especificación,
     más un campo `reemplaza` opcional. Se valida con pydantic estricto: una
     clave desconocida, un tipo incorrecto o una clave repetida en el JSON son
     errores. Se reportan todos los errores a la vez:
@@ -292,6 +294,7 @@ consideradas".
     `decidido_por.id` es `ID` y, si el investigador escribe `confirmar N`,
     registra un `decision_confirmada` por cada una. `ID` debe ser un revisor
     humano declarado. Nadie confirma decisiones atribuidas a otra persona.
+    Si no hay decisiones pendientes, termina sin exigir terminal.
 
     Cada decisión tiene un estado, que se deriva del registro:
     - **pendiente:** propuesta sin confirmar y sin reemplazar;
@@ -373,7 +376,8 @@ consideradas".
       incoherente: otra aprobación, una enmienda sin aprobación previa, una
       versión o un hash anterior que no encadena, o una confirmación de una
       propuesta inexistente o ya confirmada;
-    - falta la copia de una versión registrada, o no coincide con su hash.
+    - falta la copia de una versión registrada, no coincide con su hash o
+      no está en `protocolo/versiones/X.Y.Z.yaml`.
 
     Referencia: ADR-0006, puntos 7 y 10.
 25. **P-A09, "piloto de cribado sin tamaño definido"** (advertencia):

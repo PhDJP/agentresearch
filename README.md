@@ -22,8 +22,15 @@ Para investigadores que quieren hacer un mapeo sistemático riguroso sin pagar A
 ## Disponible hoy
 
 - CLI: `uv run agentresearch --version`.
-- Verificación de un registro encadenado de eventos: `uv run agentresearch registro verificar <archivo.jsonl>`.
-- Validación de un protocolo en YAML contra su esquema y las reglas metodológicas (errores P-E00 a P-E08 y advertencias P-A01 a P-A08): `uv run agentresearch protocolo validar [ruta] [--json]`. La plantilla comentada del protocolo viene en el paquete.
+- Verificación de un registro encadenado de eventos, opcionalmente contra un anclaje guardado: `uv run agentresearch registro verificar <archivo.jsonl> [--anclaje evt-NNNNNN@sha256:…]`.
+- Validación de un protocolo en YAML contra su esquema y las reglas metodológicas (errores P-E00 a P-E10 y advertencias P-A01 a P-A09): `uv run agentresearch protocolo validar [ruta] [--json]`. La plantilla comentada del protocolo viene en el paquete.
+- Ciclo de vida del protocolo ([ADR-0008](docs/decisiones/0008-ciclo-de-vida-del-protocolo.md)). Todos los comandos admiten `--json`:
+  - `protocolo aprobar --aprobado-por ID [--justificaciones archivo.json]`;
+  - `protocolo enmendar --nivel mayor|menor --enmendado-por ID (--justificacion … --efecto-esperado … | --archivo-enmienda archivo.json)`, y `--simular` para ver el diff sin escribir;
+  - `protocolo decision registrar --archivo decision.json` y `protocolo decision confirmar --confirmado-por ID`;
+  - `protocolo historial`, con versiones, enmiendas, decisiones y el anclaje del registro.
+
+  `aprobar`, `enmendar` y `decision confirmar` exigen una terminal interactiva: el investigador los ejecuta en su propia terminal, no desde Claude Code.
 - Pruebas, estilo (ruff) y tipos (mypy estricto), verificados en integración continua sobre Windows y Ubuntu.
 - Documentación metodológica, de arquitectura y de decisiones (ADR).
 
