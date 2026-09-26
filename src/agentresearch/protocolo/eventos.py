@@ -12,7 +12,14 @@ de opciones, revisor humano declarado, modelo exacto, etc.) están en
 
 from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+)
 
 from agentresearch.protocolo.estudio import es_ruta_relativa_valida
 
@@ -80,6 +87,17 @@ class CambioRegistrado(ModeloEvento):
     despues: Any
     agregados: list[Any] | None = None
     eliminados: list[Any] | None = None
+
+    @model_serializer(mode="wrap")
+    def _sin_listas_vacias_de_escalares(
+        self, siguiente: SerializerFunctionWrapHandler
+    ) -> dict[str, Any]:
+        """Omite `agregados` y `eliminados` cuando el cambio no es de una lista de escalares."""
+        datos: dict[str, Any] = siguiente(self)
+        if self.agregados is None and self.eliminados is None:
+            datos.pop("agregados", None)
+            datos.pop("eliminados", None)
+        return datos
 
 
 class DatosAprobado(ModeloEvento):

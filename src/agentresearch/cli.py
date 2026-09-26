@@ -12,10 +12,14 @@ from typing import Any, Protocol
 from agentresearch.protocolo import validar_archivo
 from agentresearch.protocolo.aprobacion import (
     ErrorCicloDeVida,
+    NivelElegido,
     OperacionCancelada,
     Reloj,
     ResultadoOperacion,
     aprobar,
+    enmendar,
+    simular_enmienda,
+    texto_de_cambios,
 )
 from agentresearch.protocolo.terminal import Terminal, TerminalDelSistema
 from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
@@ -73,6 +77,37 @@ def construir_analizador() -> argparse.ArgumentParser:
         help="JSON con la justificación de cada advertencia activa; las que falten se piden",
     )
     _argumento_json(aprobar_parser)
+
+    enmendar_parser = subcomandos_protocolo.add_parser(
+        "enmendar",
+        help="Registra una enmienda del protocolo vigente (exige una terminal interactiva)",
+    )
+    _argumento_ruta(enmendar_parser)
+    enmendar_parser.add_argument(
+        "--nivel",
+        choices=["mayor", "menor"],
+        help="mayor si puede cambiar qué estudios se incluyen o cómo se clasifican; menor si "
+        "no (el parche lo asigna el paquete)",
+    )
+    enmendar_parser.add_argument(
+        "--enmendado-por",
+        metavar="ID",
+        help="revisor humano declarado en seleccion.revisores que registra la enmienda",
+    )
+    enmendar_parser.add_argument("--justificacion", metavar="TEXTO")
+    enmendar_parser.add_argument("--efecto-esperado", metavar="TEXTO")
+    enmendar_parser.add_argument(
+        "--archivo-enmienda",
+        type=Path,
+        metavar="ARCHIVO",
+        help="JSON con justificacion y efecto_esperado, en lugar de las dos opciones",
+    )
+    enmendar_parser.add_argument(
+        "--simular",
+        action="store_true",
+        help="muestra el diff y la versión siguiente sin escribir nada",
+    )
+    _argumento_json(enmendar_parser)
 
     return analizador
 
@@ -161,6 +196,68 @@ def ejecutar_protocolo_aprobar(
         lambda: aprobar(ruta, aprobado_por, _terminal(terminal), justificaciones, reloj),
         _describir_operacion,
     )
+
+
+def ejecutar_protocolo_enmendar(
+    ruta: Path,
+    nivel: NivelElegido | None = None,
+    enmendado_por: str | None = None,
+    justificacion: str | None = None,
+    efecto_esperado: str | None = None,
+    archivo_enmienda: Path | None = None,
+    simular: bool = False,
+    como_json: bool = False,
+    terminal: Terminal | None = None,
+    reloj: Reloj | None = None,
+) -> int:
+    """Registra una enmienda tras la confirmación interactiva, o la simula sin escribir."""
+    if simular:
+        return _ejecutar_simulacion(ruta, nivel, como_json)
+    return _ejecutar_operacion(
+        "protocolo enmendar",
+        como_json,
+        lambda: enmendar(
+            ruta,
+            nivel,
+            enmendado_por,
+            _terminal(terminal),
+            justificacion,
+            efecto_esperado,
+            archivo_enmienda,
+            reloj,
+        ),
+        _describir_operacion,
+    )
+
+
+def _ejecutar_simulacion(ruta: Path, nivel: NivelElegido | None, como_json: bool) -> int:
+    """Simula una enmienda: 0 si se podría registrar, 1 si algo lo impediría."""
+    _tolerar_caracteres_no_representables()
+    comando = "protocolo enmendar --simular"
+    try:
+        propuesta = simular_enmienda(ruta, nivel)
+    except ErrorCicloDeVida as error:
+        return _informar_fallo(comando, como_json, "no se pudo simular", error.errores)
+    if como_json:
+        _imprimir_json(comando, not propuesta.problemas, propuesta.problemas, propuesta.como_dict())
+        return 0 if not propuesta.problemas else 1
+    print(f"simulación de enmienda: {propuesta.ruta_protocolo}")
+    print(f"versión registrada: {propuesta.version_registrada} ({propuesta.evento_registrado})")
+    if propuesta.version_siguiente is not None:
+        print(f"versión siguiente: {propuesta.version_siguiente} (nivel {propuesta.nivel})")
+    else:
+        opciones = propuesta.opciones_de_version
+        print(
+            f"versión siguiente: {opciones['menor']} si es menor, {opciones['mayor']} si es mayor"
+        )
+    for linea in texto_de_cambios(propuesta.cambios):
+        print(linea)
+    if propuesta.problemas:
+        print("impedirían enmendar:")
+        for problema in propuesta.problemas:
+            print(f"  - {problema}")
+        return 1
+    return 0
 
 
 def _terminal(terminal: Terminal | None) -> Terminal:
@@ -269,6 +366,20 @@ def main() -> None:
                 argumentos.ruta,
                 argumentos.aprobado_por,
                 argumentos.justificaciones,
+                argumentos.como_json,
+            )
+        )
+
+    if argumentos.comando == "protocolo" and argumentos.subcomando == "enmendar":
+        sys.exit(
+            ejecutar_protocolo_enmendar(
+                argumentos.ruta,
+                argumentos.nivel,
+                argumentos.enmendado_por,
+                argumentos.justificacion,
+                argumentos.efecto_esperado,
+                argumentos.archivo_enmienda,
+                argumentos.simular,
                 argumentos.como_json,
             )
         )

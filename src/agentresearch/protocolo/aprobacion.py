@@ -18,6 +18,7 @@ from typing import Any, Literal
 
 from agentresearch.protocolo.archivo import (
     DocumentoProtocolo,
+    ErrorLecturaProtocolo,
     actualizar_documento,
     decodificar_protocolo,
     texto_protocolo,
@@ -25,17 +26,25 @@ from agentresearch.protocolo.archivo import (
 from agentresearch.protocolo.ciclo_de_vida import (
     VERSION_APROBADA,
     EstadoRegistro,
+    VersionRegistrada,
     escribir_anclaje,
     leer_estado_registro,
+    siguiente_version,
 )
+from agentresearch.protocolo.diferencias import Cambio, diferencias_protocolo
 from agentresearch.protocolo.entradas import ErrorEntrada, leer_json, validar_modelo
 from agentresearch.protocolo.estudio import RutasProtocolo
 from agentresearch.protocolo.eventos import (
     TIPO_APROBADO,
+    TIPO_ENMENDADO,
     AdvertenciaJustificada,
+    AdvertenciaRegistrada,
+    CambioRegistrado,
     DatosAprobado,
+    DatosEnmendado,
     EstadoProtocolo,
     ModeloEvento,
+    Nivel,
     PersonaHumana,
 )
 from agentresearch.protocolo.modelo import Protocolo
@@ -279,6 +288,298 @@ def _justificar_advertencias(
             )
         )
     return resultado
+
+
+# --- Enmendar -----------------------------------------------------------------------
+
+NivelElegido = Literal["mayor", "menor"]
+"""Niveles que elige el investigador; el parche lo asigna el paquete (ADR-0008, punto 6)."""
+
+
+class ArchivoEnmienda(ModeloEvento):
+    """Contenido de `--archivo-enmienda` (ADR-0008, punto 12)."""
+
+    justificacion: str
+    efecto_esperado: str
+
+
+@dataclass(frozen=True, slots=True)
+class PropuestaEnmienda:
+    """Lo que registraría una enmienda: diff, versión siguiente y lo que la impediría."""
+
+    ruta_protocolo: str
+    version_registrada: str
+    evento_registrado: str
+    cambios: list[Cambio]
+    nivel: Nivel | None
+    version_siguiente: str | None
+    problemas: list[str]
+
+    @property
+    def solo_formato(self) -> bool:
+        return not self.cambios
+
+    @property
+    def opciones_de_version(self) -> dict[str, str]:
+        """Versión siguiente para cada nivel que se puede elegir, si aún no se eligió."""
+        if self.nivel is not None:
+            return {}
+        return {
+            nivel: siguiente_version(self.version_registrada, nivel) for nivel in ("menor", "mayor")
+        }
+
+    def como_dict(self) -> dict[str, Any]:
+        return {
+            "ruta_protocolo": self.ruta_protocolo,
+            "version_registrada": self.version_registrada,
+            "evento_registrado": self.evento_registrado,
+            "nivel": self.nivel,
+            "version_siguiente": self.version_siguiente,
+            "opciones_de_version": self.opciones_de_version,
+            "solo_formato": self.solo_formato,
+            "cambios": [cambio.como_dict() for cambio in self.cambios],
+            "problemas": self.problemas,
+            "se_puede_enmendar": not self.problemas,
+        }
+
+
+@dataclass(slots=True)
+class _Enmienda:
+    """Estado interno de una enmienda en preparación."""
+
+    rutas: RutasProtocolo
+    lectura: LecturaProtocolo
+    validacion: ResultadoValidacion
+    documento: DocumentoProtocolo
+    ultima: VersionRegistrada
+    propuesta: PropuestaEnmienda
+
+
+def simular_enmienda(ruta: Path | str, nivel: NivelElegido | None = None) -> PropuestaEnmienda:
+    """Calcula el diff y la versión siguiente sin escribir nada ni exigir terminal.
+
+    Lanza `ErrorCicloDeVida` solo si no se puede calcular el diff (protocolo
+    ilegible, sin aprobación o con el registro dañado). Lo demás que impediría
+    enmendar se devuelve en `problemas`.
+    """
+    return _preparar_enmienda(RutasProtocolo.desde(ruta), nivel).propuesta
+
+
+def enmendar(
+    ruta: Path | str,
+    nivel: NivelElegido | None,
+    enmendado_por: str | None,
+    terminal: Terminal,
+    justificacion: str | None = None,
+    efecto_esperado: str | None = None,
+    archivo_enmienda: Path | str | None = None,
+    reloj: Reloj | None = None,
+) -> ResultadoOperacion:
+    """Registra una enmienda de un protocolo vigente e incrementa su versión.
+
+    Lanza `ErrorCicloDeVida` si no se puede enmendar y `OperacionCancelada` si
+    el investigador no confirma. En ambos casos no escribe nada.
+    """
+    enmienda = _preparar_enmienda(RutasProtocolo.desde(ruta), nivel)
+    propuesta = enmienda.propuesta
+    errores = list(propuesta.problemas)
+    if propuesta.nivel is None:
+        errores.append("falta --nivel mayor|menor")
+    if enmendado_por is None:
+        errores.append("falta --enmendado-por")
+    else:
+        errores += _problemas_de_persona(
+            enmienda.documento.protocolo, enmendado_por, "--enmendado-por"
+        )
+    textos: tuple[str, str] | None = None
+    try:
+        textos = _textos_de_enmienda(justificacion, efecto_esperado, archivo_enmienda)
+    except ErrorEntrada as error:
+        errores += error.errores
+    if errores:
+        raise ErrorCicloDeVida(errores)
+    assert propuesta.nivel is not None and propuesta.version_siguiente is not None
+    assert enmendado_por is not None and textos is not None
+    texto_justificacion, texto_efecto = textos
+
+    version = propuesta.version_siguiente
+    contenido_nuevo = _nuevo_texto(enmienda.documento, "vigente", version)
+    hash_protocolo = hash_bytes(contenido_nuevo)
+    _exigir_terminal(terminal)
+
+    rutas = enmienda.rutas
+    terminal.mostrar(
+        _resumen_enmienda(
+            enmienda, hash_protocolo, enmendado_por, texto_justificacion, texto_efecto
+        )
+    )
+    _confirmar_frase(terminal, f"enmendar {version}")
+
+    datos = DatosEnmendado(
+        version_anterior=enmienda.ultima.version,
+        version_protocolo=version,
+        nivel=propuesta.nivel,
+        hash_protocolo_anterior=enmienda.ultima.hash_protocolo,
+        hash_revisado=_hash_leido(enmienda.lectura),
+        hash_protocolo=hash_protocolo,
+        ruta_protocolo=rutas.relativa(rutas.protocolo),
+        ruta_version=rutas.relativa(rutas.copia_de_version(version)),
+        justificacion=texto_justificacion,
+        efecto_esperado=texto_efecto,
+        enmendado_por=PersonaHumana(tipo="humano", id=enmendado_por),
+        cambios=[CambioRegistrado.model_validate(c.como_dict()) for c in propuesta.cambios],
+        solo_formato=propuesta.solo_formato,
+        advertencias=[
+            AdvertenciaRegistrada(
+                id_regla=a.id_regla,
+                ubicacion=a.ubicacion,
+                mensaje=a.mensaje,
+                referencia=a.referencia,
+            )
+            for a in enmienda.validacion.advertencias
+        ],
+    )
+    evento, anclaje = escribir_version(
+        rutas, enmienda.lectura, version, contenido_nuevo, TIPO_ENMENDADO, datos, reloj
+    )
+    return ResultadoOperacion(
+        ruta_protocolo=datos.ruta_protocolo,
+        version_anterior=datos.version_anterior,
+        version_protocolo=version,
+        hash_protocolo=hash_protocolo,
+        ruta_version=datos.ruta_version,
+        evento=evento,
+        anclaje=anclaje,
+    )
+
+
+def _preparar_enmienda(rutas: RutasProtocolo, nivel: NivelElegido | None) -> _Enmienda:
+    lectura, registro, validacion = _leer_y_validar(rutas)
+    ultima = registro.ultima_version
+    protocolo_rel = rutas.relativa(rutas.protocolo)
+
+    def _admitido(hallazgo: Hallazgo) -> bool:
+        # El P-E09 de "cambio sin enmienda" es lo que la enmienda resuelve; el de una
+        # operación interrumpida, no.
+        return (
+            hallazgo.id_regla == "P-E09"
+            and ultima is not None
+            and lectura.hash != ultima.datos.hash_revisado
+        )
+
+    problemas = [str(h) for h in validacion.errores if not _admitido(h)]
+    documento = lectura.documento
+    if documento is None or not registro.integro:
+        raise ErrorCicloDeVida(problemas)
+    if ultima is None:
+        raise ErrorCicloDeVida(
+            problemas
+            + [
+                "el protocolo no está aprobado: un borrador se edita libremente y se aprueba "
+                "con `agentresearch protocolo aprobar`"
+            ]
+        )
+
+    try:
+        anterior = decodificar_protocolo(rutas.resolver(ultima.datos.ruta_version).read_bytes())
+    except ErrorLecturaProtocolo as error:
+        raise ErrorCicloDeVida(
+            [f"no se pudo leer la copia {ultima.datos.ruta_version}: {error}"]
+        ) from None
+    protocolo = documento.protocolo
+    if protocolo.estado != "vigente":
+        problemas.append(
+            f"el estado de {protocolo_rel} es «{protocolo.estado}»; un protocolo aprobado no "
+            "vuelve a borrador, y el estado no se edita a mano"
+        )
+    if protocolo.metadatos.version_protocolo != ultima.version:
+        problemas.append(
+            f"la versión de {protocolo_rel} ({protocolo.metadatos.version_protocolo}) no es la "
+            f"registrada ({ultima.version}); la versión la asigna el paquete, no se edita a mano"
+        )
+    if lectura.hash == ultima.hash_protocolo:
+        problemas.append(
+            f"no hay cambios que enmendar: {protocolo_rel} coincide con la versión "
+            f"{ultima.version} registrada en {ultima.evento.id}"
+        )
+    problemas += _problemas_de_pendientes(registro)
+
+    cambios = diferencias_protocolo(anterior.protocolo, protocolo)
+    nivel_efectivo: Nivel | None = nivel
+    if not cambios:
+        nivel_efectivo = "parche"
+        if nivel is not None:
+            problemas.append(
+                "el cambio es solo de formato o comentarios: el nivel es parche y lo asigna el "
+                "paquete, así que no se da --nivel"
+            )
+    propuesta = PropuestaEnmienda(
+        ruta_protocolo=protocolo_rel,
+        version_registrada=ultima.version,
+        evento_registrado=ultima.evento.id,
+        cambios=cambios,
+        nivel=nivel_efectivo,
+        version_siguiente=(
+            siguiente_version(ultima.version, nivel_efectivo) if nivel_efectivo else None
+        ),
+        problemas=problemas,
+    )
+    return _Enmienda(rutas, lectura, validacion, documento, ultima, propuesta)
+
+
+def _textos_de_enmienda(
+    justificacion: str | None, efecto_esperado: str | None, archivo: Path | str | None
+) -> tuple[str, str]:
+    """Justificación y efecto esperado, del archivo o de las opciones (no de ambos)."""
+    if archivo is not None:
+        if justificacion is not None or efecto_esperado is not None:
+            raise ErrorEntrada(
+                ["use --archivo-enmienda o --justificacion y --efecto-esperado, pero no ambos"]
+            )
+        datos = validar_modelo(ArchivoEnmienda, leer_json(archivo), str(archivo))
+        justificacion, efecto_esperado = datos.justificacion, datos.efecto_esperado
+    errores = []
+    if not (justificacion or "").strip():
+        errores.append("falta la justificación de la enmienda (--justificacion)")
+    if not (efecto_esperado or "").strip():
+        errores.append("falta el efecto esperado de la enmienda (--efecto-esperado)")
+    if errores:
+        raise ErrorEntrada(errores)
+    assert justificacion is not None and efecto_esperado is not None
+    return justificacion.strip(), efecto_esperado.strip()
+
+
+def _resumen_enmienda(
+    enmienda: _Enmienda,
+    hash_protocolo: str,
+    enmendado_por: str,
+    justificacion: str,
+    efecto_esperado: str,
+) -> str:
+    propuesta = enmienda.propuesta
+    lineas = [
+        f"Enmienda del protocolo {propuesta.ruta_protocolo}",
+        f"  versión: {propuesta.version_registrada} → {propuesta.version_siguiente} "
+        f"(nivel {propuesta.nivel})",
+        f"  hash de la versión registrada: {enmienda.ultima.hash_protocolo}",
+        f"  hash del archivo revisado: {_hash_leido(enmienda.lectura)}",
+        f"  hash del protocolo enmendado: {hash_protocolo}",
+        f"  enmendado por: {enmendado_por}",
+        f"  justificación: {justificacion}",
+        f"  efecto esperado: {efecto_esperado}",
+    ]
+    lineas += texto_de_cambios(propuesta.cambios)
+    advertencias = enmienda.validacion.advertencias
+    lineas.append(f"Advertencias activas: {len(advertencias) or 'ninguna'}")
+    lineas += [f"  - {advertencia}" for advertencia in advertencias]
+    return "\n".join(lineas)
+
+
+def texto_de_cambios(cambios: list[Cambio]) -> list[str]:
+    """Líneas legibles del diff estructural."""
+    if not cambios:
+        return ["Cambios: ninguno de contenido (solo formato o comentarios)"]
+    return [f"Cambios: {len(cambios)}"] + [f"  - {cambio}" for cambio in cambios]
 
 
 # --- Piezas compartidas con la enmienda ---------------------------------------------
