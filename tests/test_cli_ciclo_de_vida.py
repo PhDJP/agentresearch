@@ -15,6 +15,7 @@ from agentresearch.cli import (
     ejecutar_decision_registrar,
     ejecutar_protocolo_aprobar,
     ejecutar_protocolo_enmendar,
+    ejecutar_protocolo_validar,
     main,
 )
 from agentresearch.trazabilidad import hash_archivo
@@ -171,6 +172,20 @@ def test_main_aprobar_sin_terminal_devuelve_uno(
 
     assert salida.value.code == 1
     assert "exige una terminal interactiva" in capsys.readouterr().out
+
+
+def test_validar_muestra_el_registro_y_su_anclaje(
+    protocolo_de_estudio: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    resultado = aprobar_protocolo(protocolo_de_estudio)
+    capsys.readouterr()
+
+    codigo = ejecutar_protocolo_validar(protocolo_de_estudio)
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "(vigente, versión 1.0.0)" in salida
+    assert f"registro: protocolo/eventos.jsonl (1 eventos, anclaje {resultado.anclaje})" in salida
 
 
 # --- protocolo enmendar ----------------------------------------------------------------
