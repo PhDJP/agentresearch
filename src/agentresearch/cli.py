@@ -26,6 +26,7 @@ from agentresearch.protocolo.decisiones import (
     confirmar_decisiones,
     registrar_decision,
 )
+from agentresearch.protocolo.historial import construir_historial, texto_historial
 from agentresearch.protocolo.terminal import Terminal, TerminalDelSistema
 from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
 
@@ -113,6 +114,13 @@ def construir_analizador() -> argparse.ArgumentParser:
         help="muestra el diff y la versión siguiente sin escribir nada",
     )
     _argumento_json(enmendar_parser)
+
+    historial = subcomandos_protocolo.add_parser(
+        "historial",
+        help="Muestra versiones, enmiendas, decisiones y el anclaje del registro",
+    )
+    _argumento_ruta(historial)
+    _argumento_json(historial)
 
     decision = subcomandos_protocolo.add_parser(
         "decision", help="Decisiones del protocolo: registrar la propuesta y confirmarla"
@@ -304,6 +312,20 @@ def _ejecutar_simulacion(ruta: Path, nivel: NivelElegido | None, como_json: bool
     return 0
 
 
+def ejecutar_protocolo_historial(ruta: Path, como_json: bool = False) -> int:
+    """Muestra el historial del protocolo. Devuelve 1 si el registro no es fiable (P-E10)."""
+    _tolerar_caracteres_no_representables()
+    historial = construir_historial(ruta)
+    codigo = 0 if historial.integro else 1
+    if como_json:
+        errores = [str(h) for h in historial.hallazgos if h.id_regla == "P-E10"]
+        _imprimir_json("protocolo historial", historial.integro, errores, historial.como_dict())
+        return codigo
+    for linea in texto_historial(historial):
+        print(linea)
+    return codigo
+
+
 def ejecutar_decision_registrar(
     archivo: Path,
     protocolo: Path = RUTA_PROTOCOLO_POR_DEFECTO,
@@ -478,6 +500,9 @@ def main() -> None:
                 argumentos.como_json,
             )
         )
+
+    if argumentos.comando == "protocolo" and argumentos.subcomando == "historial":
+        sys.exit(ejecutar_protocolo_historial(argumentos.ruta, argumentos.como_json))
 
     if argumentos.comando == "protocolo" and argumentos.subcomando == "decision":
         if argumentos.accion == "registrar":

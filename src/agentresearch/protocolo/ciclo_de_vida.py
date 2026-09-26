@@ -111,6 +111,8 @@ class EstadoRegistro:
     """Anclaje del registro tal como está, si su cadena está íntegra."""
     anclaje_guardado: Anclaje | None = None
     """Anclaje leído de `anclaje.json`, si existe y es válido."""
+    anclaje_cumplido: bool | None = None
+    """Si el registro cumple el anclaje guardado (como prefijo); `None` si no hay anclaje válido."""
     versiones: list[VersionRegistrada] = field(default_factory=list)
     decisiones: dict[str, DecisionRegistrada] = field(default_factory=dict)
     problemas: list[str] = field(default_factory=list)
@@ -200,6 +202,7 @@ def _verificar_anclaje_guardado(estado: EstadoRegistro, registro: RegistroEncade
         return
     estado.anclaje_guardado = anclaje
     resultado = registro.verificar(anclaje)
+    estado.anclaje_cumplido = resultado.valido
     if not resultado.valido:
         estado.problemas.append(
             f"{rutas.relativa(rutas.eventos)} no cumple {anclaje_rel}: {resultado.mensaje}"
