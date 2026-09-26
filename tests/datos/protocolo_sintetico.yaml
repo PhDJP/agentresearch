@@ -1,0 +1,189 @@
+# Protocolo sintético para pruebas. El tema es ficticio: el zarambo no existe,
+# y los artículos, autores y cifras son inventados. No usar como ejemplo real.
+# Está construido para no producir ningún error ni ninguna advertencia.
+version_esquema: 1
+estado: borrador
+metadatos:
+  titulo: "Métodos de secado del fruto de zarambo: un mapeo sistemático"
+  version_protocolo: "0.1.0"
+  autores:
+    - nombre: "Investigadora Ficticia Uno"
+      orcid: ""
+      rol: "investigadora principal"
+    - nombre: "Revisor Ficticio Dos"
+      orcid: ""
+      rol: "segundo revisor"
+  registro:
+    plataforma: ""
+    identificador: ""
+    url: ""
+  financiacion: "Sin financiación (protocolo de prueba)."
+justificacion: "El zarambo es un fruto ficticio cuyo secado se ha estudiado de forma dispersa."
+objetivos: "Identificar los métodos de secado del zarambo y las propiedades evaluadas."
+pregunta_general: "¿Qué se sabe sobre el secado del fruto de zarambo?"
+preguntas:
+  - id: PI1
+    texto: "¿Qué métodos de secado se han aplicado al zarambo?"
+    tipo: descriptiva
+    responde_con: [DE1, F1]
+  - id: PI2
+    texto: "¿Qué propiedades del producto seco se han evaluado?"
+    tipo: descriptiva
+    responde_con: [F2]
+  - id: PI3
+    texto: "¿Qué propiedades se evalúan con cada método de secado?"
+    tipo: analitica
+    derivada_de:
+      - [F1, F2]
+marco:
+  pcc:
+    poblacion:
+      descripcion: "Fruto de zarambo (Zarambus fictus) fresco o poscosecha."
+      terminos: ["zarambo", "Zarambus fictus"]
+    concepto:
+      descripcion: "Métodos de secado y deshidratación."
+      terminos: ["secado", "deshidratación", "liofilización"]
+    contexto:
+      descripcion: "Cualquier escala: laboratorio, piloto o industrial."
+      terminos: ["industria alimentaria"]
+      restrictivo: false
+  equivalencia_picoc:
+    population: "Fruto de zarambo"
+    intervention: "Métodos de secado"
+    comparison: "No aplica"
+    outcome: "Propiedades del producto seco"
+    context: "Cualquier escala"
+fuentes:
+  - id: openalex
+    tipo: api
+    cobertura: "Desde el inicio de la base"
+    limites: "Ninguno"
+  - id: scopus
+    tipo: exportacion
+    cobertura: "Desde 1960"
+    limites: "Ninguno"
+estrategias:
+  bases_de_datos:
+    activa: true
+  bola_de_nieve:
+    activa: true
+    direcciones: [atras, adelante]
+  busqueda_manual:
+    activa: false
+    fuentes: []
+  conjunto_validacion:
+    activo: true
+    articulos:
+      - doi: ""
+        titulo: "Secado solar del zarambo en bandejas"
+        como_se_conoce: "Aportado por la experta ficticia"
+      - doi: ""
+        titulo: "Liofilización de pulpa de zarambo"
+        como_se_conoce: "Aportado por la experta ficticia"
+      - doi: ""
+        titulo: "Cinética de deshidratación del zarambo"
+        como_se_conoce: "Aportado por la experta ficticia"
+      - doi: ""
+        titulo: "Color y textura del zarambo seco"
+        como_se_conoce: "Aportado por la experta ficticia"
+      - doi: ""
+        titulo: "Secado por aire caliente de rodajas de zarambo"
+        como_se_conoce: "Aportado por la experta ficticia"
+  criterio_parada:
+    tipo: umbral_nuevos
+    valor: 0
+    justificacion: "Se detiene cuando una iteración no aporta estudios nuevos incluidos."
+busqueda:
+  bloques:
+    - id: B1
+      nombre: "Zarambo"
+      componente: poblacion
+      terminos: ["zarambo", "\"Zarambus fictus\""]
+    - id: B2
+      nombre: "Secado"
+      componente: concepto
+      terminos: ["secado", "drying", "dehydrat*", "liofilización"]
+  periodo:
+    desde: 2000
+    hasta: null
+    justificacion: "No se conocen estudios del zarambo anteriores al año 2000."
+  idiomas:
+    valores: [en, es]
+    justificacion: "Idiomas que el equipo puede leer con fiabilidad."
+  tipos_documento: [articulo, ponencia]
+criterios:
+  inclusion:
+    - id: CI1
+      texto: "Estudia el secado del fruto de zarambo."
+      fase: titulo_resumen
+      tipo: tema
+      ejemplos_si: ["Secado solar de zarambo"]
+      ejemplos_no: ["Cultivo de zarambo en invernadero"]
+    - id: CI2
+      texto: "Está escrito en inglés o en español."
+      fase: ambas
+      tipo: idioma
+  exclusion:
+    - id: CE1
+      texto: "Es un resumen de congreso sin texto completo."
+      fase: ambas
+      tipo: tipo_documento
+    - id: CE2
+      texto: "No describe el método de secado."
+      fase: texto_completo
+      tipo: otro
+seleccion:
+  revisores:
+    - id: investigador-1
+      tipo: humano
+    - id: investigador-2
+      tipo: humano
+    - id: claude
+      tipo: llm
+  regla_combinacion:
+    avanzan: [A, B, C, D, E]
+  piloto:
+    tamano: 20
+    umbral_kappa: 0.61
+  tamano_lote_llm: 25
+extraccion:
+  items:
+    - id: DE1
+      nombre: "Escala del estudio"
+      descripcion: "Escala a la que se hizo el secado."
+      tipo: categoria
+      categorias: [laboratorio, piloto, industrial]
+      preguntas: [PI1]
+  facetas:
+    - id: F1
+      nombre: "Método de secado"
+      origen: emergente
+      multiple: true
+      categorias:
+        - id: F1.1
+          nombre: "Secado solar"
+          definicion: "Secado con radiación solar directa o indirecta."
+          regla: "Asignar si la fuente principal de energía es el sol."
+          ejemplos: ["Secador solar de bandejas"]
+        - id: F1.2
+          nombre: "Liofilización"
+          definicion: "Secado por sublimación a baja presión."
+          regla: "Asignar si el agua se elimina por sublimación."
+          ejemplos: ["Liofilizador de laboratorio"]
+    - id: F2
+      nombre: "Propiedad evaluada"
+      origen: emergente
+      multiple: true
+      categorias:
+        - id: F2.1
+          nombre: "Color"
+          definicion: "Coordenadas de color del producto seco."
+          regla: "Asignar si se mide el color."
+          ejemplos: ["Medición CIELAB"]
+calidad:
+  activa: false
+  preguntas: []
+analisis:
+  plan: "Frecuencias por faceta y mapa de burbujas de método por propiedad."
+  cruces:
+    - [F1, F2]
