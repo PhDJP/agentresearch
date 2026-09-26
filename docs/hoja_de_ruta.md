@@ -18,7 +18,7 @@ Cada hito cerrado se etiqueta con una versión (`v0.N.0`).
 - [ ] Criterios de inclusión y exclusión, y de 5 a 10 artículos clave conocidos por vías distintas de las APIs, para el conjunto de validación.
 - [ ] Claves gratuitas de API (antes del hito 3): OpenAlex, Semantic Scholar, NCBI (opcional) y Springer Nature.
 
-## Hito 0: Entorno y esqueleto (`v0.0.1`)
+## Hito 0: Entorno y esqueleto (`v0.0.1`) · ✅ completo (2026-09-25)
 
 1. Verificar que funcionen git, uv, gh y la configuración de git (`user.name`, `user.email`), sin instalar nada sin aprobación.
 2. `git init` y primer commit con la documentación existente.
@@ -31,7 +31,7 @@ Cada hito cerrado se etiqueta con una versión (`v0.N.0`).
 
 **Criterio de terminado:** CI en verde en ambos sistemas, y `uv run agentresearch --version` funciona en Windows.
 
-## Hito 1: Protocolo y trazabilidad (`v0.1.0`)
+## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · en curso: 1a ✅ y 1b ✅ (2026-09-26), sigue 1c
 
 Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/hito_1_protocolo_y_trazabilidad.md](especificaciones/hito_1_protocolo_y_trazabilidad.md).
 
@@ -113,3 +113,18 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 - Paquete del estudio listo para Zenodo.
 
 **Criterio de terminado:** el reporte del caso piloto se regenera de forma idéntica desde los datos (prueba de reproducibilidad).
+
+## Notas de revisión para hitos futuros
+
+Hallazgos de las revisiones del asesor y de auditorías, pendientes para el hito indicado. Se tachan o eliminan cuando se resuelven.
+
+- **1c:** implementar el anclaje del registro encadenado (número de eventos y hash del último) en `protocolo historial` y en los reportes, según el punto 10 del ADR-0006. Sin anclaje no se detecta la eliminación de eventos finales.
+- **1c:** agregar la advertencia P-A09, "piloto de cribado sin tamaño definido" (`seleccion.piloto.tamano` igual a 0). El proceso de selección exige un piloto con medición de concordancia antes del cribado completo (Ali y Petersen, 2014; Petersen et al., 2015, figura 17). La plantilla trae 0 por defecto, y hoy eso pasa sin aviso.
+- **1e:** mitigar el límite conocido de ruamel.yaml documentado en el ADR-0006: al eliminar el último elemento antes del comentario de una sección, ese comentario se pierde. Como `/protocolo` escribirá sección por sección, la escritura debe restaurar los comentarios de sección de primer nivel tomándolos de la plantilla, que es su fuente canónica, y probarlo vaciando una lista.
+- **1e:** la plantilla del repositorio de estudio debe incluir un `.gitattributes` con `* text=auto eol=lf`. Git para Windows convierte los fines de línea por defecto, y eso alteraría los hashes de archivos como el protocolo.
+- **1e:** decidir O1 (opción A o C) del caso piloto con `/protocolo`.
+- **Cierre del hito 1:** evaluar fijar los sistemas de la integración continua (p. ej. `ubuntu-24.04`) en vez de `*-latest`, para que el entorno de pruebas no cambie sin decisión explícita. GitHub anunció la migración de `ubuntu-latest` a Ubuntu 26 desde el 19 de octubre de 2026.
+- **Hito 5:** agregar escritura por lotes al registro encadenado, verificando la cadena una vez por lote. Con miles de decisiones, verificar el archivo completo en cada evento crece de forma cuadrática.
+- **Hito 5:** elegir el modelo del cribado con datos. En el piloto se compara la concordancia con el investigador de al menos dos configuraciones (p. ej. Sonnet 5 en esfuerzo alto y Opus 5.5 en medio), y se fija el identificador completo del modelo para todo el estudio. Cambiarlo después es una enmienda del protocolo.
+- **Proceso:** toda afirmación sobre versiones, sintaxis o límites de APIs y herramientas se verifica contra la fuente oficial o la integración continua. Por ejemplo, `astral-sh/setup-uv@v10` no existía, y la integración continua lo detectó.
+- **Proceso:** GitHub Copilot se usa solo como auditor de lectura; únicamente Claude Code edita el código.
