@@ -1,0 +1,171 @@
+# Protocolo de un estudio de mapeo sistemático (agentresearch, versión de esquema 1).
+# Proceso: Kitchenham; mapeo: Petersen et al. (2008, 2015); reporte: PRISMA-ScR (Tricco et al., 2018).
+# Validar con: agentresearch protocolo validar protocolo/protocolo.yaml
+version_esquema: 1
+# borrador mientras se construye; vigente desde su aprobación (todo cambio posterior es una enmienda).
+estado: borrador
+# Identificación, autoría y registro del protocolo (PRISMA-ScR, ítems 5 y 22).
+metadatos:
+  titulo: ""
+  version_protocolo: "0.1.0"
+  autores:
+    - nombre: ""
+      orcid: ""
+      rol: ""
+  registro:
+    plataforma: ""
+    identificador: ""
+    url: ""
+  financiacion: ""
+# Por qué hace falta este mapeo y por qué un enfoque de alcance (PRISMA-ScR, ítem 3).
+justificacion: ""
+# Qué se busca conocer con el mapeo (PRISMA-ScR, ítem 4).
+objetivos: ""
+pregunta_general: ""
+# Preguntas con ID: las descriptivas dicen qué datos las responden; las analíticas, de qué cruces se derivan (PRISMA-ScR, ítem 4).
+preguntas:
+  - id: PI1
+    texto: ""
+    tipo: descriptiva
+    responde_con: [DE1, F1]
+  - id: PI2
+    texto: ""
+    tipo: analitica
+    derivada_de:
+      - [F1, F2]
+# Marco PCC (JBI) con su equivalencia PICOC (Kitchenham); el contexto no debería restringir la búsqueda (Petersen et al., 2015, §5.1.2).
+marco:
+  pcc:
+    poblacion:
+      descripcion: ""
+      terminos: []
+    concepto:
+      descripcion: ""
+      terminos: []
+    contexto:
+      descripcion: ""
+      terminos: []
+      restrictivo: false
+  equivalencia_picoc:
+    population: ""
+    intervention: ""
+    comparison: ""
+    outcome: ""
+    context: ""
+# Fuentes de información, con su cobertura y los límites aplicados (PRISMA-ScR, ítem 7).
+fuentes:
+  - id: openalex
+    tipo: api
+    cobertura: ""
+    limites: ""
+  - id: scopus
+    tipo: exportacion
+    cobertura: ""
+    limites: ""
+# Estrategias de identificación, conjunto de validación y criterio de parada (Petersen et al., 2015, §5.1.2 y tabla 10).
+estrategias:
+  bases_de_datos:
+    activa: true
+  bola_de_nieve:
+    activa: true
+    direcciones: [atras, adelante]
+  busqueda_manual:
+    activa: false
+    fuentes: []
+  conjunto_validacion:
+    activo: true
+    articulos:
+      - doi: ""
+        titulo: ""
+        como_se_conoce: ""
+  criterio_parada:
+    tipo: umbral_nuevos
+    valor: 0
+    justificacion: ""
+# Bloques de búsqueda: OR dentro de cada bloque, AND entre bloques; periodo e idiomas con justificación (PRISMA-ScR, ítems 6 y 8).
+busqueda:
+  bloques:
+    - id: B1
+      nombre: ""
+      componente: poblacion
+      terminos: []
+    - id: B2
+      nombre: ""
+      componente: concepto
+      terminos: []
+  periodo:
+    desde: null
+    hasta: null
+    justificacion: ""
+  idiomas:
+    valores: []
+    justificacion: ""
+  tipos_documento: []
+# Criterios con ID, fase (titulo_resumen, texto_completo o ambas), tipo y ejemplos (PRISMA-ScR, ítem 6; Petersen et al., 2015, §5.1.2).
+criterios:
+  inclusion:
+    - id: CI1
+      texto: ""
+      fase: titulo_resumen
+      tipo: tema
+      ejemplos_si: []
+      ejemplos_no: []
+  exclusion:
+    - id: CE1
+      texto: ""
+      fase: ambas
+      tipo: tema
+      ejemplos_si: []
+      ejemplos_no: []
+# Revisores, regla de combinación A-F, piloto de concordancia y lote del LLM (PRISMA-ScR, ítem 9; Petersen et al., 2015, tabla 6).
+seleccion:
+  revisores:
+    - id: investigador-1
+      tipo: humano
+    - id: claude
+      tipo: llm
+  regla_combinacion:
+    avanzan: [A, B, C, D, E]
+  piloto:
+    tamano: 0
+    umbral_kappa: 0.61
+  tamano_lote_llm: 25
+# Formulario de extracción y facetas de clasificación con definición, regla y ejemplos (PRISMA-ScR, ítems 10 y 11; Wohlin et al., 2013).
+extraccion:
+  items:
+    - id: DE1
+      nombre: ""
+      descripcion: ""
+      tipo: categoria
+      categorias: []
+      preguntas: [PI1]
+  facetas:
+    - id: F1
+      nombre: ""
+      origen: emergente
+      multiple: true
+      categorias:
+        - id: F1.1
+          nombre: ""
+          definicion: ""
+          regla: ""
+          ejemplos: []
+    - id: F2
+      nombre: ""
+      origen: emergente
+      multiple: true
+      categorias:
+        - id: F2.1
+          nombre: ""
+          definicion: ""
+          regla: ""
+          ejemplos: []
+# Evaluación de calidad, opcional en los mapeos (PRISMA-ScR, ítem 12).
+calidad:
+  activa: false
+  preguntas: []
+# Plan de síntesis y cruces de facetas para los mapas (PRISMA-ScR, ítem 13; Petersen et al., 2015, §5.1.4).
+analisis:
+  plan: ""
+  cruces:
+    - [F1, F2]
