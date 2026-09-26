@@ -50,20 +50,44 @@ estado pasa a "Aceptada" cuando ambas estén completas.
    valor fijo y reconocible). `hash` es el SHA-256, con prefijo `sha256:`, de
    la serialización canónica del evento sin el campo `hash`.
 7. **Verificación.** `verificar()` no confía en los valores declarados: relee
-   el archivo línea por línea, recalcula cada hash a partir del contenido, y
-   valida en orden la secuencia de `id`, la coincidencia de `hash_anterior`
-   con el hash real del evento previo, y la coincidencia del `hash`
-   declarado con el recalculado. Reporta la primera línea donde la cadena se
-   rompe, junto con una razón legible, ya sea por una línea alterada,
-   eliminada, insertada, reordenada, con JSON inválido, o truncada (por
-   ejemplo, por un proceso interrumpido a mitad de escritura).
-8. **Alcance como evidencia.** La cadena de hashes no es una firma
+   el archivo línea por línea y valida, en orden, la secuencia de `id`, la
+   coincidencia de `hash_anterior` con el hash real del evento previo, que la
+   línea (sin su retorno de carro final, por si el archivo tuviera fin de
+   línea CRLF) sea idéntica byte a byte a la serialización canónica del
+   objeto que declara, y la coincidencia del `hash` declarado con el
+   recalculado a partir del resto de los campos. La comparación byte a byte
+   contra la forma canónica es necesaria porque el hash por sí solo no
+   detecta un reformateo del archivo (por ejemplo, reordenar las claves de un
+   evento) que no cambie los valores de sus campos. Reporta la primera línea
+   donde la cadena se rompe, junto con una razón legible, ya sea por una
+   línea alterada, eliminada, insertada, reordenada, con JSON inválido, o
+   truncada (por ejemplo, por un proceso interrumpido a mitad de escritura).
+   Un archivo inexistente es un error de `verificar()`, no una cadena vacía
+   válida.
+8. **Escritura defensiva.** `agregar()` verifica la cadena existente antes de
+   escribir, y se niega con un error explícito si está rota o si el archivo
+   no termina en un salto de línea (señal de una escritura anterior
+   incompleta). Así, el registro nunca construye un evento nuevo sobre una
+   base ya comprometida.
+9. **Alcance como evidencia.** La cadena de hashes no es una firma
    criptográfica: cualquiera con acceso de escritura al archivo podría
    recalcularla por completo. Su valor como evidencia viene de combinarla con
    el historial de Git (que registra cuándo cambió el archivo) y el depósito
    del repositorio del estudio en Zenodo con DOI. Los reportes del estudio
    deben declarar esta limitación explícitamente, sin presentarla como una
    garantía criptográfica.
+10. **Límite conocido: truncar el final no se detecta.** Si se eliminan las
+    últimas *N* líneas del archivo, el prefijo restante sigue siendo, por sí
+    mismo, una cadena perfectamente válida: ningún campo dentro del archivo
+    declara cuántos eventos debería tener en total. `verificar()` no puede
+    detectar, solo con el contenido del archivo, la eliminación de eventos al
+    final del registro. La mitigación es un **anclaje** externo: guardar en
+    otro lugar (el historial del protocolo, o un reporte depositado en
+    Zenodo) el número de eventos esperado y el `hash` del último evento en un
+    momento dado, para poder comparar el archivo actual contra ese anclaje y
+    detectar así el truncamiento. Este anclaje no se implementa en 1a; queda
+    a cargo del sub-hito 1c, en el comando `protocolo historial` y en los
+    reportes que se publiquen.
 
 ### Formato del protocolo (sub-hito 1b)
 
@@ -105,3 +129,7 @@ P-E01 a P-E09 descritas en la especificación del hito 1.
   registran en el ciclo de vida del protocolo (`protocolo_aprobado`,
   `protocolo_enmendado`, decisiones O1–O10) y cómo referencian el hash del
   archivo del protocolo en el momento de cada evento.
+- El sub-hito 1c no se da por completo, en lo que toca a trazabilidad, hasta
+  implementar el anclaje descrito en el punto 10: sin él, la cadena por sí
+  sola no respalda una afirmación de "estos son todos los eventos", solo
+  "estos eventos, en este orden, no fueron alterados".

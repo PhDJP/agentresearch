@@ -1,4 +1,4 @@
-"""Registro encadenado de eventos: JSONL de solo adicion con hashes verificables."""
+"""Registro encadenado de eventos: JSONL de solo adición con hashes verificables."""
 
 import json
 from collections.abc import Callable
@@ -14,7 +14,7 @@ HASH_GENESIS = "sha256:genesis"
 
 
 def json_canonico(objeto: dict[str, Any]) -> str:
-    """Serializa un objeto a JSON canonico: claves ordenadas, UTF-8, sin espacios sobrantes."""
+    """Serializa un objeto a JSON canónico: claves ordenadas, UTF-8, sin espacios sobrantes."""
     return json.dumps(
         objeto,
         sort_keys=True,
@@ -59,8 +59,14 @@ def _reloj_del_sistema() -> datetime:
     return datetime.now(UTC)
 
 
+def _quitar_fin_de_linea(linea_cruda: str) -> str:
+    """Quita el salto de línea final y, si quedara, un retorno de carro final."""
+    linea = linea_cruda[:-1] if linea_cruda.endswith("\n") else linea_cruda
+    return linea[:-1] if linea.endswith("\r") else linea
+
+
 class RegistroEncadenado:
-    """Archivo JSONL de solo adicion, con cada linea encadenada por hash a la anterior."""
+    """Archivo JSONL de solo adición, con cada línea encadenada por hash a la anterior."""
 
     def __init__(
         self,
@@ -71,12 +77,32 @@ class RegistroEncadenado:
         self._reloj = reloj
 
     def agregar(self, tipo: str, datos: dict[str, Any]) -> EventoRegistro:
-        """Añade un evento al final del registro y devuelve el evento escrito."""
+        """Añade un evento al final del registro y devuelve el evento escrito.
+
+        Antes de escribir, verifica que la cadena existente sea íntegra y que
+        el archivo termine en un salto de línea; si no, se niega a agregar
+        para no construir sobre un registro ya comprometido.
+        """
         momento = self._reloj()
         if momento.tzinfo is None:
             raise ValueError("el reloj debe devolver una fecha con zona horaria")
 
-        eventos_previos = self.leer()
+        eventos_previos: list[EventoRegistro] = []
+        if self._ruta.exists():
+            contenido = self._ruta.read_bytes()
+            if contenido and not contenido.endswith(b"\n"):
+                raise ValueError(
+                    "el archivo no termina en un salto de línea "
+                    f"(escritura anterior incompleta): {self._ruta}"
+                )
+            resultado = self.verificar()
+            if not resultado.valido:
+                raise ValueError(
+                    "no se puede agregar: la cadena está rota "
+                    f"en la línea {resultado.numero_linea_error} ({resultado.mensaje})"
+                )
+            eventos_previos = self.leer()
+
         siguiente_id = f"evt-{len(eventos_previos) + 1:06d}"
         hash_anterior = eventos_previos[-1].hash if eventos_previos else HASH_GENESIS
 
@@ -104,15 +130,19 @@ class RegistroEncadenado:
         eventos = []
         with self._ruta.open("r", encoding="utf-8", newline="") as archivo:
             for linea_cruda in archivo:
-                linea = linea_cruda.rstrip("\n")
+                linea = _quitar_fin_de_linea(linea_cruda)
                 if linea:
                     eventos.append(EventoRegistro(**json.loads(linea)))
         return eventos
 
     def verificar(self) -> ResultadoVerificacion:
-        """Recalcula cada hash y valida la secuencia de ids y la cadena de hashes."""
+        """Recalcula cada hash y valida la secuencia de ids y la cadena de hashes.
+
+        Un archivo inexistente se trata como un error, no como una cadena
+        vacía válida: quien pide verificar un registro espera que exista.
+        """
         if not self._ruta.exists():
-            return ResultadoVerificacion(valido=True)
+            return ResultadoVerificacion(False, None, f"el archivo no existe: {self._ruta}")
 
         with self._ruta.open("r", encoding="utf-8", newline="") as archivo:
             lineas = archivo.readlines()
@@ -120,7 +150,7 @@ class RegistroEncadenado:
         hash_esperado_anterior = HASH_GENESIS
         indice_evento = 0
         for numero_linea, linea_cruda in enumerate(lineas, start=1):
-            linea = linea_cruda.rstrip("\n")
+            linea = _quitar_fin_de_linea(linea_cruda)
             if not linea:
                 continue
             indice_evento += 1
@@ -129,7 +159,7 @@ class RegistroEncadenado:
                 evento = json.loads(linea)
             except json.JSONDecodeError:
                 return ResultadoVerificacion(
-                    False, numero_linea, "JSON invalido o linea truncada"
+                    False, numero_linea, "JSON inválido o línea truncada"
                 )
 
             id_esperado = f"evt-{indice_evento:06d}"
@@ -143,13 +173,19 @@ class RegistroEncadenado:
                     numero_linea,
                     "hash_anterior no coincide con el hash del evento anterior",
                 )
+            if json_canonico(evento) != linea:
+                return ResultadoVerificacion(
+                    False,
+                    numero_linea,
+                    "la línea no coincide con su serialización canónica",
+                )
 
             hash_declarado = evento.get("hash")
             evento_sin_hash = {clave: valor for clave, valor in evento.items() if clave != "hash"}
             hash_calculado = hash_texto(json_canonico(evento_sin_hash))
             if hash_declarado != hash_calculado:
                 return ResultadoVerificacion(
-                    False, numero_linea, "el hash no coincide con el contenido de la linea"
+                    False, numero_linea, "el hash no coincide con el contenido de la línea"
                 )
 
             hash_esperado_anterior = hash_declarado

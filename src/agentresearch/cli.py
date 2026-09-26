@@ -30,12 +30,15 @@ def construir_analizador() -> argparse.ArgumentParser:
 
 
 def ejecutar_registro_verificar(archivo: Path) -> int:
-    """Verifica un registro encadenado e imprime el resultado. Devuelve el codigo de salida."""
+    """Verifica un registro encadenado e imprime el resultado. Devuelve el código de salida."""
     resultado = RegistroEncadenado(archivo).verificar()
     if resultado.valido:
-        print(f"integro: {archivo}")
+        print(f"íntegro: {archivo}")
         return 0
-    print(f"invalido en la linea {resultado.numero_linea_error}: {resultado.mensaje}")
+    if resultado.numero_linea_error is not None:
+        print(f"inválido en la línea {resultado.numero_linea_error}: {resultado.mensaje}")
+    else:
+        print(f"inválido: {resultado.mensaje}")
     return 1
 
 
@@ -43,6 +46,10 @@ def main() -> None:
     """Punto de entrada de la CLI."""
     analizador = construir_analizador()
     argumentos = analizador.parse_args()
+
+    if argumentos.comando is None:
+        analizador.print_help()
+        return
 
     if argumentos.comando == "registro" and argumentos.subcomando == "verificar":
         sys.exit(ejecutar_registro_verificar(argumentos.archivo))

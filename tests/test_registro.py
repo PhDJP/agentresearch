@@ -59,10 +59,14 @@ def test_verificar_acepta_una_cadena_valida(tmp_path: Path) -> None:
     assert registro.verificar().valido
 
 
-def test_verificar_acepta_un_archivo_inexistente(tmp_path: Path) -> None:
+def test_verificar_rechaza_un_archivo_inexistente(tmp_path: Path) -> None:
     registro = RegistroEncadenado(tmp_path / "no_existe.jsonl")
 
-    assert registro.verificar().valido
+    resultado = registro.verificar()
+
+    assert not resultado.valido
+    assert resultado.numero_linea_error is None
+    assert "no existe" in (resultado.mensaje or "")
 
 
 def test_verificar_detecta_caracter_alterado(tmp_path: Path) -> None:
@@ -208,3 +212,49 @@ def test_json_de_cada_linea_es_un_objeto_con_claves_ordenadas(tmp_path: Path) ->
     claves = list(json.loads(linea).keys())
 
     assert claves == sorted(claves)
+
+
+def test_verificar_detecta_una_linea_reformateada_con_los_mismos_valores(
+    tmp_path: Path,
+) -> None:
+    """Reordenar las claves no cambia el hash recalculado, pero si la forma canonica."""
+    ruta = tmp_path / "eventos.jsonl"
+    registro = RegistroEncadenado(ruta, reloj=_reloj_fijo(INICIO))
+    registro.agregar("uno", {"a": 1})
+
+    evento = json.loads(ruta.read_text(encoding="utf-8").splitlines()[0])
+    evento_con_otro_orden = dict(reversed(list(evento.items())))
+    assert list(evento_con_otro_orden.keys()) != sorted(evento_con_otro_orden.keys())
+    linea_reformateada = json.dumps(
+        evento_con_otro_orden, ensure_ascii=False, separators=(",", ":")
+    )
+    ruta.write_text(linea_reformateada + "\n", encoding="utf-8", newline="\n")
+
+    resultado = registro.verificar()
+
+    assert not resultado.valido
+    assert resultado.numero_linea_error == 1
+    assert "canónic" in (resultado.mensaje or "")
+
+
+def test_agregar_rechaza_si_la_cadena_existente_esta_rota(tmp_path: Path) -> None:
+    ruta = tmp_path / "eventos.jsonl"
+    registro = RegistroEncadenado(ruta, reloj=_reloj_incremental(INICIO))
+    registro.agregar("uno", {})
+    contenido = ruta.read_text(encoding="utf-8").replace('"uno"', '"otro"')
+    ruta.write_text(contenido, encoding="utf-8", newline="\n")
+
+    with pytest.raises(ValueError, match="rota"):
+        registro.agregar("dos", {})
+
+
+def test_agregar_rechaza_si_el_archivo_no_termina_en_salto_de_linea(tmp_path: Path) -> None:
+    ruta = tmp_path / "eventos.jsonl"
+    registro = RegistroEncadenado(ruta, reloj=_reloj_incremental(INICIO))
+    registro.agregar("uno", {})
+
+    contenido_sin_salto_final = ruta.read_bytes().rstrip(b"\n")
+    ruta.write_bytes(contenido_sin_salto_final)
+
+    with pytest.raises(ValueError, match="salto de línea"):
+        registro.agregar("dos", {})

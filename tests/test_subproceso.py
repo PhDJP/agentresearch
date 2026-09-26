@@ -39,7 +39,7 @@ def test_modulo_verifica_una_cadena_integra_por_subproceso(tmp_path: Path) -> No
     )
 
     assert resultado.returncode == 0
-    assert "integro" in resultado.stdout
+    assert "íntegro" in resultado.stdout
 
 
 def test_modulo_detecta_una_cadena_rota_por_subproceso(tmp_path: Path) -> None:
@@ -56,7 +56,21 @@ def test_modulo_detecta_una_cadena_rota_por_subproceso(tmp_path: Path) -> None:
     )
 
     assert resultado.returncode == 1
-    assert "invalido" in resultado.stdout
+    assert "inválido" in resultado.stdout
+
+
+def test_modulo_reporta_error_si_el_archivo_no_existe_por_subproceso(tmp_path: Path) -> None:
+    archivo = tmp_path / "no_existe.jsonl"
+
+    resultado = subprocess.run(
+        [sys.executable, "-m", "agentresearch", "registro", "verificar", str(archivo)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert resultado.returncode == 1
+    assert "no existe" in resultado.stdout
 
 
 def test_modulo_rechaza_argumentos_invalidos_por_subproceso() -> None:

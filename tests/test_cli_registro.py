@@ -24,6 +24,21 @@ def test_ejecutar_registro_verificar_devuelve_uno_si_esta_roto(tmp_path: Path) -
     assert ejecutar_registro_verificar(archivo) == 1
 
 
+def test_ejecutar_registro_verificar_devuelve_uno_si_el_archivo_no_existe(
+    tmp_path: Path,
+) -> None:
+    assert ejecutar_registro_verificar(tmp_path / "no_existe.jsonl") == 1
+
+
+def test_ejecutar_registro_verificar_imprime_mensaje_claro_si_no_existe(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    ejecutar_registro_verificar(tmp_path / "no_existe.jsonl")
+
+    salida = capsys.readouterr().out
+    assert "no existe" in salida
+
+
 def test_analizador_asigna_comando_y_subcomando_de_registro(tmp_path: Path) -> None:
     analizador = construir_analizador()
     archivo = tmp_path / "eventos.jsonl"
