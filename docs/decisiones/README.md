@@ -11,6 +11,7 @@ Cada decisión de diseño relevante queda en un archivo numerado. Una decisión 
 | [0003](0003-fuentes-y-formatos.md) | Fuentes de información y formatos de importación | Aceptada | 2026-09-25 |
 | [0004](0004-trazabilidad-y-reproducibilidad.md) | Trazabilidad de decisiones y reproducibilidad | Aceptada | 2026-09-25 |
 | [0005](0005-ingenieria-idioma-y-publicacion.md) | Ingeniería, idioma y publicación | Aceptada | 2026-09-25 |
+| [0006](0006-formato-del-protocolo-y-registro-encadenado.md) | Formato del protocolo y registro encadenado de eventos | Propuesta | 2026-09-26 |
 
 ## Plantilla
 
