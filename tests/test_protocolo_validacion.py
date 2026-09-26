@@ -1,4 +1,4 @@
-"""Pruebas de las reglas de validación del protocolo (P-E00 a P-E08, P-A01 a P-A08)."""
+"""Pruebas de las reglas de validación del protocolo (P-E00 a P-E08, P-A01 a P-A09)."""
 
 from collections.abc import Callable
 from pathlib import Path
@@ -39,7 +39,13 @@ def test_el_protocolo_sintetico_no_tiene_errores_ni_advertencias(
 def test_la_plantilla_solo_tiene_los_hallazgos_de_un_borrador_vacio() -> None:
     hallazgos = validar_documento(cargar_protocolo(texto_plantilla()))
 
-    assert {hallazgo.id_regla for hallazgo in hallazgos} == {"P-E04", "P-A04", "P-A06", "P-A08"}
+    assert {hallazgo.id_regla for hallazgo in hallazgos} == {
+        "P-E04",
+        "P-A04",
+        "P-A06",
+        "P-A08",
+        "P-A09",
+    }
 
 
 # --- Una mutación por caso -----------------------------------------------------
@@ -260,6 +266,9 @@ CASOS: list[tuple[str, Mutacion, list[str]]] = [
     ("acrónimo truncado", _agregar_termino(1, "PEF*"), ["P-A07"]),
     # P-A08: segundo revisor humano
     ("un solo revisor humano", _quitar_revisor("investigador-2"), ["P-A08"]),
+    # P-A09: piloto de cribado sin tamaño
+    ("piloto de tamaño 0", _asignar("seleccion", "piloto", "tamano", valor=0), ["P-A09"]),
+    ("piloto de tamaño negativo", _asignar("seleccion", "piloto", "tamano", valor=-5), ["P-A09"]),
     # Controles: cambios que no deben producir hallazgos
     (
         "periodo sin límites ni justificación",
@@ -273,6 +282,7 @@ CASOS: list[tuple[str, Mutacion, list[str]]] = [
     ),
     ("sigla dentro de una frase", _agregar_termino(0, '"ZF extract"'), []),
     ("año como término", _agregar_termino(0, "2020"), []),
+    ("piloto de un solo registro", _asignar("seleccion", "piloto", "tamano", valor=1), []),
 ]
 
 
@@ -362,6 +372,7 @@ def test_el_mensaje_de_una_advertencia_cita_su_referencia(datos_sinteticos: dict
         ("P-E06", "Petersen et al. (2015), tabla 6"),
         ("P-E08", "Landis y Koch (1977)"),
         ("P-A06", "Wohlin et al. (2013)"),
+        ("P-A09", "Ali y Petersen (2014); Petersen et al. (2015), figura 17"),
     ],
 )
 def test_referencias_del_catalogo(id_regla: str, referencia: str) -> None:
@@ -370,7 +381,7 @@ def test_referencias_del_catalogo(id_regla: str, referencia: str) -> None:
 
 def test_el_catalogo_tiene_los_ids_estables_y_su_severidad() -> None:
     errores = [f"P-E0{n}" for n in range(9)]
-    advertencias = [f"P-A0{n}" for n in range(1, 9)]
+    advertencias = [f"P-A0{n}" for n in range(1, 10)]
 
     assert list(REGLAS) == errores + advertencias
     assert all(REGLAS[i].severidad == "error" for i in errores)

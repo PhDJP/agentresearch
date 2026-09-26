@@ -130,6 +130,12 @@ _CATALOGO = (
         "Sin un segundo revisor humano para el piloto de cribado",
         "Petersen et al. (2015), §5.1.2",
     ),
+    Regla(
+        "P-A09",
+        "advertencia",
+        "Piloto de cribado sin tamaño definido",
+        "Ali y Petersen (2014); Petersen et al. (2015), figura 17",
+    ),
 )
 
 REGLAS: dict[str, Regla] = {regla.id: regla for regla in _CATALOGO}

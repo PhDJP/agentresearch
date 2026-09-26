@@ -1,4 +1,4 @@
-"""Validación del protocolo contra las reglas metodológicas P-E00 a P-E08 y P-A01 a P-A08.
+"""Validación del protocolo contra las reglas metodológicas P-E00 a P-E08 y P-A01 a P-A09.
 
 Cada regla es una función determinista sobre el modelo ya cargado; no usa
 heurísticas sobre el texto libre, salvo P-A07, que examina la forma de los
@@ -561,6 +561,18 @@ def _p_a08(protocolo: Protocolo) -> Iterator[_Resultado]:
         )
 
 
+def _p_a09(protocolo: Protocolo) -> Iterator[_Resultado]:
+    """Piloto de cribado sin tamaño: la concordancia se mide antes del cribado completo."""
+    tamano = protocolo.seleccion.piloto.tamano
+    if tamano <= 0:
+        yield (
+            "P-A09",
+            f"el piloto de cribado no tiene tamaño definido (valor: {tamano}); la "
+            "concordancia entre revisores se mide en un piloto antes del cribado completo",
+            ("seleccion", "piloto", "tamano"),
+        )
+
+
 _COMPROBACIONES: tuple[_Comprobacion, ...] = (
     _p_e01,
     _p_e02,
@@ -578,4 +590,5 @@ _COMPROBACIONES: tuple[_Comprobacion, ...] = (
     _p_a06,
     _p_a07,
     _p_a08,
+    _p_a09,
 )
