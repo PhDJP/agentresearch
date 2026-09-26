@@ -224,7 +224,7 @@ def _verificar_version_esquema(datos: CommentedMap) -> None:
         return  # el esquema lo reporta como campo obligatorio ausente
     version = datos["version_esquema"]
     if isinstance(version, bool) or version != VERSION_ESQUEMA:
-        linea, columna = _posicion(datos, ("version_esquema",))
+        linea, columna = posicion_en_yaml(datos, ("version_esquema",))
         raise ErrorLecturaProtocolo(
             [
                 ProblemaLectura(
@@ -249,7 +249,9 @@ def formatear_ubicacion(ruta: Sequence[str | int]) -> str:
     return "".join(partes)
 
 
-def _posicion(datos: CommentedMap, ruta: Sequence[str | int]) -> tuple[int | None, int | None]:
+def posicion_en_yaml(
+    datos: CommentedMap, ruta: Sequence[str | int]
+) -> tuple[int | None, int | None]:
     """Línea y columna (desde 1) del nodo más profundo de `ruta` que existe en `datos`."""
     posicion: tuple[int | None, int | None] = (None, None)
     nodo: Any = datos
@@ -268,7 +270,7 @@ def _posicion(datos: CommentedMap, ruta: Sequence[str | int]) -> tuple[int | Non
 def _problema_de_esquema(detalle: ErrorDetails, datos: CommentedMap) -> ProblemaLectura:
     ruta = [paso for paso in detalle["loc"] if isinstance(paso, str | int)]
     ubicacion = formatear_ubicacion(ruta) or None
-    linea, columna = _posicion(datos, ruta)
+    linea, columna = posicion_en_yaml(datos, ruta)
     return ProblemaLectura(
         mensaje=_mensaje_de_esquema(detalle),
         ubicacion=ubicacion,
