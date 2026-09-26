@@ -60,4 +60,4 @@ Tablas y detalle: `docs/metodologia/reglas_metodologicas.md`.
 
 ## Estado actual
 
-Hito 0 (entorno y esqueleto) pendiente. Ver `docs/hoja_de_ruta.md`.
+Hito 0 completo (`v0.0.1`, repositorio público https://github.com/PhDJP/agentresearch). Sigue el hito 1, sub-hito 1a: ver `docs/especificaciones/hito_1_protocolo_y_trazabilidad.md`.

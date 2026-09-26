@@ -33,6 +33,8 @@ Cada hito cerrado se etiqueta con una versión (`v0.N.0`).
 
 ## Hito 1: Protocolo y trazabilidad (`v0.1.0`)
 
+Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/hito_1_protocolo_y_trazabilidad.md](especificaciones/hito_1_protocolo_y_trazabilidad.md).
+
 - **Trazabilidad:** registro JSONL de solo adición, hashes, versión del agente y fecha y hora UTC.
 - **Modelo del protocolo** con pydantic:
   - justificación, preguntas (`PI*`), PCC con equivalencia PICOC;
