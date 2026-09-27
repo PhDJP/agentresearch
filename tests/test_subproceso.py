@@ -1,14 +1,71 @@
-"""Pruebas de integracion por subproceso, usando el modulo instalado."""
+"""Pruebas de integración por subproceso, usando el módulo instalado.
+
+Son herméticas respecto a la codificación: el subproceso no hereda las
+variables de codificación del sistema, escribe en UTF-8 por decisión
+explícita y su salida se decodifica en UTF-8 estricto.
+"""
 
 import json
+import os
 import subprocess
 import sys
 from importlib.metadata import entry_points
 from pathlib import Path
 
+import pytest
+
 from agentresearch.trazabilidad import RegistroEncadenado
 
 from .apoyo import agregar_evento, aprobar_protocolo, decision_propuesta, reemplazar_en
+
+VARIABLES_DE_CODIFICACION = (
+    "PYTHONIOENCODING",
+    "PYTHONUTF8",
+    "PYTHONLEGACYWINDOWSSTDIO",
+    "PYTHONLEGACYWINDOWSFSENCODING",
+    "PYTHONCOERCECLOCALE",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LANG",
+)
+
+
+def _entorno() -> dict[str, str]:
+    """Entorno del subproceso: sin la codificación del sistema y con UTF-8 fijado."""
+    entorno = {
+        clave: valor
+        for clave, valor in os.environ.items()
+        if clave.upper() not in VARIABLES_DE_CODIFICACION
+    }
+    entorno["PYTHONIOENCODING"] = "utf-8"
+    entorno["PYTHONUTF8"] = "1"
+    return entorno
+
+
+def _ejecutar(*argumentos: str, stdin: int | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", "agentresearch", *argumentos],
+        capture_output=True,
+        encoding="utf-8",
+        errors="strict",
+        env=_entorno(),
+        check=False,
+        timeout=60,
+        stdin=stdin,
+    )
+
+
+def test_el_entorno_del_subproceso_no_hereda_la_codificacion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PYTHONIOENCODING", "cp1252")
+    monkeypatch.setenv("LC_ALL", "C")
+
+    entorno = _entorno()
+
+    assert entorno["PYTHONIOENCODING"] == "utf-8"
+    assert entorno["PYTHONUTF8"] == "1"
+    assert "LC_ALL" not in entorno
 
 
 def test_el_comando_agentresearch_esta_registrado_como_punto_de_entrada() -> None:
@@ -19,12 +76,7 @@ def test_el_comando_agentresearch_esta_registrado_como_punto_de_entrada() -> Non
 
 
 def test_modulo_muestra_la_version_por_subproceso() -> None:
-    resultado = subprocess.run(
-        [sys.executable, "-m", "agentresearch", "--version"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    resultado = _ejecutar("--version")
 
     assert resultado.returncode == 0
     assert resultado.stdout.startswith("agentresearch ")
@@ -34,12 +86,7 @@ def test_modulo_verifica_una_cadena_integra_por_subproceso(tmp_path: Path) -> No
     archivo = tmp_path / "eventos.jsonl"
     RegistroEncadenado(archivo).agregar("uno", {"clave": "valor"})
 
-    resultado = subprocess.run(
-        [sys.executable, "-m", "agentresearch", "registro", "verificar", str(archivo)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    resultado = _ejecutar("registro", "verificar", str(archivo))
 
     assert resultado.returncode == 0
     assert "íntegro" in resultado.stdout
@@ -51,12 +98,7 @@ def test_modulo_detecta_una_cadena_rota_por_subproceso(tmp_path: Path) -> None:
     contenido = archivo.read_text(encoding="utf-8").replace('"uno"', '"otro"')
     archivo.write_text(contenido, encoding="utf-8", newline="\n")
 
-    resultado = subprocess.run(
-        [sys.executable, "-m", "agentresearch", "registro", "verificar", str(archivo)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    resultado = _ejecutar("registro", "verificar", str(archivo))
 
     assert resultado.returncode == 1
     assert "inválido" in resultado.stdout
@@ -65,42 +107,19 @@ def test_modulo_detecta_una_cadena_rota_por_subproceso(tmp_path: Path) -> None:
 def test_modulo_reporta_error_si_el_archivo_no_existe_por_subproceso(tmp_path: Path) -> None:
     archivo = tmp_path / "no_existe.jsonl"
 
-    resultado = subprocess.run(
-        [sys.executable, "-m", "agentresearch", "registro", "verificar", str(archivo)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    resultado = _ejecutar("registro", "verificar", str(archivo))
 
     assert resultado.returncode == 1
     assert "no existe" in resultado.stdout
 
 
 def test_modulo_rechaza_argumentos_invalidos_por_subproceso() -> None:
-    resultado = subprocess.run(
-        [sys.executable, "-m", "agentresearch", "registro", "verificar"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    resultado = _ejecutar("registro", "verificar")
 
     assert resultado.returncode != 0
 
 
 # --- Ciclo de vida del protocolo (ADR-0008) --------------------------------------------
-
-
-def _ejecutar(*argumentos: str, stdin: int | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "-m", "agentresearch", *argumentos],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",  # la consola del proceso hijo puede no usar UTF-8
-        check=False,
-        timeout=60,
-        stdin=stdin,
-    )
 
 
 def test_validar_muestra_el_registro_y_su_anclaje_por_subproceso(
