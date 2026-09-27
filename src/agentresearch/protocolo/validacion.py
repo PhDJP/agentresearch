@@ -211,6 +211,7 @@ def resumen_registro(registro: EstadoRegistro) -> dict[str, Any]:
         "version_registrada": ultima.version if ultima else None,
         "hash_registrado": ultima.hash_protocolo if ultima else None,
         "decisiones_pendientes": [d.id_decision for d in registro.pendientes],
+        "falta_anclaje": registro.falta_anclaje,
     }
 
 

@@ -350,6 +350,7 @@ def test_confirmar_en_lote_las_decisiones_propias(
         "confirmadas": ["O1", "O3"],
         "eventos": ["evt-000004", "evt-000005"],
         "anclaje": str(resultado.anclaje),
+        "anclaje_recreado": False,
         "pendientes_de_otros": ["O2"],
     }
 

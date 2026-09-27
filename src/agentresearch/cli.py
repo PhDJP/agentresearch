@@ -9,7 +9,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Protocol
 
-from agentresearch.protocolo import validar_archivo
+from agentresearch.protocolo import RutasProtocolo, validar_archivo
 from agentresearch.protocolo.aprobacion import (
     ErrorCicloDeVida,
     NivelElegido,
@@ -21,6 +21,7 @@ from agentresearch.protocolo.aprobacion import (
     simular_enmienda,
     texto_de_cambios,
 )
+from agentresearch.protocolo.ciclo_de_vida import MENSAJE_ANCLAJE_RECREADO, nota_falta_anclaje
 from agentresearch.protocolo.decisiones import (
     ResultadoConfirmacion,
     confirmar_decisiones,
@@ -107,6 +108,13 @@ def construir_analizador() -> argparse.ArgumentParser:
         type=Path,
         metavar="ARCHIVO",
         help="JSON con justificacion y efecto_esperado, en lugar de las dos opciones",
+    )
+    enmendar_parser.add_argument(
+        "--justificaciones",
+        type=Path,
+        metavar="ARCHIVO",
+        help="JSON con la justificación de cada advertencia nueva (no activa en la versión "
+        "registrada); las que falten se piden",
     )
     enmendar_parser.add_argument(
         "--simular",
@@ -227,6 +235,8 @@ def ejecutar_protocolo_validar(ruta: Path, como_json: bool = False) -> int:
     if registro is not None and registro["existe"]:
         anclaje = f", anclaje {registro['anclaje']}" if registro["anclaje"] else ""
         print(f"registro: {registro['ruta']} ({registro['numero_eventos']} eventos{anclaje})")
+        if registro["falta_anclaje"]:
+            print(f"nota: {nota_falta_anclaje(RutasProtocolo.desde(ruta))}")
     for hallazgo in resultado.hallazgos:
         print(hallazgo)
     print(f"resultado: {_resumen(len(resultado.errores), len(resultado.advertencias))}")
@@ -261,6 +271,7 @@ def ejecutar_protocolo_enmendar(
     como_json: bool = False,
     terminal: Terminal | None = None,
     reloj: Reloj | None = None,
+    justificaciones: Path | None = None,
 ) -> int:
     """Registra una enmienda tras la confirmación interactiva, o la simula sin escribir."""
     if simular:
@@ -277,6 +288,7 @@ def ejecutar_protocolo_enmendar(
             efecto_esperado,
             archivo_enmienda,
             reloj,
+            justificaciones,
         ),
         _describir_operacion,
     )
@@ -304,6 +316,13 @@ def _ejecutar_simulacion(ruta: Path, nivel: NivelElegido | None, como_json: bool
         )
     for linea in texto_de_cambios(propuesta.cambios):
         print(linea)
+    if propuesta.advertencias_nuevas:
+        print(
+            f"advertencias nuevas (no activas en la versión {propuesta.version_registrada}), "
+            "que exigirán justificación:"
+        )
+        for advertencia in propuesta.advertencias_nuevas:
+            print(f"  - {advertencia}")
     if propuesta.problemas:
         print("impedirían enmendar:")
         for problema in propuesta.problemas:
@@ -343,6 +362,7 @@ def ejecutar_decision_registrar(
             "el investigador la confirma en su terminal con: agentresearch protocolo decision "
             "confirmar --confirmado-por <id>",
             f"anclaje: {resultado.anclaje}",
+            *_aviso_anclaje(resultado.anclaje_recreado),
         ],
     )
 
@@ -371,6 +391,7 @@ def _describir_confirmacion(resultado: ResultadoConfirmacion) -> list[str]:
             f"decisiones confirmadas por {resultado.confirmado_por}: "
             f"{', '.join(resultado.confirmadas)}",
             f"anclaje: {resultado.anclaje}",
+            *_aviso_anclaje(resultado.anclaje_recreado),
         ]
     if resultado.pendientes_de_otros:
         lineas.append(f"pendientes de otros revisores: {', '.join(resultado.pendientes_de_otros)}")
@@ -390,7 +411,12 @@ def _describir_operacion(resultado: ResultadoOperacion) -> list[str]:
         f"evento: {resultado.evento.id} ({resultado.evento.tipo})",
         f"copia de la versión: {resultado.ruta_version}",
         f"anclaje: {resultado.anclaje}",
+        *_aviso_anclaje(resultado.anclaje_recreado),
     ]
+
+
+def _aviso_anclaje(recreado: bool) -> list[str]:
+    return [f"aviso: {MENSAJE_ANCLAJE_RECREADO}"] if recreado else []
 
 
 class _ConDiccionario(Protocol):
@@ -498,6 +524,7 @@ def main() -> None:
                 argumentos.archivo_enmienda,
                 argumentos.simular,
                 argumentos.como_json,
+                justificaciones=argumentos.justificaciones,
             )
         )
 

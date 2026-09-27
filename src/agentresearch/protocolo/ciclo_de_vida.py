@@ -127,6 +127,11 @@ class EstadoRegistro:
         return self.versiones[-1] if self.versiones else None
 
     @property
+    def falta_anclaje(self) -> bool:
+        """El registro existe sin `anclaje.json` (ADR-0008, punto 21)."""
+        return self.existe_registro and not self.existe_anclaje
+
+    @property
     def pendientes(self) -> list[DecisionRegistrada]:
         return [d for d in self.decisiones.values() if d.estado == "pendiente"]
 
@@ -421,6 +426,34 @@ def texto_anclaje(rutas: RutasProtocolo, anclaje: Anclaje) -> bytes:
         "registro": rutas.relativa(rutas.eventos),
     }
     return (json.dumps(datos, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
+
+
+def falta_anclaje(rutas: RutasProtocolo) -> bool:
+    """Indica si el registro existe sin `anclaje.json` (ADR-0008, punto 21).
+
+    No es un error: el siguiente comando que registre un evento lo vuelve a
+    crear. Pero mientras falte no se detecta que se quiten eventos finales, así
+    que se informa.
+    """
+    return rutas.eventos.is_file() and not rutas.anclaje.is_file()
+
+
+def nota_falta_anclaje(rutas: RutasProtocolo) -> str:
+    """Aviso de `validar` e `historial` mientras el registro exista sin anclaje."""
+    return (
+        f"falta {rutas.relativa(rutas.anclaje)}: mientras falte, no se detecta que se quiten "
+        "eventos finales del registro. El siguiente comando que registre un evento lo vuelve a "
+        "crear; antes, compare el anclaje actual con uno guardado fuera del estudio (p. ej. en "
+        "el historial de Git)"
+    )
+
+
+MENSAJE_ANCLAJE_RECREADO = (
+    "faltaba anclaje.json y se volvió a crear a partir del registro actual. Sin el anclaje "
+    "anterior no se puede comprobar que no se hayan quitado eventos finales: compare el anclaje "
+    "nuevo con uno guardado fuera del estudio (p. ej. en el historial de Git)"
+)
+"""Aviso de los comandos que recrean `anclaje.json` porque faltaba (ADR-0008, punto 21)."""
 
 
 def escribir_anclaje(rutas: RutasProtocolo) -> Anclaje:

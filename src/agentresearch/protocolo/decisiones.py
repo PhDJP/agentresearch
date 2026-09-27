@@ -30,6 +30,7 @@ from agentresearch.protocolo.ciclo_de_vida import (
     DecisionRegistrada,
     EstadoRegistro,
     escribir_anclaje,
+    falta_anclaje,
 )
 from agentresearch.protocolo.entradas import ErrorEntrada, leer_json, validar_modelo
 from agentresearch.protocolo.estudio import RutasProtocolo
@@ -63,6 +64,8 @@ class ResultadoRegistro:
     id_decision: str
     evento: EventoRegistro
     anclaje: Anclaje
+    anclaje_recreado: bool = False
+    """`anclaje.json` faltaba y se volvió a crear (ADR-0008, punto 21)."""
 
     def como_dict(self) -> dict[str, Any]:
         return {
@@ -70,6 +73,7 @@ class ResultadoRegistro:
             "estado": "pendiente",
             "evento": self.evento.id,
             "anclaje": str(self.anclaje),
+            "anclaje_recreado": self.anclaje_recreado,
             "datos": self.evento.datos,
         }
 
@@ -82,6 +86,8 @@ class ResultadoConfirmacion:
     eventos: list[EventoRegistro]
     anclaje: Anclaje | None
     pendientes_de_otros: list[str]
+    anclaje_recreado: bool = False
+    """`anclaje.json` faltaba y se volvió a crear (ADR-0008, punto 21)."""
 
     @property
     def confirmadas(self) -> list[str]:
@@ -93,6 +99,7 @@ class ResultadoConfirmacion:
             "confirmadas": self.confirmadas,
             "eventos": [evento.id for evento in self.eventos],
             "anclaje": str(self.anclaje) if self.anclaje else None,
+            "anclaje_recreado": self.anclaje_recreado,
             "pendientes_de_otros": self.pendientes_de_otros,
         }
 
@@ -124,8 +131,9 @@ def registrar_decision(
         estado_protocolo=protocolo.estado,
         hash_protocolo=hash_leido(lectura),
     )
+    recreado = falta_anclaje(rutas)
     evento = _registro(rutas, reloj).agregar(TIPO_DECISION_PROPUESTA, datos.model_dump(mode="json"))
-    return ResultadoRegistro(decision.id_decision, evento, escribir_anclaje(rutas))
+    return ResultadoRegistro(decision.id_decision, evento, escribir_anclaje(rutas), recreado)
 
 
 def problemas_de_decision(
@@ -257,6 +265,7 @@ def confirmar_decisiones(
         )
     confirmar_frase(terminal, f"confirmar {len(propias)}")
 
+    recreado = falta_anclaje(rutas)
     registro_eventos = _registro(rutas, reloj)
     eventos = []
     for decision in propias:
@@ -269,7 +278,9 @@ def confirmar_decisiones(
         eventos.append(
             registro_eventos.agregar(TIPO_DECISION_CONFIRMADA, datos.model_dump(mode="json"))
         )
-    return ResultadoConfirmacion(confirmado_por, eventos, escribir_anclaje(rutas), de_otros)
+    return ResultadoConfirmacion(
+        confirmado_por, eventos, escribir_anclaje(rutas), de_otros, recreado
+    )
 
 
 def texto_de_decision(registrada: DecisionRegistrada) -> str:

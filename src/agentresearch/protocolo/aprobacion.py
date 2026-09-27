@@ -28,6 +28,7 @@ from agentresearch.protocolo.ciclo_de_vida import (
     EstadoRegistro,
     VersionRegistrada,
     escribir_anclaje,
+    falta_anclaje,
     leer_estado_registro,
     siguiente_version,
 )
@@ -104,6 +105,8 @@ class ResultadoOperacion:
     ruta_version: str
     evento: EventoRegistro
     anclaje: Anclaje
+    anclaje_recreado: bool = False
+    """`anclaje.json` faltaba y se volvió a crear (ADR-0008, punto 21)."""
 
     def como_dict(self) -> dict[str, Any]:
         return {
@@ -116,6 +119,7 @@ class ResultadoOperacion:
             "tipo_evento": self.evento.tipo,
             "datos": self.evento.datos,
             "anclaje": str(self.anclaje),
+            "anclaje_recreado": self.anclaje_recreado,
         }
 
 
@@ -157,7 +161,7 @@ def aprobar(
         )
     errores += problemas_de_persona(protocolo, aprobado_por, "--aprobado-por")
     errores += _problemas_de_pendientes(registro)
-    justificadas: dict[tuple[str, str | None], str] = {}
+    justificadas: dict[ClaveAdvertencia, str] = {}
     if justificaciones is not None:
         try:
             justificadas = _leer_justificaciones(justificaciones, validacion.advertencias)
@@ -175,8 +179,25 @@ def aprobar(
             rutas, protocolo, version_anterior, lectura, hash_protocolo, aprobado_por, registro
         )
     )
-    advertencias = _justificar_advertencias(terminal, validacion.advertencias, justificadas)
+    advertencias_activas = validacion.advertencias
+    textos = _justificar_advertencias(
+        terminal,
+        advertencias_activas,
+        justificadas,
+        f"Advertencias activas: {len(advertencias_activas)}, cada una con su justificación",
+    )
     confirmar_frase(terminal, f"aprobar {VERSION_APROBADA}")
+    advertencias = [
+        AdvertenciaJustificada(
+            id_regla=a.id_regla,
+            ubicacion=a.ubicacion,
+            mensaje=a.mensaje,
+            referencia=a.referencia,
+            justificacion=textos[clave_advertencia(a)][0],
+            origen=textos[clave_advertencia(a)][1],
+        )
+        for a in advertencias_activas
+    ]
 
     datos = DatosAprobado(
         version_anterior=version_anterior,
@@ -188,7 +209,7 @@ def aprobar(
         aprobado_por=PersonaHumana(tipo="humano", id=aprobado_por),
         advertencias=advertencias,
     )
-    evento, anclaje = escribir_version(
+    evento, anclaje, recreado = escribir_version(
         rutas, lectura, VERSION_APROBADA, contenido_nuevo, TIPO_APROBADO, datos, reloj
     )
     return ResultadoOperacion(
@@ -199,6 +220,7 @@ def aprobar(
         ruta_version=datos.ruta_version,
         evento=evento,
         anclaje=anclaje,
+        anclaje_recreado=recreado,
     )
 
 
@@ -225,19 +247,42 @@ def _resumen_aprobacion(
     )
 
 
+ClaveAdvertencia = tuple[str, str | None]
+OrigenJustificacion = Literal["archivo", "terminal"]
+
+
+def clave_advertencia(advertencia: Hallazgo) -> ClaveAdvertencia:
+    """Identifica una advertencia por su regla y su ubicación (ADR-0008, punto 10)."""
+    return (advertencia.id_regla, advertencia.ubicacion)
+
+
 def _leer_justificaciones(
-    ruta: Path | str, advertencias: list[Hallazgo]
-) -> dict[tuple[str, str | None], str]:
+    ruta: Path | str,
+    a_justificar: list[Hallazgo],
+    ya_activas: frozenset[ClaveAdvertencia] = frozenset(),
+    version_anterior: str | None = None,
+) -> dict[ClaveAdvertencia, str]:
+    """Lee el archivo de justificaciones y empareja cada entrada con una advertencia.
+
+    `ya_activas` son las advertencias de una enmienda que ya estaban activas en
+    la versión anterior: no se vuelven a justificar, así que una entrada para
+    ellas es un error, igual que una que no corresponde a ninguna advertencia.
+    """
     nombre = str(ruta)
     archivo = validar_modelo(ArchivoJustificaciones, leer_json(ruta), nombre)
-    activas = {(a.id_regla, a.ubicacion) for a in advertencias}
-    justificadas: dict[tuple[str, str | None], str] = {}
+    activas = {clave_advertencia(a) for a in a_justificar}
+    justificadas: dict[ClaveAdvertencia, str] = {}
     errores: list[str] = []
     for entrada in archivo.justificaciones:
         clave = (entrada.id_regla, entrada.ubicacion)
         descripcion = f"{entrada.id_regla} en {entrada.ubicacion or '(sin ubicación)'}"
         if clave in justificadas:
             errores.append(f"{nombre}: la advertencia {descripcion} está repetida")
+        elif clave in ya_activas:
+            errores.append(
+                f"{nombre}: la advertencia {descripcion} ya estaba activa en la versión "
+                f"{version_anterior}; al enmendar solo se justifican las advertencias nuevas"
+            )
         elif clave not in activas:
             errores.append(
                 f"{nombre}: la advertencia {descripcion} no corresponde a ninguna advertencia "
@@ -255,38 +300,38 @@ def _leer_justificaciones(
 def _justificar_advertencias(
     terminal: Terminal,
     advertencias: list[Hallazgo],
-    justificadas: dict[tuple[str, str | None], str],
-) -> list[AdvertenciaJustificada]:
-    """Muestra cada advertencia con su justificación y pide las que falten."""
+    justificadas: dict[ClaveAdvertencia, str],
+    encabezado: str,
+    ya_activas: frozenset[ClaveAdvertencia] = frozenset(),
+    version_anterior: str | None = None,
+) -> dict[ClaveAdvertencia, tuple[str, OrigenJustificacion]]:
+    """Muestra cada advertencia con su justificación y pide las que falten.
+
+    Las advertencias de `ya_activas` se muestran sin pedir justificación.
+    Devuelve el texto y el origen de la justificación de cada una de las demás.
+    """
     if not advertencias:
         terminal.mostrar("Advertencias activas: ninguna")
-        return []
-    terminal.mostrar(f"Advertencias activas: {len(advertencias)}, cada una con su justificación")
-    resultado = []
+        return {}
+    terminal.mostrar(encabezado)
+    resultado: dict[ClaveAdvertencia, tuple[str, OrigenJustificacion]] = {}
     for advertencia in advertencias:
         terminal.mostrar(f"  - {advertencia}")
-        texto = justificadas.get((advertencia.id_regla, advertencia.ubicacion))
-        origen: Literal["archivo", "terminal"] = "archivo"
+        clave = clave_advertencia(advertencia)
+        if clave in ya_activas:
+            terminal.mostrar(f"    ya estaba activa en la versión {version_anterior}")
+            continue
+        texto = justificadas.get(clave)
         if texto is not None:
             terminal.mostrar(f"    justificación (archivo): {texto}")
-        else:
-            respuesta = terminal.preguntar("    justificación: ")
-            texto = (respuesta or "").strip()
-            origen = "terminal"
-            if not texto:
-                raise OperacionCancelada(
-                    f"la advertencia {advertencia.id_regla} necesita una justificación"
-                )
-        resultado.append(
-            AdvertenciaJustificada(
-                id_regla=advertencia.id_regla,
-                ubicacion=advertencia.ubicacion,
-                mensaje=advertencia.mensaje,
-                referencia=advertencia.referencia,
-                justificacion=texto,
-                origen=origen,
+            resultado[clave] = (texto, "archivo")
+            continue
+        texto = (terminal.preguntar("    justificación: ") or "").strip()
+        if not texto:
+            raise OperacionCancelada(
+                f"la advertencia {advertencia.id_regla} necesita una justificación"
             )
-        )
+        resultado[clave] = (texto, "terminal")
     return resultado
 
 
@@ -314,6 +359,8 @@ class PropuestaEnmienda:
     nivel: Nivel | None
     version_siguiente: str | None
     problemas: list[str]
+    advertencias_nuevas: list[Hallazgo]
+    """Advertencias activas que no lo estaban en la versión registrada: exigen justificación."""
 
     @property
     def solo_formato(self) -> bool:
@@ -338,6 +385,7 @@ class PropuestaEnmienda:
             "opciones_de_version": self.opciones_de_version,
             "solo_formato": self.solo_formato,
             "cambios": [cambio.como_dict() for cambio in self.cambios],
+            "advertencias_nuevas": [a.como_dict() for a in self.advertencias_nuevas],
             "problemas": self.problemas,
             "se_puede_enmendar": not self.problemas,
         }
@@ -374,11 +422,15 @@ def enmendar(
     efecto_esperado: str | None = None,
     archivo_enmienda: Path | str | None = None,
     reloj: Reloj | None = None,
+    justificaciones: Path | str | None = None,
 ) -> ResultadoOperacion:
     """Registra una enmienda de un protocolo vigente e incrementa su versión.
 
-    Lanza `ErrorCicloDeVida` si no se puede enmendar y `OperacionCancelada` si
-    el investigador no confirma. En ambos casos no escribe nada.
+    Las advertencias que no estaban activas en la versión registrada exigen una
+    justificación, del archivo `justificaciones` o de la terminal (ADR-0008,
+    punto 10). Lanza `ErrorCicloDeVida` si no se puede enmendar y
+    `OperacionCancelada` si el investigador no confirma. En ambos casos no
+    escribe nada.
     """
     enmienda = _preparar_enmienda(RutasProtocolo.desde(ruta), nivel)
     propuesta = enmienda.propuesta
@@ -396,6 +448,15 @@ def enmendar(
         textos = _textos_de_enmienda(justificacion, efecto_esperado, archivo_enmienda)
     except ErrorEntrada as error:
         errores += error.errores
+    ya_activas = _claves_registradas(enmienda.ultima)
+    justificadas: dict[ClaveAdvertencia, str] = {}
+    if justificaciones is not None:
+        try:
+            justificadas = _leer_justificaciones(
+                justificaciones, propuesta.advertencias_nuevas, ya_activas, enmienda.ultima.version
+            )
+        except ErrorEntrada as error:
+            errores += error.errores
     if errores:
         raise ErrorCicloDeVida(errores)
     assert propuesta.nivel is not None and propuesta.version_siguiente is not None
@@ -412,6 +473,16 @@ def enmendar(
         _resumen_enmienda(
             enmienda, hash_protocolo, enmendado_por, texto_justificacion, texto_efecto
         )
+    )
+    advertencias_activas = enmienda.validacion.advertencias
+    textos_advertencias = _justificar_advertencias(
+        terminal,
+        advertencias_activas,
+        justificadas,
+        f"Advertencias activas: {len(advertencias_activas)}; se justifican las nuevas, que no "
+        f"estaban activas en la versión {enmienda.ultima.version}",
+        ya_activas,
+        enmienda.ultima.version,
     )
     confirmar_frase(terminal, f"enmendar {version}")
 
@@ -430,16 +501,11 @@ def enmendar(
         cambios=[CambioRegistrado.model_validate(c.como_dict()) for c in propuesta.cambios],
         solo_formato=propuesta.solo_formato,
         advertencias=[
-            AdvertenciaRegistrada(
-                id_regla=a.id_regla,
-                ubicacion=a.ubicacion,
-                mensaje=a.mensaje,
-                referencia=a.referencia,
-            )
-            for a in enmienda.validacion.advertencias
+            _advertencia_registrada(a, textos_advertencias.get(clave_advertencia(a)))
+            for a in advertencias_activas
         ],
     )
-    evento, anclaje = escribir_version(
+    evento, anclaje, recreado = escribir_version(
         rutas, enmienda.lectura, version, contenido_nuevo, TIPO_ENMENDADO, datos, reloj
     )
     return ResultadoOperacion(
@@ -450,6 +516,7 @@ def enmendar(
         ruta_version=datos.ruta_version,
         evento=evento,
         anclaje=anclaje,
+        anclaje_recreado=recreado,
     )
 
 
@@ -504,6 +571,10 @@ def _preparar_enmienda(rutas: RutasProtocolo, nivel: NivelElegido | None) -> _En
         )
     problemas += _problemas_de_pendientes(registro)
 
+    ya_activas = _claves_registradas(ultima)
+    advertencias_nuevas = [
+        a for a in validacion.advertencias if clave_advertencia(a) not in ya_activas
+    ]
     cambios = diferencias_protocolo(anterior.protocolo, protocolo)
     nivel_efectivo: Nivel | None = nivel
     if not cambios:
@@ -523,8 +594,29 @@ def _preparar_enmienda(rutas: RutasProtocolo, nivel: NivelElegido | None) -> _En
             siguiente_version(ultima.version, nivel_efectivo) if nivel_efectivo else None
         ),
         problemas=problemas,
+        advertencias_nuevas=advertencias_nuevas,
     )
     return _Enmienda(rutas, lectura, validacion, documento, ultima, propuesta)
+
+
+def _claves_registradas(version: VersionRegistrada) -> frozenset[ClaveAdvertencia]:
+    """Advertencias activas en una versión registrada, según su evento."""
+    return frozenset((a.id_regla, a.ubicacion) for a in version.datos.advertencias)
+
+
+def _advertencia_registrada(
+    advertencia: Hallazgo, justificada: tuple[str, OrigenJustificacion] | None
+) -> AdvertenciaRegistrada:
+    """Advertencia del evento de enmienda: las nuevas llevan su justificación."""
+    return AdvertenciaRegistrada(
+        id_regla=advertencia.id_regla,
+        ubicacion=advertencia.ubicacion,
+        mensaje=advertencia.mensaje,
+        referencia=advertencia.referencia,
+        nueva=justificada is not None,
+        justificacion=justificada[0] if justificada is not None else None,
+        origen=justificada[1] if justificada is not None else None,
+    )
 
 
 def _textos_de_enmienda(
@@ -569,9 +661,6 @@ def _resumen_enmienda(
         f"  efecto esperado: {efecto_esperado}",
     ]
     lineas += texto_de_cambios(propuesta.cambios)
-    advertencias = enmienda.validacion.advertencias
-    lineas.append(f"Advertencias activas: {len(advertencias) or 'ninguna'}")
-    lineas += [f"  - {advertencia}" for advertencia in advertencias]
     return "\n".join(lineas)
 
 
@@ -677,11 +766,12 @@ def escribir_version(
     tipo: str,
     datos: ModeloEvento,
     reloj: Reloj | None,
-) -> tuple[EventoRegistro, Anclaje]:
+) -> tuple[EventoRegistro, Anclaje, bool]:
     """Escribe copia, evento, anclaje y protocolo, en ese orden (ADR-0008, punto 14).
 
     Antes de escribir, comprueba que el protocolo no cambió desde que se leyó
-    (por ejemplo, mientras el investigador confirmaba).
+    (por ejemplo, mientras el investigador confirmaba). Devuelve el evento, el
+    anclaje y si `anclaje.json` faltaba y se volvió a crear.
     """
     try:
         actual = rutas.protocolo.read_bytes()
@@ -693,6 +783,7 @@ def escribir_version(
             "ejecutar el comando"
         )
     escribir_atomico(rutas.copia_de_version(version), contenido_nuevo)
+    recreado = falta_anclaje(rutas)
     registro = (
         RegistroEncadenado(rutas.eventos, reloj=reloj)
         if reloj is not None
@@ -701,4 +792,4 @@ def escribir_version(
     evento = registro.agregar(tipo, datos.model_dump(mode="json"))
     anclaje = escribir_anclaje(rutas)
     escribir_atomico(rutas.protocolo, contenido_nuevo)
-    return evento, anclaje
+    return evento, anclaje, recreado

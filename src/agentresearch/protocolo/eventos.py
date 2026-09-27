@@ -19,6 +19,7 @@ from pydantic import (
     Field,
     SerializerFunctionWrapHandler,
     model_serializer,
+    model_validator,
 )
 
 from agentresearch.protocolo.estudio import es_ruta_relativa_valida
@@ -70,12 +71,39 @@ class AdvertenciaJustificada(ModeloEvento):
 
 
 class AdvertenciaRegistrada(ModeloEvento):
-    """Advertencia activa al enmendar (no se exige justificarla)."""
+    """Advertencia activa al enmendar (ADR-0008, punto 10).
+
+    `nueva` indica que no estaba activa en la versión registrada anterior. Solo
+    las nuevas llevan justificación y origen; las que ya existían se registran
+    sin ellos, porque se justificaron (o se registraron) antes.
+    """
 
     id_regla: str
     ubicacion: str | None
     mensaje: str
     referencia: str
+    nueva: bool
+    justificacion: TextoNoVacio | None = None
+    origen: Literal["archivo", "terminal"] | None = None
+
+    @model_validator(mode="after")
+    def _justificada_si_es_nueva(self) -> "AdvertenciaRegistrada":
+        justificada = self.justificacion is not None and self.origen is not None
+        sin_justificar = self.justificacion is None and self.origen is None
+        if self.nueva and not justificada:
+            raise ValueError("una advertencia nueva lleva justificacion y origen")
+        if not self.nueva and not sin_justificar:
+            raise ValueError("una advertencia que ya estaba activa no lleva justificacion")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _sin_justificacion_vacia(self, siguiente: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """Omite `justificacion` y `origen` en las advertencias que ya estaban activas."""
+        datos: dict[str, Any] = siguiente(self)
+        if not self.nueva:
+            datos.pop("justificacion", None)
+            datos.pop("origen", None)
+        return datos
 
 
 class CambioRegistrado(ModeloEvento):

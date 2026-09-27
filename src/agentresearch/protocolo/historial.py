@@ -15,6 +15,7 @@ from agentresearch.protocolo.ciclo_de_vida import (
     EstadoRegistro,
     VersionRegistrada,
     leer_estado_registro,
+    nota_falta_anclaje,
 )
 from agentresearch.protocolo.diferencias import Cambio
 from agentresearch.protocolo.estudio import RutasProtocolo
@@ -118,6 +119,8 @@ def texto_historial(historial: Historial) -> list[str]:
         if guardado is not None and guardado != registro.anclaje_actual:
             detalle += f": {guardado}"
         lineas.append(f"anclaje guardado en {rutas.relativa(rutas.anclaje)}: {detalle}")
+    if registro.falta_anclaje:
+        lineas.append(f"nota: {nota_falta_anclaje(rutas)}")
 
     lineas.append("versiones:" if registro.versiones else "versiones: ninguna registrada")
     for version in registro.versiones:
@@ -157,6 +160,10 @@ def _texto_version(version: VersionRegistrada) -> list[str]:
     else:
         lineas.append(f"    cambios: {len(datos.cambios)}")
         lineas += [f"      - {_cambio(c.model_dump())}" for c in datos.cambios]
+    nuevas = [a for a in datos.advertencias if a.nueva]
+    if nuevas:
+        lineas.append(f"    advertencias nuevas justificadas: {len(nuevas)}")
+        lineas += [f"      - {a.id_regla} en {a.ubicacion}: {a.justificacion}" for a in nuevas]
     return lineas
 
 

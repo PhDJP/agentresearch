@@ -392,6 +392,7 @@ def test_estados_de_las_decisiones(protocolo_de_estudio: Path) -> None:
         "version_registrada": None,
         "hash_registrado": None,
         "decisiones_pendientes": ["O2b"],
+        "falta_anclaje": False,
     }
 
 

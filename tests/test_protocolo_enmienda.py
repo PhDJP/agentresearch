@@ -1,9 +1,11 @@
-"""Pruebas de la enmienda del protocolo (ADR-0008, puntos 6, 12, 13 y 23)."""
+"""Pruebas de la enmienda del protocolo (ADR-0008, puntos 6, 10, 12, 13 y 23)."""
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from agentresearch.protocolo import RutasProtocolo, leer_estado_registro, validar_archivo
 from agentresearch.protocolo.aprobacion import (
@@ -14,6 +16,8 @@ from agentresearch.protocolo.aprobacion import (
     enmendar,
     simular_enmienda,
 )
+from agentresearch.protocolo.eventos import AdvertenciaRegistrada
+from agentresearch.protocolo.historial import construir_historial, texto_historial
 from agentresearch.protocolo.terminal import MENSAJE_SIN_TERMINAL
 from agentresearch.trazabilidad import RegistroEncadenado, hash_archivo
 
@@ -211,16 +215,177 @@ def test_el_resumen_muestra_el_diff_y_los_textos_completos(
     ]
 
 
-def test_la_enmienda_registra_las_advertencias_sin_exigir_justificacion(
+# --- Advertencias al enmendar (ADR-0008, punto 10) ---------------------------------
+
+JUSTIFICACION_PILOTO = "El tamaño del piloto se fija con el primer lote de registros."
+
+
+def _enmendar_con(
+    ruta: Path, respuestas: list[str | None], justificaciones: Path | None = None
+) -> tuple[ResultadoOperacion, TerminalSimulada]:
+    terminal = TerminalSimulada(respuestas)
+    resultado = enmendar(
+        ruta,
+        "menor",
+        "investigador-1",
+        terminal,
+        justificacion="El piloto mostró ambigüedad.",
+        efecto_esperado="Menos desacuerdos en el cribado.",
+        reloj=reloj_incremental(),
+        justificaciones=justificaciones,
+    )
+    return resultado, terminal
+
+
+def _archivo_justificaciones(tmp_path: Path, entradas: list[dict[str, Any]]) -> Path:
+    archivo = tmp_path / "justificaciones.json"
+    archivo.write_text(json.dumps({"justificaciones": entradas}), encoding="utf-8")
+    return archivo
+
+
+@pytest.fixture
+def vigente_con_advertencia(protocolo_de_estudio: Path) -> Path:
+    """Protocolo aprobado con la advertencia P-A09 activa y justificada."""
+    reemplazar_en(protocolo_de_estudio, "tamano: 20", "tamano: 0")
+    aprobar_protocolo(protocolo_de_estudio, [JUSTIFICACION_PILOTO, "aprobar 1.0.0"])
+    return protocolo_de_estudio
+
+
+def test_una_advertencia_nueva_exige_justificacion_en_la_terminal(
     protocolo_vigente: Path,
 ) -> None:
     reemplazar_en(protocolo_vigente, "tamano: 20", "tamano: 0")
 
-    resultado = _enmendar(protocolo_vigente, "menor")
+    resultado, terminal = _enmendar_con(protocolo_vigente, [JUSTIFICACION_PILOTO, "enmendar 1.1.0"])
 
     [advertencia] = resultado.evento.datos["advertencias"]
     assert advertencia["id_regla"] == "P-A09"
+    assert advertencia["nueva"] is True
+    assert advertencia["justificacion"] == JUSTIFICACION_PILOTO
+    assert advertencia["origen"] == "terminal"
+    assert (
+        "Advertencias activas: 1; se justifican las nuevas, que no estaban activas en la "
+        "versión 1.0.0"
+    ) in terminal.texto
+    assert terminal.preguntas[0] == "    justificación: "
+    historial = texto_historial(construir_historial(protocolo_vigente))
+    assert "    advertencias nuevas justificadas: 1" in historial
+    assert any(
+        linea.endswith(f"P-A09 en seleccion.piloto.tamano: {JUSTIFICACION_PILOTO}")
+        for linea in historial
+    )
+
+
+def test_una_advertencia_nueva_se_justifica_con_el_archivo(
+    protocolo_vigente: Path, tmp_path: Path
+) -> None:
+    reemplazar_en(protocolo_vigente, "tamano: 20", "tamano: 0")
+    [nueva] = simular_enmienda(protocolo_vigente).advertencias_nuevas
+    archivo = _archivo_justificaciones(
+        tmp_path,
+        [
+            {
+                "id_regla": "P-A09",
+                "ubicacion": nueva.ubicacion,
+                "justificacion": JUSTIFICACION_PILOTO,
+            }
+        ],
+    )
+
+    resultado, terminal = _enmendar_con(protocolo_vigente, ["enmendar 1.1.0"], archivo)
+
+    [advertencia] = resultado.evento.datos["advertencias"]
+    assert advertencia["origen"] == "archivo"
+    assert f"    justificación (archivo): {JUSTIFICACION_PILOTO}" in terminal.texto
+    assert len(terminal.preguntas) == 1  # solo la frase de confirmación
+
+
+def test_una_advertencia_nueva_sin_justificacion_cancela(protocolo_vigente: Path) -> None:
+    reemplazar_en(protocolo_vigente, "tamano: 20", "tamano: 0")
+    eventos = RutasProtocolo.desde(protocolo_vigente).eventos
+    antes = eventos.read_bytes()
+
+    with pytest.raises(OperacionCancelada, match="P-A09 necesita una justificación"):
+        _enmendar_con(protocolo_vigente, ["  "])
+
+    assert eventos.read_bytes() == antes
+    assert _archivos_de_versiones(protocolo_vigente) == ["1.0.0.yaml"]
+
+
+def test_una_advertencia_que_ya_estaba_activa_no_se_justifica_de_nuevo(
+    vigente_con_advertencia: Path,
+) -> None:
+    reemplazar_en(vigente_con_advertencia, "tamano_lote_llm: 25", "tamano_lote_llm: 30")
+    assert simular_enmienda(vigente_con_advertencia).advertencias_nuevas == []
+
+    resultado, terminal = _enmendar_con(vigente_con_advertencia, ["enmendar 1.1.0"])
+
+    [advertencia] = resultado.evento.datos["advertencias"]
+    assert advertencia["id_regla"] == "P-A09"
+    assert advertencia["nueva"] is False
     assert "justificacion" not in advertencia
+    assert "origen" not in advertencia
+    assert "    ya estaba activa en la versión 1.0.0" in terminal.texto
+    assert len(terminal.preguntas) == 1
+
+
+def test_justificar_una_advertencia_que_ya_estaba_activa_falla(
+    vigente_con_advertencia: Path, tmp_path: Path
+) -> None:
+    reemplazar_en(vigente_con_advertencia, "tamano_lote_llm: 25", "tamano_lote_llm: 30")
+    [activa] = validar_archivo(vigente_con_advertencia).advertencias
+    archivo = _archivo_justificaciones(
+        tmp_path,
+        [{"id_regla": "P-A09", "ubicacion": activa.ubicacion, "justificacion": "otra vez"}],
+    )
+
+    with pytest.raises(ErrorCicloDeVida) as error:
+        _enmendar_con(vigente_con_advertencia, ["enmendar 1.1.0"], archivo)
+
+    [mensaje] = error.value.errores
+    assert "ya estaba activa en la versión 1.0.0" in mensaje
+    assert "solo se justifican las advertencias nuevas" in mensaje
+
+
+def test_justificar_una_advertencia_inexistente_al_enmendar_falla(
+    protocolo_vigente: Path, tmp_path: Path
+) -> None:
+    reemplazar_en(protocolo_vigente, "tamano_lote_llm: 25", "tamano_lote_llm: 30")
+    archivo = _archivo_justificaciones(
+        tmp_path, [{"id_regla": "P-A03", "ubicacion": None, "justificacion": "j"}]
+    )
+
+    with pytest.raises(ErrorCicloDeVida, match="no corresponde a ninguna advertencia activa"):
+        _enmendar_con(protocolo_vigente, ["enmendar 1.1.0"], archivo)
+
+
+def test_simular_lista_las_advertencias_nuevas(protocolo_vigente: Path) -> None:
+    reemplazar_en(protocolo_vigente, "tamano: 20", "tamano: 0")
+
+    propuesta = simular_enmienda(protocolo_vigente, "menor")
+
+    [nueva] = propuesta.como_dict()["advertencias_nuevas"]
+    assert nueva["id_regla"] == "P-A09"
+    assert propuesta.problemas == []  # se justifica al enmendar, no impide simular
+
+
+@pytest.mark.parametrize(
+    ("datos", "mensaje"),
+    [
+        ({"nueva": True}, "una advertencia nueva lleva justificacion y origen"),
+        ({"nueva": True, "justificacion": "j"}, "una advertencia nueva lleva justificacion"),
+        (
+            {"nueva": False, "justificacion": "j", "origen": "archivo"},
+            "una advertencia que ya estaba activa no lleva justificacion",
+        ),
+    ],
+)
+def test_el_esquema_exige_justificacion_solo_en_las_nuevas(
+    datos: dict[str, Any], mensaje: str
+) -> None:
+    base = {"id_regla": "P-A09", "ubicacion": None, "mensaje": "m", "referencia": "r"}
+    with pytest.raises(ValidationError, match=mensaje):
+        AdvertenciaRegistrada.model_validate({**base, **datos})
 
 
 # --- Rechazos (no se escribe nada) --------------------------------------------------
@@ -481,6 +646,7 @@ def test_simular_no_escribe_ni_exige_terminal(protocolo_vigente: Path) -> None:
                 "despues": 30,
             }
         ],
+        "advertencias_nuevas": [],
         "problemas": [],
         "se_puede_enmendar": True,
     }
