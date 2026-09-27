@@ -196,6 +196,41 @@ CASOS: list[tuple[str, Mutacion, list[str]]] = [
     ),
     ("lote cero", _asignar("seleccion", "tamano_lote_llm", valor=0), ["P-E08"]),
     ("lote negativo", _asignar("seleccion", "tamano_lote_llm", valor=-3), ["P-E08"]),
+    # P-E11: términos de búsqueda traducibles (ADR-0009, puntos 1 a 3)
+    ("varias palabras sin comillas", _agregar_termino(0, "fruto seco"), ["P-E11"]),
+    ("operador como término, en minúsculas", _agregar_termino(0, "near"), ["P-E11"]),
+    ("operador en minúsculas en una frase", _agregar_termino(0, '"fruto and seco"'), ["P-E11"]),
+    ("paréntesis", _agregar_termino(0, "(zarambo)"), ["P-E11"]),
+    ("etiqueta de campo", _agregar_termino(0, "zarambo[tiab]"), ["P-E11"]),
+    ("comodín de un carácter", _agregar_termino(0, "zaramb?"), ["P-E11"]),
+    ("truncamiento al inicio", _agregar_termino(0, "*zarambo"), ["P-E11"]),
+    ("truncamiento en medio", _agregar_termino(0, "zar*bo"), ["P-E11"]),
+    ("truncamiento tras un guion", _agregar_termino(0, "by-*"), ["P-E11"]),
+    ("guion al inicio", _agregar_termino(0, "-zarambo"), ["P-E11"]),
+    ("comillas sin cerrar", _agregar_termino(0, '"fruto seco'), ["P-E11"]),
+    ("comillas vacías", _agregar_termino(0, '""'), ["P-E11"]),
+    ("término en blanco junto a otros", _agregar_termino(0, " "), ["P-E11"]),
+    ("signo de puntuación", _agregar_termino(0, "zarambo."), ["P-E11"]),
+    (
+        "variante de un término no truncado",
+        _asignar("busqueda", "bloques", 1, "variantes", valor={"secado": ["secados"]}),
+        ["P-E11"],
+    ),
+    (
+        "variante truncada",
+        _asignar("busqueda", "bloques", 1, "variantes", valor={"dehydrat*": ["dehydrated*"]}),
+        ["P-E11"],
+    ),
+    (
+        "término truncado sin variantes en la lista",
+        _asignar("busqueda", "bloques", 1, "variantes", valor={"dehydrat*": []}),
+        ["P-E11"],
+    ),
+    (
+        "variante de varias palabras sin comillas",
+        _asignar("busqueda", "bloques", 1, "variantes", valor={"dehydrat*": ["dry fruit"]}),
+        ["P-E11"],
+    ),
     # P-A01: evaluación empírica
     (
         "inclusión que exige evaluación empírica",
@@ -281,6 +316,23 @@ CASOS: list[tuple[str, Mutacion, list[str]]] = [
         [],
     ),
     ("sigla dentro de una frase", _agregar_termino(0, '"ZF extract"'), []),
+    ("palabra con guion interno truncada", _agregar_termino(0, "by-product*"), []),
+    ("palabra con guion interno", _agregar_termino(0, "post-extraction"), []),
+    ("palabra con apóstrofo interno", _agregar_termino(0, "farmer's"), []),
+    ("palabra con tilde", _agregar_termino(0, "extracción"), []),
+    ("frase truncada", _agregar_termino(0, '"fruto sec*"'), []),
+    ("palabra sola entre comillas", _agregar_termino(0, '"zarambo"'), []),
+    (
+        "variantes válidas",
+        _asignar(
+            "busqueda",
+            "bloques",
+            1,
+            "variantes",
+            valor={"dehydrat*": ["dehydration", '"dry fruit"']},
+        ),
+        [],
+    ),
     ("año como término", _agregar_termino(0, "2020"), []),
     ("piloto de un solo registro", _asignar("seleccion", "piloto", "tamano", valor=1), []),
 ]
@@ -381,7 +433,7 @@ def test_referencias_del_catalogo(id_regla: str, referencia: str) -> None:
 
 
 def test_el_catalogo_tiene_los_ids_estables_y_su_severidad() -> None:
-    errores = [f"P-E{n:02d}" for n in range(11)]
+    errores = [f"P-E{n:02d}" for n in range(12)]
     advertencias = [f"P-A0{n}" for n in range(1, 10)]
 
     assert list(REGLAS) == errores + advertencias
