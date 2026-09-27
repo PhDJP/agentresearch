@@ -1,5 +1,20 @@
 {
   "permissions": {
+    "ask": [
+      "Bash(git push*)",
+      "Bash(git tag*)",
+      "Bash(gh repo create*)",
+      "Bash(gh repo delete*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh release*)",
+      "PowerShell(git push*)",
+      "PowerShell(git tag*)",
+      "PowerShell(gh repo create*)",
+      "PowerShell(gh repo delete*)",
+      "PowerShell(gh pr merge*)",
+      "PowerShell(gh release*)",
+      "Edit(/.claude/**)"
+    ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.local)",
