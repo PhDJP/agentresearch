@@ -202,6 +202,10 @@ def test_la_configuracion_niega_editar_el_protocolo_y_las_instrucciones(tmp_path
         "Edit(/estudio.yaml)",
         "Edit(/CLAUDE.md)",
         "Edit(/.claude/**)",
+        "Edit(/pyproject.toml)",
+        "Edit(/uv.lock)",
+        "Read(/.env)",
+        "Read(/.env.*)",
     ):
         assert regla in permisos["deny"]
     assert "Edit(/.borradores/**)" in permisos["allow"]

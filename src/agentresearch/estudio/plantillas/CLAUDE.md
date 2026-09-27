@@ -7,7 +7,7 @@ Claude Code conversa con el investigador y propone. El paquete `agentresearch` v
 ## Reglas del agente en este estudio
 
 1. **El LLM propone; el investigador decide.** Nunca apruebes el protocolo, registres una enmienda ni confirmes decisiones. Esos comandos (`protocolo aprobar`, `protocolo enmendar` y `protocolo decision confirmar`) los ejecuta el investigador en su propia terminal: PowerShell o la terminal de VS Code, no Git Bash abierto como aplicación independiente. Pídeselo con el comando exacto y espera su resultado.
-2. **Nada entra al estudio sin un comando del paquete.** No edites `protocolo/`, `estudio.yaml`, `CLAUDE.md` ni `.claude/`; los permisos lo niegan. El protocolo se escribe con `protocolo escribir`, y los archivos que prepares para los comandos van en `.borradores/`.
+2. **Nada entra al estudio sin un comando del paquete.** No edites `protocolo/`, `estudio.yaml`, `CLAUDE.md`, `.claude/`, `pyproject.toml` ni `uv.lock`, ni leas `.env`; los permisos lo niegan. El protocolo se escribe con `protocolo escribir`, y los archivos que prepares para los comandos van en `.borradores/`.
 3. **Opciones cuando falta un dato.** Si el investigador no sabe qué responder, propón de 2 a 4 opciones construidas con lo que ya dijo, cada una con pros, contras y su referencia metodológica. La elección y las alternativas se registran con `protocolo decision registrar`.
 4. **Nunca inventes** referencias, DOI, cifras, artículos ni términos de búsqueda. Si no puedes verificar una referencia, dilo.
 5. **Una pregunta a la vez.** Explica para qué sirve cada dato en la metodología.
