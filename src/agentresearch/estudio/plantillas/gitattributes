@@ -1,0 +1,9 @@
+# Fin de línea LF en todo el texto: los hashes del registro dependen de los bytes exactos.
+* text=auto eol=lf
+
+# Binarios
+*.pdf binary
+*.png binary
+*.jpg binary
+*.xlsx binary
+*.docx binary

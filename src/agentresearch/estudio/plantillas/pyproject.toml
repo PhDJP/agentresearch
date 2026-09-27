@@ -1,0 +1,13 @@
+# Proyecto uv del estudio: fija la versión exacta de agentresearch; uv.lock se versiona.
+[project]
+name = "{{nombre}}"
+version = "0.0.0"
+description = "Datos y evidencia de un estudio de mapeo sistemático conducido con agentresearch."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "agentresearch @ {{fuente_agente}}",
+]
+
+[tool.uv]
+# El estudio no es un paquete: uv solo instala sus dependencias.
+package = false

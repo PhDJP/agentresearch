@@ -1,0 +1,23 @@
+# Entorno de Python
+.venv/
+__pycache__/
+
+# Secretos: nunca se versionan
+.env
+.env.*
+
+# Archivos intermedios que prepara Claude Code (su contenido queda en los eventos)
+.borradores/
+
+# Configuración local de Claude Code
+.claude/settings.local.json
+
+# Texto completo y material con derechos de autor: solo uso local
+*.pdf
+material_con_derechos/
+
+# Archivos temporales del sistema y de Office
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*

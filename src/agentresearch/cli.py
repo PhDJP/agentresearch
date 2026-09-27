@@ -9,6 +9,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Protocol
 
+from agentresearch.estudio.creacion import ErrorCreacion, ResultadoCreacion, crear_estudio
 from agentresearch.protocolo import RutasProtocolo, validar_archivo
 from agentresearch.protocolo.aprobacion import (
     ErrorCicloDeVida,
@@ -46,6 +47,31 @@ def construir_analizador() -> argparse.ArgumentParser:
         version=f"agentresearch {version('agentresearch')}",
     )
     subcomandos = analizador.add_subparsers(dest="comando")
+
+    nuevo_estudio = subcomandos.add_parser(
+        "nuevo-estudio",
+        help="Crea el repositorio de un estudio con su protocolo, registro e instrucciones",
+    )
+    nuevo_estudio.add_argument(
+        "ruta", type=Path, help="carpeta nueva del estudio; su nombre es el nombre del estudio"
+    )
+    nuevo_estudio.add_argument(
+        "--titulo", required=True, metavar="TEXTO", help="título del estudio"
+    )
+    nuevo_estudio.add_argument(
+        "--modelo",
+        required=True,
+        metavar="ID",
+        help="identificador exacto del modelo que se fija en .claude/settings.json "
+        "(p. ej. claude-opus-5-5)",
+    )
+    nuevo_estudio.add_argument(
+        "--contexto",
+        type=Path,
+        metavar="ARCHIVO",
+        help="insumo del investigador que se copia en protocolo/insumos/",
+    )
+    _argumento_json(nuevo_estudio)
 
     registro = subcomandos.add_parser("registro", help="Operaciones sobre registros encadenados")
     subcomandos_registro = registro.add_subparsers(dest="subcomando", required=True)
@@ -226,6 +252,44 @@ def _anclaje_argumento(texto: str) -> Anclaje:
         return Anclaje.desde_texto(texto)
     except ValueError as error:
         raise argparse.ArgumentTypeError(str(error)) from None
+
+
+def ejecutar_nuevo_estudio(
+    ruta: Path,
+    titulo: str,
+    modelo: str,
+    contexto: Path | None = None,
+    como_json: bool = False,
+) -> int:
+    """Crea el repositorio de un estudio y muestra los pasos siguientes."""
+    _tolerar_caracteres_no_representables()
+    comando = "nuevo-estudio"
+    try:
+        resultado = crear_estudio(ruta, titulo, modelo, contexto)
+    except ErrorCreacion as error:
+        return _informar_fallo(comando, como_json, "no se pudo crear el estudio", error.errores)
+    if como_json:
+        _imprimir_json(comando, True, [], resultado.como_dict())
+    else:
+        for linea in _describir_creacion(resultado):
+            print(linea)
+    return 0
+
+
+def _describir_creacion(resultado: ResultadoCreacion) -> list[str]:
+    estudio = resultado.estudio
+    return [
+        f"estudio creado: {resultado.ruta}",
+        f"título: {estudio.titulo}",
+        f"agente: agentresearch {estudio.agente.version} ({estudio.agente.fuente})",
+        f"modelo fijado: {estudio.modelo}",
+        f"evento: {resultado.evento.id} ({resultado.evento.tipo})",
+        f"anclaje: {resultado.anclaje}",
+        "archivos:",
+        *[f"  {archivo}" for archivo in resultado.archivos],
+        "pasos siguientes:",
+        *[f"  {numero}. {paso}" for numero, paso in enumerate(resultado.pasos_siguientes(), 1)],
+    ]
 
 
 def ejecutar_registro_verificar(archivo: Path, anclaje: Anclaje | None = None) -> int:
@@ -629,6 +693,17 @@ def main() -> None:
     if argumentos.comando is None:
         analizador.print_help()
         return
+
+    if argumentos.comando == "nuevo-estudio":
+        sys.exit(
+            ejecutar_nuevo_estudio(
+                argumentos.ruta,
+                argumentos.titulo,
+                argumentos.modelo,
+                argumentos.contexto,
+                argumentos.como_json,
+            )
+        )
 
     if argumentos.comando == "registro" and argumentos.subcomando == "verificar":
         sys.exit(ejecutar_registro_verificar(argumentos.archivo, argumentos.anclaje))

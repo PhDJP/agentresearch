@@ -200,6 +200,20 @@ def problemas_de_decision(
     return errores
 
 
+def es_identificador_exacto_de_modelo(modelo: str) -> bool:
+    """Indica si `modelo` es un identificador exacto: sin espacios, con su versión y sin alias.
+
+    Por ejemplo, `claude-opus-5-5` lo es; `opus`, `sonnet` o `claude-opus-latest`, no.
+    """
+    return not (
+        not modelo.strip()
+        or re.search(r"\s", modelo)
+        or not any(caracter.isdigit() for caracter in modelo)
+        or modelo.casefold() in ALIAS_DE_MODELO
+        or modelo.casefold().endswith("-latest")
+    )
+
+
 def _problemas_de_proponente(decision: Decision) -> list[str]:
     proponente = decision.propuesto_por
     if proponente.tipo == "humano":
@@ -215,12 +229,7 @@ def _problemas_de_proponente(decision: Decision) -> list[str]:
             "propuesto_por.modelo está vacío: un LLM se identifica con el identificador exacto "
             "del modelo (p. ej. claude-opus-5-5)"
         ]
-    if (
-        re.search(r"\s", modelo)
-        or not any(caracter.isdigit() for caracter in modelo)
-        or modelo.casefold() in ALIAS_DE_MODELO
-        or modelo.casefold().endswith("-latest")
-    ):
+    if not es_identificador_exacto_de_modelo(modelo):
         return [
             f"propuesto_por.modelo {modelo!r} no es un identificador exacto: sin espacios, con "
             "su versión y sin alias como «opus» o «-latest» (p. ej. claude-opus-5-5)"
