@@ -53,6 +53,7 @@ Tablas y detalle: `docs/metodologia/reglas_metodologicas.md`.
 - Commits pequeños, con mensajes en español (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`).
 - Toda decisión de diseño relevante se registra como ADR en `docs/decisiones/`.
 - Avanzar hito por hito según `docs/hoja_de_ruta.md`, sin adelantar hitos.
+- Validación: cada hito se acepta con un estudio de demostración (tema real y neutral, nunca datos del caso piloto). El caso piloto se ejecuta en el hito 11, con el agente terminado, y da la `v1.0.0`; el hito 10 cierra como `v0.10.0`.
 - Este repositorio es la herramienta. Los datos de cada estudio van en un repositorio aparte.
 - `referencias_locales/` tiene PDFs con derechos de autor: se pueden leer para verificar, pero nunca se versionan ni se copian textualmente.
 - `caso_piloto_local/` es privado: no se versiona ni se copia a archivos versionados. Las pruebas usan datos sintéticos, no los del caso piloto.

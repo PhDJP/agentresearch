@@ -13,7 +13,7 @@ Al terminar el hito 1, un investigador puede:
 4. aprobarlo;
 5. dejar trazada cada decisión y cada enmienda.
 
-El caso piloto (subproductos del CBD) es la prueba de aceptación.
+La prueba de aceptación es un estudio de demostración: un tema real y neutral, distinto del caso piloto. El caso piloto (subproductos del CBD) se ejecuta en el hito 11, con el agente terminado (decisión del 2026-09-27; ver «Estrategia de validación» en la hoja de ruta).
 
 ## Sub-hitos
 
@@ -25,7 +25,7 @@ Cada sub-hito se trabaja en una sesión de Claude Code, con plan aprobado antes 
 | 1b | Modelo del protocolo, YAML y validación | Alto |
 | 1c | Ciclo de vida: aprobación, enmiendas y decisiones del protocolo | Alto |
 | 1d | Ecuaciones de búsqueda por fuente | Alto |
-| 1e | Repositorio de estudio, plantilla y comando `/protocolo`; aceptación con el caso piloto | Alto |
+| 1e | Repositorio de estudio, plantilla y comando `/protocolo`; aceptación con el estudio de demostración | Alto |
 
 Al cerrar 1e se etiqueta `v0.1.0`.
 
@@ -294,13 +294,15 @@ Se implementa como comando o *skill* de Claude Code, según lo que la versión a
 5. Al cerrar cada sección, escribir en `protocolo.yaml`, ejecutar `protocolo validar` y mostrar las advertencias con una propuesta para resolverlas.
 6. Al final, mostrar un resumen completo y pedir aprobación explícita. Nunca aprobar sin ella.
 
-### Aceptación con el caso piloto
+### Aceptación con el estudio de demostración
 
-- Se crea el repositorio del estudio (propuesta: `Documentos\mapeo-subproductos-cbd`, privado en GitHub hasta registrar el protocolo).
-- `/protocolo` construye el protocolo partiendo de `caso_piloto_local/contexto_caso_piloto.md`.
-- Las decisiones O1 a O10 quedan registradas.
-- `validar` da cero errores y todas las advertencias quedan revisadas.
-- El protocolo queda aprobado como `1.0.0`, y `historial` muestra todo el recorrido.
+- El ADR-0007 fija el tema del estudio de demostración (real y neutral, distinto del caso piloto, de pocos registros) y dónde viven sus datos.
+- Se crea su repositorio con `nuevo-estudio`.
+- `/protocolo` construye el protocolo de punta a punta, incluidas al menos dos decisiones registradas con `decision registrar` y confirmadas por el investigador en su terminal.
+- `validar` da cero errores y todas las advertencias quedan justificadas.
+- El investigador aprueba el protocolo como `1.0.0` en su propia terminal (PowerShell o la terminal de VS Code), se generan las ecuaciones con `ecuaciones --escribir`, y `historial` muestra todo el recorrido con su anclaje.
+
+El protocolo del caso piloto se construye con este mismo flujo en el hito 11.
 
 ## ADR que el hito 1 debe producir
 
@@ -318,4 +320,4 @@ Se implementa como comando o *skill* de Claude Code, según lo que la versión a
 - CI en verde en Windows y Ubuntu.
 - ADR 0006, 0007 y 0008, y `CHANGELOG.md` actualizado.
 - Etiqueta `v0.1.0`.
-- Protocolo del caso piloto aprobado.
+- Protocolo del estudio de demostración aprobado.
