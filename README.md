@@ -2,7 +2,7 @@
 
 Agente investigador para estudios de mapeo sistemático de la literatura. Combina las guías de Kitchenham y de Petersen con el reporte PRISMA-ScR, y funciona con Claude Code y recursos gratuitos.
 
-> **Estado:** en construcción. El hito 0 (base técnica, versión 0.0.1) está completo. Las funciones de mapeo se incorporan hito a hito, y cada una se valida en un estudio real (el caso piloto) antes de darse por terminada. Mientras tanto, solo debe usarse lo que aparece en "Disponible hoy". Ver la [hoja de ruta](docs/hoja_de_ruta.md).
+> **Estado:** en construcción. Las funciones de mapeo se incorporan hito a hito, y cada hito se acepta con un estudio de demostración real y neutral; el caso piloto se ejecuta al final, con el agente terminado (versión 1.0.0). Mientras tanto, solo debe usarse lo que aparece en "Disponible hoy". Ver la [hoja de ruta](docs/hoja_de_ruta.md).
 
 ## Para quién
 
@@ -22,15 +22,18 @@ Para investigadores que quieren hacer un mapeo sistemático riguroso sin pagar A
 ## Disponible hoy
 
 - CLI: `uv run agentresearch --version`.
+- Creación del repositorio de un estudio ([ADR-0007](docs/decisiones/0007-repositorio-de-estudio.md)): `uv run agentresearch nuevo-estudio <carpeta> --titulo "…" --modelo <identificador exacto> [--contexto archivo.md]`. Crea el protocolo en borrador, el registro de eventos con su anclaje, el proyecto uv que fija la versión del agente, el `CLAUDE.md` del estudio, la configuración de Claude Code (modelo y permisos) y la *skill* `/protocolo`, que construye el protocolo con el investigador sección por sección.
 - Verificación de un registro encadenado de eventos, opcionalmente contra un anclaje guardado: `uv run agentresearch registro verificar <archivo.jsonl> [--anclaje evt-NNNNNN@sha256:…]`.
 - Validación de un protocolo en YAML contra su esquema y las reglas metodológicas (errores P-E00 a P-E10 y advertencias P-A01 a P-A09): `uv run agentresearch protocolo validar [ruta] [--json]`. La plantilla comentada del protocolo viene en el paquete.
 - Ciclo de vida del protocolo ([ADR-0008](docs/decisiones/0008-ciclo-de-vida-del-protocolo.md)). Todos los comandos admiten `--json`:
   - `protocolo aprobar --aprobado-por ID [--justificaciones archivo.json]`;
   - `protocolo enmendar --nivel mayor|menor --enmendado-por ID (--justificacion … --efecto-esperado … | --archivo-enmienda archivo.json)`, y `--simular` para ver el diff sin escribir;
   - `protocolo decision registrar --archivo decision.json` y `protocolo decision confirmar --confirmado-por ID`;
-  - `protocolo historial`, con versiones, enmiendas, decisiones y el anclaje del registro.
+  - `protocolo historial`, con versiones, enmiendas, decisiones y el anclaje del registro;
+  - `protocolo escribir <sección> --archivo fragmento.yaml`, que escribe una sección validando antes el esquema y conservando los comentarios.
 
   `aprobar`, `enmendar` y `decision confirmar` exigen una terminal interactiva: el investigador los ejecuta en su propia terminal, no desde Claude Code.
+- Ecuaciones de búsqueda por fuente ([ADR-0009](docs/decisiones/0009-ecuaciones-de-busqueda-por-fuente.md)): `uv run agentresearch protocolo ecuaciones [ruta] [--escribir] [--json]`, para OpenAlex, PubMed, Scopus, Web of Science y una versión genérica.
 - Pruebas, estilo (ruff) y tipos (mypy estricto), verificados en integración continua sobre Windows y Ubuntu.
 - Documentación metodológica, de arquitectura y de decisiones (ADR).
 

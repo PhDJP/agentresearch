@@ -42,20 +42,27 @@ flowchart LR
 | `analisis` | Conteos por faceta, series temporales, mapas de burbujas y de calor | 9 |
 | `reporte` | Diagrama de flujo, checklist PRISMA-ScR, tabla de estudios, declaración de IA | 10 |
 | `prompts/` | Prompts versionados de cada tarea del LLM (archivos de texto) | 5 |
-| `plantillas/estudio/` | `CLAUDE.md` del estudio, comandos o *skills* de Claude Code, protocolo de ejemplo | 1 |
+| `estudio` | Creación del repositorio de un estudio (`nuevo-estudio`) y sus plantillas: `CLAUDE.md` del estudio, configuración y *skills* de Claude Code (ADR-0007) | 1 |
 
 ## Estructura del repositorio de un estudio
+
+`agentresearch nuevo-estudio` crea la raíz y `protocolo/` (ADR-0007); cada hito crea sus carpetas cuando las usa.
 
 ```text
 mi-estudio/
 ├── CLAUDE.md                     # comportamiento del agente en este estudio (desde plantilla)
-├── .claude/                      # comandos o skills; modelo fijado con su identificador completo
-├── estudio.yaml                  # metadatos y versión exacta del agente
+├── .claude/                      # settings.json (modelo fijado y permisos) y skills/protocolo/
+├── estudio.yaml                  # metadatos, versión exacta del agente y modelo fijado
+├── pyproject.toml, uv.lock       # proyecto uv que fija el agente a la etiqueta de su versión
+├── README.md, .gitignore, .gitattributes
+├── .borradores/                  # archivos intermedios de Claude Code (no se versiona)
 ├── protocolo/
 │   ├── protocolo.yaml            # versión actual
-│   ├── eventos.jsonl             # aprobación, enmiendas y decisiones (registro encadenado, ADR-0008)
+│   ├── eventos.jsonl             # creación, aprobación, enmiendas y decisiones (ADR-0007 y ADR-0008)
 │   ├── anclaje.json              # número de eventos y hash del último
-│   └── versiones/                # copia exacta de cada versión registrada (X.Y.Z.yaml)
+│   ├── versiones/                # copia exacta de cada versión registrada (X.Y.Z.yaml)
+│   ├── ecuaciones.md             # ecuaciones de búsqueda por fuente (ADR-0009)
+│   └── insumos/                  # insumos del investigador (--contexto)
 ├── busquedas/
 │   └── <fuente>/<fecha-hora>/    # consulta.json, respuesta cruda, conteo
 ├── importaciones/                # archivos exportados originales + hash
@@ -123,7 +130,7 @@ mi-estudio/
 
 Estas reglas van en las plantillas del estudio, no en el `CLAUDE.md` de desarrollo.
 
-- **Guía por fases** con un comando por fase, por ejemplo: `/protocolo`, `/busqueda`, `/importar`, `/deduplicar`, `/cribado`, `/bola-de-nieve`, `/texto-completo`, `/extraccion`, `/analisis`, `/reporte` y `/estado`.
+- **Guía por fases** con un comando (*skill*) por fase, por ejemplo: `/protocolo`, `/busqueda`, `/importar`, `/deduplicar`, `/cribado`, `/bola-de-nieve`, `/texto-completo`, `/extraccion`, `/analisis`, `/reporte` y `/estado`.
 - **Una pregunta a la vez.** El agente explica para qué sirve cada dato en la metodología.
 - **Opciones cuando falta información.** Si el investigador no sabe qué responder, el agente propone de 2 a 4 opciones construidas a partir de lo ya dicho, cada una con pros, contras y su referencia metodológica. La elección y las alternativas se registran.
 - **Fases en orden.** El agente no avanza de fase sin la verificación de la anterior (`agentresearch estado`).

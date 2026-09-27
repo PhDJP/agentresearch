@@ -95,6 +95,23 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
     guiones, o con truncados sin variantes, usa la búsqueda exacta;
   - en Scopus, los términos con guion van entre comillas.
 - ADR-0009 aceptado: ecuaciones de búsqueda por fuente.
+- Repositorio de estudio y comando `/protocolo` (sub-hito 1e, ADR-0007):
+  - `nuevo-estudio <ruta> --titulo T --modelo ID [--contexto archivo]`:
+    crea el repositorio de un estudio desde las plantillas del paquete
+    (`estudio.yaml`, proyecto uv fijado a la etiqueta de la versión del
+    agente, protocolo en borrador, `CLAUDE.md`, `.claude/settings.json`,
+    la *skill* `/protocolo`, `.gitignore`, `.gitattributes` y `README.md`)
+    y registra el evento `estudio_creado` con el hash de cada archivo;
+  - *skill* `/protocolo`: construye o enmienda el protocolo sección por
+    sección, registra las decisiones y pide al investigador aprobar,
+    enmendar y confirmar en su propia terminal;
+  - configuración de Claude Code del estudio: modelo exacto fijado; niega
+    `aprobar` y `decision confirmar`, pregunta antes de `enmendar` y niega
+    editar el protocolo, el registro y las instrucciones del agente;
+  - `protocolo escribir <sección> --archivo fragmento.yaml`: escribe una
+    sección validando antes el esquema, también con el protocolo vigente;
+  - nota de estado «instrucciones del agente modificadas» en `validar` e
+    `historial`, y la creación del estudio en `historial`.
 
 ### Cambiado
 
@@ -102,10 +119,15 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
   salida incluye un resumen del registro de eventos con su anclaje.
 - `RegistroEncadenado.agregar()` sincroniza cada evento a disco con
   `os.fsync`.
+- El evento `estudio_creado` se valida con su esquema y solo puede ser el
+  primero del registro (P-E10).
 
 ### Corregido
 
 - `CITATION.cff`: se agrega `repository-code`.
+- La escritura del protocolo restaura los comentarios de sección de primer
+  nivel, que ruamel.yaml perdía al vaciar una sección o dejaba fuera de
+  lugar al agregarle un elemento al final (límite del ADR-0006).
 - `RegistroEncadenado.verificar()` informa una línea JSON que no es un
   objeto, en vez de fallar con una excepción.
 - Integración continua: `actions/checkout` y `astral-sh/setup-uv`

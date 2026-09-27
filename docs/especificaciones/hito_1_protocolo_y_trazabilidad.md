@@ -294,6 +294,16 @@ Se implementa como comando o *skill* de Claude Code, según lo que la versión a
 5. Al cerrar cada sección, escribir en `protocolo.yaml`, ejecutar `protocolo validar` y mostrar las advertencias con una propuesta para resolverlas.
 6. Al final, mostrar un resumen completo y pedir aprobación explícita. Nunca aprobar sin ella.
 
+Ajustes aprobados al implementar 1e (2026-09-27); el detalle está en el [ADR-0007](../decisiones/0007-repositorio-de-estudio.md):
+
+- **`/protocolo` es una *skill*** con `disable-model-invocation: true` y dos archivos de apoyo (guía por sección y formatos), como recomienda la documentación actual de Claude Code.
+- **`nuevo-estudio --modelo ID`** es obligatorio y exige un identificador exacto. Solo crea `protocolo/`; las carpetas de las demás fases las crea cada hito. No ejecuta Git ni uv: muestra los pasos siguientes. El estudio es un proyecto uv que fija el agente a la etiqueta `v<versión>`.
+- **Evento inicial `estudio_creado`,** con el hash de cada archivo creado, de las instrucciones del agente (`CLAUDE.md`, `.claude/settings.json` y la *skill*) y de los insumos. `validar` e `historial` muestran la nota «instrucciones del agente modificadas» si esos archivos cambian.
+- **`protocolo escribir <sección> --archivo fragmento.yaml`** es la vía para escribir el protocolo: valida contra el esquema antes de escribir y conserva comentarios y estilo. Funciona también con el protocolo vigente, para preparar una enmienda.
+- **Comentarios de sección:** la escritura restaura los del propio archivo, que en un estudio nace de la plantilla.
+- **Permisos del estudio:** se niegan `aprobar` y `decision confirmar`, `enmendar` pregunta cada vez (para permitir `--simular`), y se niega editar `protocolo/`, `estudio.yaml`, `CLAUDE.md` y `.claude/`. No son una frontera de seguridad: la barrera sigue siendo la terminal.
+- **Versión del agente:** antes de `v0.1.0`, el estudio de demostración se fija a la etiqueta candidata `v0.1.0rc1`.
+
 ### Aceptación con el estudio de demostración
 
 - El ADR-0007 fija el tema del estudio de demostración (real y neutral, distinto del caso piloto, de pocos registros) y dónde viven sus datos.
