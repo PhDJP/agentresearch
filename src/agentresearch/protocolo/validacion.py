@@ -32,9 +32,15 @@ from agentresearch.protocolo.ciclo_de_vida import (
     leer_estado_registro,
     problemas_p_e09,
 )
+from agentresearch.protocolo.ecuaciones.documento import EstadoEcuaciones, estado_ecuaciones
 from agentresearch.protocolo.estudio import RutasProtocolo
 from agentresearch.protocolo.modelo import VERSION_ESQUEMA, Protocolo
 from agentresearch.protocolo.reglas import REGLAS, Severidad
+from agentresearch.protocolo.terminos import (
+    TerminoNoValido,
+    analizar_termino,
+    problemas_de_variantes,
+)
 from agentresearch.trazabilidad import hash_bytes
 
 MINIMO_CONJUNTO_VALIDACION = 5
@@ -87,6 +93,8 @@ class ResultadoValidacion:
     version_protocolo: str | None = None
     registro: dict[str, Any] | None = None
     """Resumen del registro de eventos del estudio, con su anclaje."""
+    ecuaciones: EstadoEcuaciones | None = None
+    """Si `ecuaciones.md` corresponde al protocolo actual (ADR-0009, punto 14)."""
 
     @property
     def errores(self) -> list[Hallazgo]:
@@ -114,6 +122,8 @@ class ResultadoValidacion:
             "advertencias": len(self.advertencias),
             "hallazgos": [hallazgo.como_dict() for hallazgo in self.hallazgos],
             "registro": self.registro,
+            "ecuaciones": self.ecuaciones.como_dict() if self.ecuaciones else None,
+            "ecuaciones_desactualizadas": bool(self.ecuaciones and self.ecuaciones.desactualizadas),
         }
 
 
@@ -175,6 +185,7 @@ def validar_lectura(lectura: LecturaProtocolo, registro: EstadoRegistro) -> Resu
             documento.protocolo.metadatos.version_protocolo if documento is not None else None
         ),
         registro=resumen_registro(registro),
+        ecuaciones=estado_ecuaciones(registro.rutas, lectura.hash),
     )
 
 
@@ -667,6 +678,28 @@ def _p_a09(protocolo: Protocolo) -> Iterator[_Resultado]:
         )
 
 
+def _p_e11(protocolo: Protocolo) -> Iterator[_Resultado]:
+    """Términos de búsqueda que no cumplen la gramática, y variantes mal formadas."""
+    for i, bloque in enumerate(protocolo.busqueda.bloques):
+        if all(_vacio(termino) for termino in bloque.terminos):
+            continue  # un bloque sin términos ya lo reporta P-E04
+        for j, termino in enumerate(bloque.terminos):
+            try:
+                analizar_termino(termino)
+            except TerminoNoValido as error:
+                yield (
+                    "P-E11",
+                    f"el término {termino!r} del bloque {bloque.id} no se puede traducir: {error}",
+                    ("busqueda", "bloques", i, "terminos", j),
+                )
+        for clave, mensaje in problemas_de_variantes(bloque.terminos, bloque.variantes):
+            yield (
+                "P-E11",
+                f"variantes del bloque {bloque.id}: {mensaje}",
+                ("busqueda", "bloques", i, "variantes", clave),
+            )
+
+
 _COMPROBACIONES: tuple[_Comprobacion, ...] = (
     _p_e01,
     _p_e02,
@@ -676,6 +709,7 @@ _COMPROBACIONES: tuple[_Comprobacion, ...] = (
     _p_e06,
     _p_e07,
     _p_e08,
+    _p_e11,
     _p_a01,
     _p_a02,
     _p_a03,

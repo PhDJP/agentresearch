@@ -1,0 +1,11 @@
+ecuacion: (bloqueada)
+avisos:
+- bloqueante [B2, "freeze dr*"]: Web of Science no documenta el truncamiento dentro de una frase entre comillas, y lo no documentado se trata como no admitido. Agregue en busqueda.bloques[B2].variantes las variantes de '"freeze dr*"' que Web of Science debe buscar en su lugar
+- bloqueante [B2, "fruto sec*"]: Web of Science no documenta el truncamiento dentro de una frase entre comillas, y lo no documentado se trata como no admitido. Agregue en busqueda.bloques[B2].variantes las variantes de '"fruto sec*"' que Web of Science debe buscar en su lugar
+- advertencia [B2, liofilización]: Web of Science no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
+- advertencia: idiomas no reconocidos ('español'): van a la instrucción de la interfaz tal como están escritos. Use códigos ISO 639-1 (p. ej. es, en) para que salgan con el nombre en inglés que usa la base
+- advertencia: tipos de documento no reconocidos ('poster'): van a la instrucción de la interfaz tal como están escritos, sin convertirlos. Tipos del vocabulario controlado (ADR-0009, punto 10): articulo, revision, conferencia, capitulo, libro, editorial, carta, nota
+instrucciones de la interfaz:
+- Periodo: ajuste los años de publicación en la interfaz: desde 2015, inclusive (la ayuda solo documenta PY= con un intervalo cerrado)
+- Idioma: en los resultados, filtre por idioma (Languages) a English, español
+- Tipo de documento: en los resultados, filtre por tipo (Document Types) a Article, poster (un registro puede tener dos tipos, p. ej. Article y Proceedings Paper)

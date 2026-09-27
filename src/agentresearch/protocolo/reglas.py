@@ -99,6 +99,14 @@ _CATALOGO = (
         "ADR-0006, puntos 7 y 10; ADR-0008, punto 24",
     ),
     Regla(
+        "P-E11",
+        "error",
+        "Término de búsqueda no traducible: cada término es una palabra, una palabra "
+        "truncada o una frase entre comillas, y cada variante corresponde a un término "
+        "truncado del bloque",
+        "PRISMA-ScR, ítem 8; Petersen et al. (2015), §5.1.2; ADR-0009, puntos 1 a 3",
+    ),
+    Regla(
         "P-A01",
         "advertencia",
         "Criterio que exige evaluación empírica",

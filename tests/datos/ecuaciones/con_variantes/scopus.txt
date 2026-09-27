@@ -1,0 +1,7 @@
+ecuacion: TITLE-ABS-KEY((zarambo OR "Zarambus fictus" OR "by-product*" OR "post-extraction" OR fru* OR "zarambina") AND (secado OR dehydrat* OR "freeze drying" OR "freeze dried" OR "fruto sec*" OR liofilización)) AND PUBYEAR > 2009 AND PUBYEAR < 2026 AND (LANGUAGE(english) OR LANGUAGE(spanish)) AND (DOCTYPE(ar) OR DOCTYPE(re))
+avisos:
+- nota [B1, by-product*]: se escribe entre comillas: Elsevier solo documenta el guion dentro de una frase aproximada (lo ignora y admite comodines), y lo no documentado se trata como no admitido
+- nota [B1, post-extraction]: se escribe entre comillas: Elsevier solo documenta el guion dentro de una frase aproximada (lo ignora y admite comodines), y lo no documentado se trata como no admitido
+- nota [B2, "freeze dr*"]: Scopus exige al menos 3 letras antes del *, y '"freeze dr*"' tiene una raíz más corta; se usan sus variantes: "freeze drying", "freeze dried"
+- advertencia [B2, liofilización]: Scopus no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
+instrucciones de la interfaz:

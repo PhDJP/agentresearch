@@ -1,0 +1,9 @@
+ecuacion: TS=((zarambo OR "Zarambus fictus" OR by-product* OR post-extraction OR fru* OR "zarambina") AND (secado OR dehydrat* OR "freeze drying" OR "freeze dried" OR "fruto seco" OR "frutos secos" OR liofilización)) AND PY=(2010-2025)
+avisos:
+- nota [B2, "freeze dr*"]: Web of Science no documenta el truncamiento dentro de una frase entre comillas, y lo no documentado se trata como no admitido; se usan sus variantes: "freeze drying", "freeze dried"
+- nota [B2, "fruto sec*"]: Web of Science no documenta el truncamiento dentro de una frase entre comillas, y lo no documentado se trata como no admitido; se usan sus variantes: "fruto seco", "frutos secos"
+- advertencia [B2, liofilización]: Web of Science no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
+- nota: la ayuda de Web of Science recomienda intervalos de 5 años o menos en PY=, porque los más largos hacen lenta la búsqueda; si ocurre, quite PY= de la ecuación y ajuste los años de publicación en la interfaz
+instrucciones de la interfaz:
+- Idioma: en los resultados, filtre por idioma (Languages) a English, Spanish
+- Tipo de documento: en los resultados, filtre por tipo (Document Types) a Article, Review (un registro puede tener dos tipos, p. ej. Article y Proceedings Paper)

@@ -174,6 +174,11 @@ class Bloque(ModeloProtocolo):
     nombre: str
     componente: ComponenteBloque
     terminos: list[str] = []
+    variantes: dict[str, list[str]] = {}
+    """Variantes de un término truncado, para las fuentes que no admiten su truncamiento.
+
+    Las escribe el investigador; el paquete nunca las inventa (ADR-0009, punto 3).
+    """
 
 
 class Periodo(ModeloProtocolo):

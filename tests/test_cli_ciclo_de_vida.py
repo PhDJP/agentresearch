@@ -282,6 +282,21 @@ def test_simular_en_texto_con_nivel_y_problemas(
     assert "impedirían enmendar:\n  - la versión de protocolo/protocolo.yaml (9.0.0)" in salida
 
 
+def test_simular_en_texto_lista_las_advertencias_nuevas(
+    protocolo_editado: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    reemplazar_en(protocolo_editado, "tamano: 20", "tamano: 0")
+
+    codigo = ejecutar_protocolo_enmendar(protocolo_editado, "menor", simular=True)
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert (
+        "advertencias nuevas (no activas en la versión 1.0.0), que exigirán justificación:\n"
+        "  - advertencia P-A09"
+    ) in salida
+
+
 def test_simular_en_json(protocolo_editado: Path, capsys: pytest.CaptureFixture[str]) -> None:
     codigo = ejecutar_protocolo_enmendar(protocolo_editado, "menor", simular=True, como_json=True)
 

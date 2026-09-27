@@ -1,0 +1,10 @@
+ecuacion: title_and_abstract.search.exact:(zarambo OR "Zarambus fictus" OR "by-product*" OR "post-extraction" OR fru* OR "zarambina"),title_and_abstract.search:(secado OR dehydration OR dehydrated OR "freeze drying" OR "freeze dried" OR "fruto seco" OR "frutos secos" OR liofilización)
+avisos:
+- advertencia [B1]: el bloque B1 usa la búsqueda sin lematizar (search.exact): en este bloque, OpenAlex no buscará plurales ni otras formas de los términos sin *. Motivo: la búsqueda lematizada quita las palabras vacías también dentro de frases y términos con guion ("by-product" se buscaría como "product"); términos afectados: by-product, by-products. Si quiere recuperar también la forma sin la palabra vacía (p. ej. byproduct), agréguela como término aparte, sin reemplazar el original, que las demás fuentes buscan como frase; si no, acepte la búsqueda exacta en este bloque
+- nota [B1, by-product*]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- nota [B1, post-extraction]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- nota [B2, dehydrat*]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados del bloque tienen variantes; se usan sus variantes: dehydration, dehydrated
+- nota [B2, "freeze dr*"]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados del bloque tienen variantes; se usan sus variantes: "freeze drying", "freeze dried"
+- nota [B2, "fruto sec*"]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados del bloque tienen variantes; se usan sus variantes: "fruto seco", "frutos secos"
+- advertencia [B2, liofilización]: OpenAlex distingue las letras con tilde de las sin tilde (verificado el 2026-09-27); si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
+instrucciones de la interfaz:

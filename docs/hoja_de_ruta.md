@@ -31,7 +31,7 @@ Cada hito cerrado se etiqueta con una versión (`v0.N.0`).
 
 **Criterio de terminado:** CI en verde en ambos sistemas, y `uv run agentresearch --version` funciona en Windows.
 
-## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · en curso: 1a ✅, 1b ✅ y 1c ✅ (2026-09-26), sigue 1d
+## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · en curso: 1a ✅, 1b ✅ y 1c ✅ (2026-09-26) y 1d ✅ (2026-09-27), sigue 1e
 
 Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/hito_1_protocolo_y_trazabilidad.md](especificaciones/hito_1_protocolo_y_trazabilidad.md).
 
@@ -128,6 +128,8 @@ Hallazgos de las revisiones del asesor y de auditorías, pendientes para el hito
 - **Cierre del hito 1:** en POSIX, sincronizar el directorio (`os.open` del directorio y `os.fsync`) después de cada `os.replace` de la escritura atómica, para que el cambio de nombre también sobreviva a un corte de energía. El ADR-0008 (punto 14) lo omitió porque Windows no lo admite; en Windows se sigue omitiendo.
 - **Cierre del hito 1:** evaluar fijar los sistemas de la integración continua (p. ej. `ubuntu-24.04`) en vez de `*-latest`, para que el entorno de pruebas no cambie sin decisión explícita. GitHub anunció la migración de `ubuntu-latest` a Ubuntu 26 desde el 19 de octubre de 2026.
 - **Hito 2:** al importar una exportación de una búsqueda manual (Scopus, Web of Science u otra base sin API), registrar además del hash y los conteos: la ecuación usada (versión y hash del protocolo de `ecuaciones.md`), la fecha y hora en que el investigador ejecutó la búsqueda, y el número de resultados que mostró la interfaz, para compararlo con los registros importados. PRISMA-ScR, ítem 7, exige reportar la fecha de cada búsqueda.
+- **Hito 3:** los conectores de OpenAlex y PubMed aplican como parámetros los límites de la búsqueda (periodo, idiomas y tipos de documento), que `ecuaciones.md` solo lista como texto para esas fuentes (ADR-0009, punto 10).
+- **Hito 3:** los conectores deben quitar `api_key` (y cualquier otra clave o credencial) de la URL, los parámetros y los encabezados que se guardan con la respuesta cruda y su hash, y de los mensajes de error y los registros. Una prueba debe verificar que la clave no aparece en nada de lo que se guarda.
 - **Hito 3:** decidir si Semantic Scholar necesita un traductor propio de ecuaciones. Es fuente de búsqueda en el ADR-0003, pero el 1d solo traduce para OpenAlex, PubMed, Scopus, Web of Science y la versión genérica.
 - **Hito 5:** agregar escritura por lotes al registro encadenado, verificando la cadena una vez por lote. Con miles de decisiones, verificar el archivo completo en cada evento crece de forma cuadrática.
 - **Hito 5:** elegir el modelo del cribado con datos. En el piloto se compara la concordancia con el investigador de al menos dos configuraciones (p. ej. Sonnet 5 en esfuerzo alto y Opus 5.5 en medio), y se fija el identificador completo del modelo para todo el estudio. Cambiarlo después es una enmienda del protocolo.

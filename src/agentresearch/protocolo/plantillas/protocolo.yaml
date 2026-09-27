@@ -82,7 +82,7 @@ estrategias:
     tipo: umbral_nuevos
     valor: 0
     justificacion: ""
-# Bloques de búsqueda: OR dentro de cada bloque, AND entre bloques; periodo e idiomas con justificación (PRISMA-ScR, ítems 6 y 8).
+# Bloques de búsqueda: OR dentro de cada bloque, AND entre bloques; términos como palabra, palabra* o "frase", y variantes opcionales de los truncados; periodo e idiomas (ISO 639-1) con justificación (PRISMA-ScR, ítems 6 y 8; ADR-0009).
 busqueda:
   bloques:
     - id: B1

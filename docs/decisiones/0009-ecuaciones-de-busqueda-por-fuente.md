@@ -1,0 +1,405 @@
+# ADR-0009: Ecuaciones de búsqueda por fuente
+
+- Estado: Aceptada
+- Fecha: 2026-09-26 (propuesta); 2026-09-27 (aceptada, tras la revisión del
+  asesor del PR #2)
+- Participantes: investigador doctoral y Claude Code
+
+## Contexto
+
+El sub-hito 1d de la
+[especificación del hito 1](../especificaciones/hito_1_protocolo_y_trazabilidad.md)
+traduce los bloques de búsqueda del protocolo (OR dentro de cada bloque, AND
+entre bloques) a una ecuación por fuente: OpenAlex, PubMed, Scopus, Web of
+Science y una versión genérica. PRISMA-ScR (ítem 8) pide la estrategia de
+búsqueda completa de al menos una base, de forma que se pueda repetir, y las
+reglas metodológicas (§3) piden ecuaciones por fuente con sus límites.
+
+Cada base interpreta de forma distinta las frases, el truncamiento, los
+guiones y los límites. Por eso la especificación exige:
+
+- verificar la sintaxis contra la documentación oficial al implementar, y no
+  contra lo que el modelo recuerda;
+- que un traductor que no puede expresar algo lo informe y aplique una
+  alternativa explícita, en vez de omitirlo en silencio;
+- advertir cuando una ecuación supera el máximo conocido de la fuente.
+
+Las opciones de cada decisión se presentaron al investigador, que eligió
+(2026-09-26). Las no elegidas están en "Alternativas consideradas".
+
+## Decisión
+
+### Qué es un término (regla P-E11)
+
+1. **Gramática de un término de búsqueda.** Cada elemento de
+   `busqueda.bloques[].terminos` tiene una de estas formas:
+   - **palabra:** letras (con o sin tilde), dígitos, y guiones o apóstrofos
+     internos (`secado`, `by-product`, `post-extraction`);
+   - **palabra truncada:** una palabra seguida de `*` (`dehydrat*`,
+     `by-product*`);
+   - **frase:** una o más palabras entre comillas dobles, cada una
+     opcionalmente truncada (`"Zarambus fictus"`, `"hemp seed*"`). Una sola
+     palabra entre comillas (`"CBD"`) pide la forma exacta: en Web of
+     Science desactiva la lematización, y en PubMed el mapeo automático de
+     términos.
+2. **Error P-E11, "término de búsqueda no traducible".** Salta con:
+   - varias palabras sin comillas, porque cada base las interpretaría
+     distinto (AND implícito en Web of Science y Scopus, frase en PubMed);
+   - operadores (`AND`, `OR`, `NOT`, `NEAR`, `SAME`, `W/n`, `PRE/n`),
+     paréntesis o etiquetas de campo (`[tiab]`, `TS=`, `TITLE-ABS-KEY(`);
+   - comodines distintos de `*` (`?`, `$`, `#`), `*` al inicio o en medio de
+     una palabra, o `*` después de un guion;
+   - comillas vacías o sin cerrar;
+   - guiones o apóstrofos al inicio o al final de una palabra.
+
+   El mensaje nombra el bloque y el término. Cuando un operador aparece
+   dentro de una frase, ofrece alternativas: separar la frase en varios
+   términos del bloque o reformularla sin esa palabra, según lo que conserve
+   el significado. Referencia: PRISMA-ScR, ítem 8; Petersen et al. (2015),
+   §5.1.2. Como los demás errores, impide aprobar.
+3. **Variantes.** Cada bloque admite un campo opcional nuevo,
+   `variantes: {término truncado: [variantes]}`, que escribe el
+   investigador. Es un campo opcional, así que no cambia la versión del
+   esquema (ADR-0006, punto 16). P-E11 también salta si una clave no es un
+   término truncado del mismo bloque, o si una variante no es una palabra o
+   una frase válidas sin `*`.
+
+   Un traductor usa las variantes solo donde el truncamiento de ese término
+   no se admite (punto 7). Si faltan, esa fuente sale con un **aviso
+   bloqueante** y sin ecuación. El paquete nunca inventa variantes (regla 6
+   de CLAUDE.md).
+
+### Fuentes que se traducen
+
+4. **Fuentes.** Se traducen las fuentes de `fuentes` cuyo `id` es
+   `openalex`, `pubmed`, `scopus` o `wos`, más la genérica siempre. Una
+   fuente declarada sin traductor se lista en `ecuaciones.md` con la
+   indicación de usar la ecuación genérica.
+5. **Estructura común.** Todas las ecuaciones ponen cada bloque entre
+   paréntesis, y también la unión de bloques cuando hay más de uno (en
+   Scopus y Web of Science, los paréntesis del campo la encierran), aunque
+   la precedencia de la fuente no lo exija. Así la ecuación se puede
+   combinar con límites sin depender de la precedencia. Elsevier anuncia
+   que en 2026 cambiará la precedencia de los operadores de Scopus, y los
+   paréntesis hacen la ecuación independiente de ese cambio. Los límites
+   que se traducen se agregan con `AND` después de la unión (punto 10).
+   En OpenAlex, cada bloque es un filtro y los filtros se unen por coma,
+   que la API combina con AND (punto 9).
+
+### Sintaxis verificada (2026-09-26)
+
+6. **Campos que cubre cada ecuación.** La diferencia de alcance entre fuentes
+   es una amenaza a la validez que el reporte debe declarar (punto 16).
+
+   | Fuente | Campo | Qué cubre | Fuente de la verificación |
+   |---|---|---|---|
+   | OpenAlex | `title_and_abstract.search` o `.search.exact` (punto 9) | título y resumen | [Búsqueda](https://help.openalex.org/api/searching/), [guía](https://help.openalex.org/guides/searching) (act. 2026-09-19); consultas a la API (2026-09-27) |
+   | PubMed | `[tiab]` | título y resumen | [Guía de usuario](https://pubmed.ncbi.nlm.nih.gov/help/) (act. 2026-09-24) |
+   | Scopus | `TITLE-ABS-KEY(…)` | título, resumen y palabras clave; `KEY` reúne palabras clave de autor, términos indexados, nombres comerciales y nombres químicos | [Consejos de búsqueda de la API](https://dev.elsevier.com/sc_search_tips.html), [búsqueda avanzada](https://www.elsevier.support/scopus/answer/how-can-i-best-use-the-advanced-search) (act. 2026-08-24) |
+   | Web of Science | `TS=(…)` | título, resumen, palabras clave de autor y Keywords Plus | [Campos de búsqueda](https://webofscience.zendesk.com/hc/en-us/articles/26916258216209-Web-of-Science-Core-Collection-Search-Fields), [reglas](https://webofscience.zendesk.com/hc/en-us/articles/25350084904721-Search-Rules), [operadores](https://webofscience.zendesk.com/hc/en-us/articles/20016122409105-Search-Operators) (act. 2025-10-17) |
+   | Genérica | ninguno | lo que la base busque por defecto | no aplica |
+
+   Keywords Plus (Web of Science) y los términos indexados (Scopus) los
+   asigna la base a partir de otros datos. Un estudio puede aparecer en una
+   base por un término que no está en su título ni en su resumen.
+7. **Truncamiento, frases y guiones.**
+
+   | Fuente | Frase | Truncamiento | Guion |
+   |---|---|---|---|
+   | OpenAlex | `"…"` (la lematizada lematiza y quita palabras vacías también dentro de la frase) | solo con `search.exact` (sin lematización), al menos 3 letras antes; no al inicio; admitido en frases | sin comillas, AND de las partes; entre comillas, frase: el traductor lo pone entre comillas |
+   | PubMed | `"…"[tiab]` | al menos 4 letras antes del primer `*`; admitido en frases y tras guion (`breast-feed*`) | busca la frase; si no está en el índice de frases, no devuelve nada |
+   | Scopus | `"…"` (aproximada: ignora la puntuación e incluye plurales) | al menos 3 letras; admitido en frases aproximadas; se descarta si va justo después de un guion | documentado solo dentro de una frase aproximada, donde se ignora: el traductor pone entre comillas todo término con guion |
+   | Web of Science | `"…"` (exacta: desactiva la lematización) | al menos 3 letras antes; en frases, **no documentado** | `TS=hydro-power` recupera `hydro-power` y `hydro power` |
+   | Genérica | `"…"` | se deja el `*`, con una nota | se deja el guion |
+
+   - El largo mínimo se cuenta sobre la parte de la palabra que sigue al
+     último guion, que es la unidad que indexan Scopus y Web of Science.
+   - Si la raíz es más corta que el mínimo de la fuente, se usan las
+     variantes del término.
+   - **Lo no documentado se trata como no admitido.** Por eso una frase con
+     truncamiento en Web of Science usa las variantes.
+   - Web of Science no lleva comillas en una palabra suelta, porque las
+     comillas desactivan la lematización (`"mouse"` no recupera `mice`).
+8. **Tildes.** Ninguna de las cuatro fuentes documenta cómo trata las
+   letras con tilde en los campos de tema. Web of Science documenta que no
+   se buscan en los nombres de autor. En OpenAlex, las consultas del punto
+   9 muestran que las formas con y sin tilde recuperan conjuntos distintos.
+   El término se traduce tal como está escrito, con un aviso no bloqueante
+   que sugiere agregar la forma sin tilde como término aparte si el
+   investigador quiere recuperarla. El paquete no la agrega por su cuenta.
+9. **OpenAlex.**
+   - **Verificación con la API (2026-09-27).** Consultas a
+     `https://api.openalex.org/works` con `per-page=1` y `select=id`,
+     autenticadas con la clave del investigador, que no se registra aquí.
+     Se anotó el estado HTTP y `meta.count`. Los conteos cambian con el
+     tiempo; lo que se verifica es la relación entre ellos.
+
+     | Consulta (valor de `filter`, o parámetro) | HTTP | `meta.count` | Qué muestra |
+     |---|---|---|---|
+     | `title_and_abstract.search:dehydration` | 200 | 205 598 | el filtro existe |
+     | `title_and_abstract.search.exact:dehydration` | 200 | 161 465 | la variante exacta existe y no lematiza |
+     | parámetro `search=dehydration` | 200 | 1 120 839 | `search` cubre además el texto completo |
+     | `title_and_abstract.search:(dehydration OR lyophilization)` | 200 | 240 582 | `OR` y paréntesis funcionan (sola, lyophilization: 35 632) |
+     | `title_and_abstract.search:((dehydration OR lyophilization) AND (mango))` | 200 | 516 | `AND` entre bloques funciona (solo mango: 46 309) |
+     | `title_and_abstract.search:(dehydration or lyophilization)` | 200 | 648 | `or` en minúsculas no es un operador |
+     | `title_and_abstract.search:"freeze drying"` | 200 | 66 864 | frase (sin comillas: 75 459) |
+     | `title_and_abstract.search:dehydrat*` | 400 | — | la lematizada rechaza comodines |
+     | `title_and_abstract.search.exact:dehydrat*` | 200 | 217 197 | la exacta los admite |
+     | `title_and_abstract.search.exact:dr*` | 400 | — | exige al menos 3 caracteres antes del `*` |
+     | `title_and_abstract.search.exact:"freeze dry*"` | 200 | 40 341 | comodín dentro de una frase (`"freeze drying"`: 38 508) |
+     | `title_and_abstract.search.exact:(dehydrat* OR lyophiliz*)` | 200 | 252 668 | `OR` con comodines |
+     | `title_and_abstract.search:byproduct` y `:byproducts` | 200 | 112 361 y 112 361 | la lematizada busca plurales (exacta `byproduct`: 64 277) |
+     | `title_and_abstract.search:"mangoes"` | 200 | 46 309 | las comillas no desactivan la lematización (igual que `mango`) |
+     | `title_and_abstract.search:post-extraction` | 200 | 63 993 | sin comillas, el guion es AND (`post AND extraction`: 63 993) |
+     | `title_and_abstract.search:"post-extraction"` | 200 | 4 341 | entre comillas, frase (`"post extraction"`: 4 341) |
+     | `title_and_abstract.search:"by-product"` | 200 | 6 769 981 | la lematizada quita "by": igual que `product` |
+     | `title_and_abstract.search.exact:"by-product"` | 200 | 118 195 | la exacta conserva "by" (igual que `"by product"`) |
+     | `title_and_abstract.search.exact:"by-product*"` | 200 | 242 068 | guion y comodín en frase (igual que `"by product*"`) |
+     | `title_and_abstract.search:"X product"`, con X = by, for, with, in, of, the, and | 200 | 6 769 981 | palabras vacías: se quitan |
+     | `title_and_abstract.search:"X product"`, con X = via, per, co, non, post, pre | 200 | 603 a 9 782 | no son palabras vacías |
+     | `title_and_abstract.search:liofilización` y `:liofilizacion` | 200 | 595 y 277 | las tildes cuentan (igual en la exacta) |
+     | `title_and_abstract.search:(dehydration OR lyophilization),title_and_abstract.search:(mango)` | 200 | 516 | dos filtros separados por coma se combinan con AND (igual que un solo filtro con AND) |
+     | `title_and_abstract.search:(dehydration OR lyophilization),title_and_abstract.search.exact:(mango*)` | 200 | 535 | una solicitud admite un filtro lematizado y otro exacto (todo exacto con AND: 357; solo `mango*` exacto: 62 133) |
+
+   - **Alcance.** Se usa `title_and_abstract.search`, confirmado por la
+     verificación: busca en título y resumen, como las demás fuentes, y
+     admite booleanos, frases y (en su variante `.exact`) comodines. La
+     ecuación es el valor del filtro (`title_and_abstract.search:(…)` o
+     `title_and_abstract.search.exact:(…)`).
+   - **Guiones.** Un término con guion va siempre entre comillas, porque sin
+     ellas OpenAlex busca sus partes con AND.
+   - **Modo de búsqueda, por bloque.** La lematizada busca plurales y otras
+     formas, pero no admite comodines y quita las palabras vacías también
+     dentro de frases. La exacta admite comodines y conserva las palabras
+     vacías, pero no lematiza. Una solicitud admite varios filtros separados
+     por coma, que se combinan con AND y pueden mezclar los dos modos. Por
+     eso cada bloque es un filtro con su propio modo, y solo pierde la
+     lematización el bloque que la necesita. El aviso nombra el bloque y el
+     motivo. Para cada bloque se elige así:
+     - sin términos truncados ni palabras vacías en frases o guiones:
+       búsqueda lematizada;
+     - con términos truncados y **todos** con variantes: búsqueda
+       lematizada con las variantes en lugar de los truncamientos. **Pro:**
+       conserva la lematización (plurales y otras formas) en todos los
+       términos, y la lematización también expande las variantes. **Contra:**
+       recupera solo las variantes que escribió el investigador, no todas
+       las palabras con esa raíz;
+     - con términos truncados y alguno sin variantes: `search.exact` con los
+       comodines y un aviso de que el bloque pierde la lematización. Si
+       alguna raíz tiene menos de 3 letras y no tiene variantes, OpenAlex
+       queda bloqueada;
+     - con una palabra vacía dentro de una frase o de un término con guion
+       (en los términos que irían en la búsqueda lematizada, incluidas las
+       variantes): `search.exact`, con un aviso que nombra los términos. En
+       la lematizada, `"by-product"` se buscaría como `product` y
+       recuperaría 57 veces más registros. El aviso sugiere agregar la forma
+       sin la palabra vacía (p. ej. `byproduct`) como término aparte, sin
+       reemplazar el original, que las demás fuentes buscan como frase; o
+       aceptar la búsqueda exacta en ese bloque. No sugiere reformular el
+       término, porque eso reduciría el alcance en las demás fuentes. La
+       lista de palabras vacías es la de inglés de Lucene: se verificaron
+       siete, y el resto se infiere. Una palabra tratada de más como vacía
+       solo cuesta la lematización del bloque; una tratada de menos
+       ampliaría la búsqueda sin aviso.
+   - **Longitud.** La URL completa admite unos 4 KB (4096 caracteres). La
+     ecuación se mide como una URL con solo el filtro, pero el conector
+     agregará `api_key` y otros parámetros (`per-page`, `cursor`, `select`).
+     Por eso el aviso salta a partir de 3900 caracteres, con margen para
+     ellos.
+
+### Límites de la búsqueda
+
+10. **Periodo, idiomas y tipos de documento.**
+    - **OpenAlex, PubMed y la genérica:** se listan como texto en
+      `ecuaciones.md`. Se traducirán en el hito 3, con los conectores.
+    - **Scopus y Web of Science,** que se usan por exportación manual, se
+      traducen cuando la sintaxis está verificada. Si no, `ecuaciones.md` da
+      la instrucción de filtro de la interfaz:
+
+      | Límite | Scopus | Web of Science |
+      |---|---|---|
+      | Periodo | `PUBYEAR > desde-1` y `PUBYEAR < hasta+1` (`>` y `<` son estrictos: "after", "before") | `PY=(desde-hasta)` si están los dos años, con una nota si el intervalo pasa de 5 años (la ayuda lo recomienda por rendimiento); si falta uno, instrucción de la interfaz |
+      | Idiomas | `LANGUAGE(nombre en inglés)` para los códigos ISO 639-1 conocidos | instrucción de la interfaz: no hay etiqueta de idioma documentada |
+      | Tipos de documento | `DOCTYPE(código)` para los tipos conocidos | instrucción de la interfaz: no hay etiqueta de tipo documentada |
+
+    - El protocolo guarda idiomas y tipos como texto libre. El paquete
+      solo reconoce los valores de un **vocabulario controlado**, sin
+      sinónimos. Un valor fuera de estas tablas genera un aviso y la
+      instrucción de filtrar en la interfaz tal como está escrito, nunca una
+      conversión en silencio.
+
+      Tipos de documento (verificados el 2026-09-26 en los [consejos de
+      búsqueda de Scopus](https://dev.elsevier.com/sc_search_tips.html) y en
+      [Document Types](https://webofscience.zendesk.com/hc/en-us/articles/26916283577745-Document-Types)
+      de Web of Science):
+
+      | Valor en el protocolo | Scopus (`DOCTYPE`) | Web of Science (filtro Document Types) |
+      |---|---|---|
+      | `articulo` | `ar` (Article) | Article |
+      | `revision` | `re` (Review) | Review |
+      | `conferencia` | `cp` (Conference Paper) | Proceedings Paper |
+      | `capitulo` | `ch` (Book Chapter) | Book Chapter |
+      | `libro` | `bk` (Book) | Book |
+      | `editorial` | `ed` (Editorial) | Editorial Material |
+      | `carta` | `le` (Letter) | Letter |
+      | `nota` | `no` (Note) | Note |
+
+      Web of Science no documenta una etiqueta de tipo para la búsqueda
+      avanzada (`DT` es una etiqueta de exportación), así que su columna es
+      el nombre del filtro de la interfaz. Un registro puede tener dos tipos
+      (Article y Proceedings Paper), y la instrucción lo advierte.
+
+      Idiomas: códigos ISO 639-1 `de`, `en`, `es`, `fr`, `it`, `ja`, `ko`,
+      `nl`, `pl`, `pt`, `ru`, `tr` y `zh`. En Scopus se escriben con su
+      nombre en inglés en minúsculas (`LANGUAGE(spanish)`, siguiendo el
+      ejemplo documentado `LANGUAGE(french)`); en Web of Science, con su
+      nombre en inglés en el filtro Languages de la interfaz.
+    - Un límite se traduce solo si se reconocen **todos** sus valores:
+      traducir una parte excluiría, por el `AND`, los valores no
+      traducidos. Si alguno no se reconoce, todo ese límite va como
+      instrucción de la interfaz, con un aviso.
+
+### Salida
+
+11. **Comando `agentresearch protocolo ecuaciones [ruta] [--escribir] [--json]`.**
+    - Sin `--escribir` muestra las ecuaciones; con `--escribir` además
+      guarda `protocolo/ecuaciones.md`. No exige terminal.
+    - Se niega si hay P-E00, P-E10, P-E11, o un P-E04 de la búsqueda (no
+      hay bloques, o un bloque no tiene términos: la ecuación no tendría
+      sentido). Con `--escribir` también se niega con P-E09, porque unas
+      ecuaciones de un protocolo con cambios sin registrar no corresponden
+      a ninguna versión. Sin `--escribir`, avisa del P-E09. Los demás
+      errores del protocolo no impiden traducir.
+    - Si alguna fuente queda bloqueada, escribe igual el archivo, con la
+      sección de esa fuente explicando qué falta, y sale con código 1.
+    - En `--json`, además de los campos comunes del ADR-0008 (punto 26), el
+      primer nivel lleva siempre `"escrito": true|false` y
+      `"fuentes_bloqueadas": [...]`, también en un rechazo. Así se
+      distinguen los casos sin depender de `resultado`:
+
+      | Caso | `exito` | `errores` | `escrito` | `fuentes_bloqueadas` |
+      |---|---|---|---|---|
+      | Todas las fuentes con ecuación | `true` | `[]` | según `--escribir` | `[]` |
+      | Alguna fuente bloqueada | `false` | `[]` | según `--escribir` | las bloqueadas |
+      | Rechazo (no se genera nada) | `false` | los motivos | `false` | `[]` |
+    - No registra un evento: `ecuaciones.md` se deriva del protocolo de
+      forma determinista, y lo versiona Git.
+12. **`protocolo/ecuaciones.md`** es determinista: no lleva marca de tiempo,
+    y el mismo protocolo con la misma versión del agente produce los mismos
+    bytes (UTF-8, LF). Contiene:
+    - una cabecera con la ruta, la versión, el estado y el hash del
+      protocolo, y la versión del agente. La línea
+      `- Hash del protocolo: sha256:<hex>` es la que se compara en el
+      punto 14;
+    - por cada fuente: la ecuación en un bloque de código, los campos que
+      cubre, su longitud frente al máximo conocido, y los avisos;
+    - los límites (punto 10);
+    - las fuentes declaradas sin traductor.
+13. **Pasos para las fuentes manuales.** Junto a las ecuaciones de Scopus y
+    Web of Science, `ecuaciones.md` indica al investigador:
+    - dónde pegarla: búsqueda avanzada (Scopus) o la búsqueda avanzada con
+      etiquetas de campo (Web of Science);
+    - qué filtros aplicar en la interfaz (punto 10);
+    - en qué formato exportar, según el ADR-0003: CSV en Scopus y el formato
+      de etiquetas (.txt) en Web of Science, con todos los campos
+      disponibles (resumen y palabras clave incluidos);
+    - qué anotar al ejecutarla: la fecha y hora, y el número de resultados
+      que mostró la interfaz. El hito 2 lo pedirá al importar la
+      exportación (PRISMA-ScR, ítem 7).
+
+### Ecuaciones desactualizadas
+
+14. **Nota de estado, no advertencia.** `validar` e `historial` comparan el
+    hash de la cabecera de `ecuaciones.md` con el hash actual del protocolo.
+    Si no coinciden, muestran una nota ("ecuaciones desactualizadas") y su
+    salida `--json` lleva `"ecuaciones_desactualizadas": true`. No bloquea
+    ni exige justificación. Si `ecuaciones.md` no existe, no hay nota.
+15. **Flujo.** Aprobar o enmendar cambia el estado o la versión, y con ello
+    el hash, así que las ecuaciones quedan desactualizadas justo después.
+    El investigador (o `/protocolo` en el 1e) las regenera con
+    `protocolo ecuaciones --escribir` después de aprobar o enmendar.
+
+### Amenazas a la validez
+
+16. El reporte (hito 10) debe declarar:
+    - que los campos cubiertos difieren entre fuentes (punto 6);
+    - que las frases de Web of Science son exactas y no lematizadas,
+      mientras que las de Scopus son aproximadas e incluyen plurales;
+    - si OpenAlex buscó sin lematización, y por qué (punto 9);
+    - los términos con tilde, cuyo tratamiento no está documentado en las
+      fuentes manuales y que en OpenAlex recuperan conjuntos distintos
+      (punto 8).
+
+## Alternativas consideradas
+
+- **Varias palabras sin comillas:**
+  - tratarlas como frase y avisarlo: es más cómodo, pero el paquete
+    interpretaría por su cuenta la intención del investigador;
+  - dejarlas como las interprete cada base: el mismo término significaría
+    cosas distintas en cada fuente.
+- **Truncamiento no admitido:**
+  - que el paquete no genere ecuación para esa fuente y pida escribir las
+    variantes en los términos: obliga a duplicar términos en el bloque,
+    también para las fuentes que sí admiten el truncamiento;
+  - quitar el `*` y avisar: siempre hay ecuación, pero cambia el alcance de
+    la búsqueda sin que el investigador lo decida;
+  - generar variantes automáticamente: no hay un vocabulario fiable, y
+    violaría la regla 6.
+- **OpenAlex con truncamiento:** usar siempre `search.exact`: es más simple,
+  pero pierde la lematización aunque el investigador ya haya escrito todas
+  las variantes.
+- **OpenAlex con un solo modo para toda la ecuación:** es más simple, pero
+  un término con una palabra vacía o un truncado sin variantes quitaría la
+  lematización también a los bloques que no la necesitan.
+- **OpenAlex con palabras vacías en frases o guiones:**
+  - sugerir reformular el término en el protocolo (p. ej. `byproduct` en
+    lugar de `by-product`): reduciría el alcance en las demás fuentes, que
+    sí lo buscan como frase;
+  - mantener la búsqueda lematizada con un aviso: la ecuación recuperaría,
+    por ejemplo, todo lo que contiene "product" en lugar de "by-product";
+  - bloquear OpenAlex hasta que el investigador reformule el término: es
+    más estricto de lo necesario, porque la búsqueda exacta sí lo expresa;
+  - usar solo las siete palabras vacías verificadas: un término con otra
+    palabra de la lista de Lucene ampliaría la búsqueda sin aviso.
+- **OpenAlex con el parámetro `search` (texto completo):** recupera unas
+  cinco veces más registros que el filtro de título y resumen, con otro
+  alcance que las demás fuentes.
+- **Scopus con el guion sin comillas:** Elsevier solo documenta el guion
+  dentro de una frase aproximada, y lo no documentado se trata como no
+  admitido.
+- **Tipos de documento con sinónimos internos** (p. ej. "ponencia" como
+  `conferencia`): el paquete decidiría por su cuenta qué significa un valor
+  que el investigador escribió; el vocabulario controlado lo hace explícito.
+- **Distinguir un rechazo por `"resultado": null`:** obliga a quien lee el
+  JSON a conocer esa convención; los campos explícitos no.
+- **Tildes:** agregar de forma automática la forma sin tilde: es
+  determinista, pero cambia los términos del investigador sin que lo
+  decida, y ninguna fuente documenta que haga falta.
+- **Límites:**
+  - traducirlos para todas las fuentes ya: OpenAlex y PubMed se consultarán
+    con los conectores del hito 3, que aplican los límites como parámetros;
+  - no traducirlos para ninguna: Scopus y Web of Science se usan por
+    exportación manual, y la ecuación completa es lo que el investigador
+    pega y lo que el reporte cita.
+- **Fuentes:** traducir siempre las cinco, sin mirar `fuentes`: genera
+  ecuaciones que el protocolo no declara.
+- **Ecuaciones desactualizadas como advertencia P-A10:** con el ADR-0008
+  (punto 10), toda enmienda la volvería "nueva" y exigiría justificarla, y
+  `--escribir` no puede regenerar antes de enmendar porque P-E09 lo impide.
+- **Registrar un evento al escribir `ecuaciones.md`:** duplica lo que ya
+  guardan el protocolo versionado y Git, sin aportar evidencia nueva.
+
+## Consecuencias
+
+- El investigador escribe variantes solo para los términos truncados que
+  alguna fuente declarada no admite, y el aviso bloqueante le dice cuáles.
+- P-E11 puede volver inválido un protocolo que hoy pasa `validar`. No hay
+  todavía protocolos aprobados, así que no hace falta una migración.
+- `ecuaciones.md` hay que regenerarlo después de aprobar o enmendar. La
+  nota de estado lo recuerda, y `/protocolo` (1e) lo automatizará.
+- La sintaxis de cada fuente puede cambiar. Cada traductor guarda la URL y
+  la fecha de verificación, y los archivos de referencia de las pruebas
+  fijan la salida esperada, así que un cambio de sintaxis se corrige en un
+  solo lugar y se ve en el diff de las pruebas.
+- Quedan fuera del 1d: el traductor de Semantic Scholar (hoja de ruta,
+  hito 3), la exclusión con `NOT` y la búsqueda por proximidad.
