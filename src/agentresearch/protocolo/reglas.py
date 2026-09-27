@@ -6,6 +6,9 @@ aplicarse se retira del catálogo, pero su ID no se asigna a otra.
 
 - Los errores (P-E) impiden aprobar el protocolo.
 - Las advertencias (P-A) no lo impiden, pero el investigador debe revisarlas.
+
+P-E09 y P-E10 leen el directorio del estudio, no solo el modelo (ADR-0008,
+punto 22).
 """
 
 from dataclasses import dataclass
@@ -82,6 +85,20 @@ _CATALOGO = (
         "Landis y Koch (1977)",
     ),
     Regla(
+        "P-E09",
+        "error",
+        "Cambio sin enmienda registrada: el protocolo aprobado no coincide con el último "
+        "hash registrado, o está vigente sin aprobación registrada",
+        "Reglas metodológicas del agente, §2 (registro de enmiendas); PRISMA-ScR, ítem 20",
+    ),
+    Regla(
+        "P-E10",
+        "error",
+        "Registro de eventos del protocolo íntegro, coherente y conforme a su anclaje, "
+        "con las copias de cada versión registrada",
+        "ADR-0006, puntos 7 y 10; ADR-0008, punto 24",
+    ),
+    Regla(
         "P-A01",
         "advertencia",
         "Criterio que exige evaluación empírica",
@@ -129,6 +146,12 @@ _CATALOGO = (
         "advertencia",
         "Sin un segundo revisor humano para el piloto de cribado",
         "Petersen et al. (2015), §5.1.2",
+    ),
+    Regla(
+        "P-A09",
+        "advertencia",
+        "Piloto de cribado sin tamaño definido",
+        "Ali y Petersen (2014); Petersen et al. (2015), figura 17",
     ),
 )
 

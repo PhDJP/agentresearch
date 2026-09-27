@@ -2,7 +2,7 @@
 
 El esquema valida la forma: claves, tipos y valores permitidos. No exige
 contenido, porque un protocolo en borrador está incompleto por naturaleza; las
-reglas de contenido (P-E01 a P-E08 y P-A01 a P-A08) viven en
+reglas de contenido (P-E01 a P-E08 y P-A01 a P-A09) viven en
 `agentresearch.protocolo.validacion` y se aplican sobre el modelo ya cargado.
 
 Los campos que vigila una regla de contenido son opcionales o tienen un valor

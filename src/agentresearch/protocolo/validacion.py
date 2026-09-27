@@ -1,15 +1,17 @@
-"""Validación del protocolo contra las reglas metodológicas P-E00 a P-E08 y P-A01 a P-A08.
+"""Validación del protocolo: reglas P-E00 a P-E10 y P-A01 a P-A09.
 
-Cada regla es una función determinista sobre el modelo ya cargado; no usa
-heurísticas sobre el texto libre, salvo P-A07, que examina la forma de los
-términos de búsqueda. Los hallazgos siguen el orden del catálogo de reglas y,
-dentro de cada regla, el orden del documento.
+Casi todas las reglas son funciones deterministas sobre el modelo ya cargado;
+no usan heurísticas sobre el texto libre, salvo P-A07, que examina la forma de
+los términos de búsqueda. P-E09 y P-E10 no leen el modelo sino el directorio
+del estudio (registro de eventos, anclaje y copias de versión), así que solo
+las evalúa `validar_archivo()` (ADR-0008, punto 22). Los hallazgos siguen el
+orden del catálogo de reglas y, dentro de cada regla, el orden del documento.
 """
 
 import math
 import re
 from collections.abc import Callable, Iterable, Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -19,13 +21,21 @@ from ruamel.yaml.comments import CommentedMap
 from agentresearch.protocolo.archivo import (
     DocumentoProtocolo,
     ErrorLecturaProtocolo,
+    ProblemaLectura,
+    decodificar_protocolo,
     formatear_ubicacion,
-    leer_protocolo,
+    leer_bytes_protocolo,
     posicion_en_yaml,
 )
+from agentresearch.protocolo.ciclo_de_vida import (
+    EstadoRegistro,
+    leer_estado_registro,
+    problemas_p_e09,
+)
+from agentresearch.protocolo.estudio import RutasProtocolo
 from agentresearch.protocolo.modelo import VERSION_ESQUEMA, Protocolo
 from agentresearch.protocolo.reglas import REGLAS, Severidad
-from agentresearch.trazabilidad import hash_archivo
+from agentresearch.trazabilidad import hash_bytes
 
 MINIMO_CONJUNTO_VALIDACION = 5
 """Artículos mínimos del conjunto de validación antes de advertir (P-A04)."""
@@ -75,6 +85,8 @@ class ResultadoValidacion:
     hash_archivo: str | None = None
     estado: str | None = None
     version_protocolo: str | None = None
+    registro: dict[str, Any] | None = None
+    """Resumen del registro de eventos del estudio, con su anclaje."""
 
     @property
     def errores(self) -> list[Hallazgo]:
@@ -101,36 +113,118 @@ class ResultadoValidacion:
             "errores": len(self.errores),
             "advertencias": len(self.advertencias),
             "hallazgos": [hallazgo.como_dict() for hallazgo in self.hallazgos],
+            "registro": self.registro,
         }
 
 
-def validar_archivo(ruta: Path | str) -> ResultadoValidacion:
-    """Lee y valida un archivo de protocolo. Nunca lanza por problemas del archivo."""
+@dataclass(frozen=True, slots=True)
+class LecturaProtocolo:
+    """Los bytes del protocolo, leídos una sola vez, y lo que se pudo cargar de ellos.
+
+    Los comandos del ciclo de vida validan, calculan el diff y el hash sobre
+    estos mismos bytes (ADR-0008, punto 3).
+    """
+
+    ruta: Path
+    contenido: bytes | None
+    documento: DocumentoProtocolo | None
+    problemas: list[ProblemaLectura] = field(default_factory=list)
+
+    @property
+    def hash(self) -> str | None:
+        return hash_bytes(self.contenido) if self.contenido is not None else None
+
+
+def leer_para_validar(ruta: Path | str) -> LecturaProtocolo:
+    """Lee los bytes del protocolo una vez y los carga. Nunca lanza por problemas del archivo."""
     ruta = Path(ruta)
-    huella = hash_archivo(ruta) if ruta.is_file() else None
     try:
-        documento = leer_protocolo(ruta)
+        contenido = leer_bytes_protocolo(ruta)
     except ErrorLecturaProtocolo as error:
-        regla = REGLAS["P-E00"]
-        hallazgos = [
-            Hallazgo(
-                id_regla=regla.id,
-                severidad=regla.severidad,
-                mensaje=problema.mensaje,
-                referencia=regla.referencia,
-                ubicacion=problema.ubicacion,
-                linea=problema.linea,
-                columna=problema.columna,
-            )
-            for problema in error.problemas
-        ]
-        return ResultadoValidacion(ruta=str(ruta), hallazgos=hallazgos, hash_archivo=huella)
+        return LecturaProtocolo(ruta, None, None, error.problemas)
+    try:
+        documento = decodificar_protocolo(contenido)
+    except ErrorLecturaProtocolo as error:
+        return LecturaProtocolo(ruta, contenido, None, error.problemas)
+    return LecturaProtocolo(ruta, contenido, documento)
+
+
+def validar_archivo(ruta: Path | str) -> ResultadoValidacion:
+    """Lee y valida un protocolo y su directorio. Nunca lanza por problemas del archivo."""
+    lectura = leer_para_validar(ruta)
+    return validar_lectura(lectura, leer_estado_registro(RutasProtocolo.desde(lectura.ruta)))
+
+
+def validar_lectura(lectura: LecturaProtocolo, registro: EstadoRegistro) -> ResultadoValidacion:
+    """Valida un protocolo ya leído contra todas las reglas, incluidas P-E09 y P-E10."""
+    documento = lectura.documento
+    if documento is None:
+        hallazgos = [_hallazgo_de_lectura(problema) for problema in lectura.problemas]
+    else:
+        hallazgos = validar_documento(documento)
+    estado_protocolo = documento.protocolo.estado if documento is not None else None
+    hallazgos += hallazgos_de_directorio(registro, lectura.hash, estado_protocolo)
+    orden = {id_regla: posicion for posicion, id_regla in enumerate(REGLAS)}
+    hallazgos.sort(key=lambda hallazgo: orden[hallazgo.id_regla])
     return ResultadoValidacion(
-        ruta=str(ruta),
-        hallazgos=validar_documento(documento),
-        hash_archivo=huella,
-        estado=documento.protocolo.estado,
-        version_protocolo=documento.protocolo.metadatos.version_protocolo,
+        ruta=str(lectura.ruta),
+        hallazgos=hallazgos,
+        hash_archivo=lectura.hash,
+        estado=estado_protocolo,
+        version_protocolo=(
+            documento.protocolo.metadatos.version_protocolo if documento is not None else None
+        ),
+        registro=resumen_registro(registro),
+    )
+
+
+def hallazgos_de_directorio(
+    registro: EstadoRegistro, hash_actual: str | None, estado_protocolo: str | None
+) -> list[Hallazgo]:
+    """Hallazgos de P-E10 y P-E09, que leen el directorio del estudio (ADR-0008, punto 22)."""
+    mensajes = [("P-E10", problema) for problema in registro.problemas]
+    mensajes += [
+        ("P-E09", problema) for problema in problemas_p_e09(registro, hash_actual, estado_protocolo)
+    ]
+    return [
+        Hallazgo(
+            id_regla=id_regla,
+            severidad=REGLAS[id_regla].severidad,
+            mensaje=mensaje,
+            referencia=REGLAS[id_regla].referencia,
+        )
+        for id_regla, mensaje in mensajes
+    ]
+
+
+def resumen_registro(registro: EstadoRegistro) -> dict[str, Any]:
+    """Resumen del registro para la salida JSON: ruta, integridad y anclaje (ADR-0008, 21)."""
+    rutas = registro.rutas
+    ultima = registro.ultima_version
+    return {
+        "ruta": rutas.relativa(rutas.eventos),
+        "existe": registro.existe_registro,
+        "integro": registro.integro,
+        "numero_eventos": len(registro.eventos) if registro.existe_registro else None,
+        "anclaje": str(registro.anclaje_actual) if registro.anclaje_actual else None,
+        "anclaje_guardado": (str(registro.anclaje_guardado) if registro.anclaje_guardado else None),
+        "version_registrada": ultima.version if ultima else None,
+        "hash_registrado": ultima.hash_protocolo if ultima else None,
+        "decisiones_pendientes": [d.id_decision for d in registro.pendientes],
+        "falta_anclaje": registro.falta_anclaje,
+    }
+
+
+def _hallazgo_de_lectura(problema: ProblemaLectura) -> Hallazgo:
+    regla = REGLAS["P-E00"]
+    return Hallazgo(
+        id_regla=regla.id,
+        severidad=regla.severidad,
+        mensaje=problema.mensaje,
+        referencia=regla.referencia,
+        ubicacion=problema.ubicacion,
+        linea=problema.linea,
+        columna=problema.columna,
     )
 
 
@@ -561,6 +655,18 @@ def _p_a08(protocolo: Protocolo) -> Iterator[_Resultado]:
         )
 
 
+def _p_a09(protocolo: Protocolo) -> Iterator[_Resultado]:
+    """Piloto de cribado sin tamaño: la concordancia se mide antes del cribado completo."""
+    tamano = protocolo.seleccion.piloto.tamano
+    if tamano <= 0:
+        yield (
+            "P-A09",
+            f"el piloto de cribado no tiene tamaño definido (valor: {tamano}); la "
+            "concordancia entre revisores se mide en un piloto antes del cribado completo",
+            ("seleccion", "piloto", "tamano"),
+        )
+
+
 _COMPROBACIONES: tuple[_Comprobacion, ...] = (
     _p_e01,
     _p_e02,
@@ -578,4 +684,5 @@ _COMPROBACIONES: tuple[_Comprobacion, ...] = (
     _p_a06,
     _p_a07,
     _p_a08,
+    _p_a09,
 )

@@ -52,8 +52,10 @@ mi-estudio/
 ├── .claude/                      # comandos o skills; modelo fijado con su identificador completo
 ├── estudio.yaml                  # metadatos y versión exacta del agente
 ├── protocolo/
-│   ├── protocolo.yaml            # versión vigente
-│   └── enmiendas.jsonl           # cambios con fecha y justificación
+│   ├── protocolo.yaml            # versión actual
+│   ├── eventos.jsonl             # aprobación, enmiendas y decisiones (registro encadenado, ADR-0008)
+│   ├── anclaje.json              # número de eventos y hash del último
+│   └── versiones/                # copia exacta de cada versión registrada (X.Y.Z.yaml)
 ├── busquedas/
 │   └── <fuente>/<fecha-hora>/    # consulta.json, respuesta cruda, conteo
 ├── importaciones/                # archivos exportados originales + hash

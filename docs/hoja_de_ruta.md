@@ -31,7 +31,7 @@ Cada hito cerrado se etiqueta con una versión (`v0.N.0`).
 
 **Criterio de terminado:** CI en verde en ambos sistemas, y `uv run agentresearch --version` funciona en Windows.
 
-## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · en curso: 1a ✅ y 1b ✅ (2026-09-26), sigue 1c
+## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · en curso: 1a ✅, 1b ✅ y 1c ✅ (2026-09-26), sigue 1d
 
 Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/hito_1_protocolo_y_trazabilidad.md](especificaciones/hito_1_protocolo_y_trazabilidad.md).
 
@@ -118,12 +118,17 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 
 Hallazgos de las revisiones del asesor y de auditorías, pendientes para el hito indicado. Se tachan o eliminan cuando se resuelven.
 
-- **1c:** implementar el anclaje del registro encadenado (número de eventos y hash del último) en `protocolo historial` y en los reportes, según el punto 10 del ADR-0006. Sin anclaje no se detecta la eliminación de eventos finales.
-- **1c:** agregar la advertencia P-A09, "piloto de cribado sin tamaño definido" (`seleccion.piloto.tamano` igual a 0). El proceso de selección exige un piloto con medición de concordancia antes del cribado completo (Ali y Petersen, 2014; Petersen et al., 2015, figura 17). La plantilla trae 0 por defecto, y hoy eso pasa sin aviso.
+- ~~**1c:** implementar el anclaje del registro encadenado (número de eventos y hash del último) en `protocolo historial` y en los reportes, según el punto 10 del ADR-0006. Sin anclaje no se detecta la eliminación de eventos finales.~~ Resuelto en 1c (ADR-0008, puntos 19 a 21).
+- ~~**1c:** agregar la advertencia P-A09, "piloto de cribado sin tamaño definido" (`seleccion.piloto.tamano` igual a 0). El proceso de selección exige un piloto con medición de concordancia antes del cribado completo (Ali y Petersen, 2014; Petersen et al., 2015, figura 17). La plantilla trae 0 por defecto, y hoy eso pasa sin aviso.~~ Resuelto en 1c (ADR-0008, punto 25).
+- **1e:** `nuevo-estudio` debe crear `protocolo/eventos.jsonl` con su evento inicial y el `anclaje.json` correspondiente. `/protocolo` debe pedir al investigador que ejecute `aprobar`, `enmendar` y `decision confirmar` en su propia terminal. Valorar negar esos comandos en los permisos de Claude Code del estudio (ADR-0008, consecuencias).
+- **1e:** verificar en la terminal real del investigador (PowerShell y la terminal de VS Code) que la confirmación interactiva funciona, y que Git Bash abierto como aplicación independiente (mintty) se rechaza con el mensaje que recomienda PowerShell o la terminal de VS Code. Las pruebas simulan la consola; en esta sesión solo se comprobó que las herramientas de Claude Code no la ofrecen.
 - **1e:** mitigar el límite conocido de ruamel.yaml documentado en el ADR-0006: al eliminar el último elemento antes del comentario de una sección, ese comentario se pierde. Como `/protocolo` escribirá sección por sección, la escritura debe restaurar los comentarios de sección de primer nivel tomándolos de la plantilla, que es su fuente canónica, y probarlo vaciando una lista.
 - **1e:** la plantilla del repositorio de estudio debe incluir un `.gitattributes` con `* text=auto eol=lf`. Git para Windows convierte los fines de línea por defecto, y eso alteraría los hashes de archivos como el protocolo.
 - **1e:** decidir O1 (opción A o C) del caso piloto con `/protocolo`.
+- **Cierre del hito 1:** en POSIX, sincronizar el directorio (`os.open` del directorio y `os.fsync`) después de cada `os.replace` de la escritura atómica, para que el cambio de nombre también sobreviva a un corte de energía. El ADR-0008 (punto 14) lo omitió porque Windows no lo admite; en Windows se sigue omitiendo.
 - **Cierre del hito 1:** evaluar fijar los sistemas de la integración continua (p. ej. `ubuntu-24.04`) en vez de `*-latest`, para que el entorno de pruebas no cambie sin decisión explícita. GitHub anunció la migración de `ubuntu-latest` a Ubuntu 26 desde el 19 de octubre de 2026.
+- **Hito 2:** al importar una exportación de una búsqueda manual (Scopus, Web of Science u otra base sin API), registrar además del hash y los conteos: la ecuación usada (versión y hash del protocolo de `ecuaciones.md`), la fecha y hora en que el investigador ejecutó la búsqueda, y el número de resultados que mostró la interfaz, para compararlo con los registros importados. PRISMA-ScR, ítem 7, exige reportar la fecha de cada búsqueda.
+- **Hito 3:** decidir si Semantic Scholar necesita un traductor propio de ecuaciones. Es fuente de búsqueda en el ADR-0003, pero el 1d solo traduce para OpenAlex, PubMed, Scopus, Web of Science y la versión genérica.
 - **Hito 5:** agregar escritura por lotes al registro encadenado, verificando la cadena una vez por lote. Con miles de decisiones, verificar el archivo completo en cada evento crece de forma cuadrática.
 - **Hito 5:** elegir el modelo del cribado con datos. En el piloto se compara la concordancia con el investigador de al menos dos configuraciones (p. ej. Sonnet 5 en esfuerzo alto y Opus 5.5 en medio), y se fija el identificador completo del modelo para todo el estudio. Cambiarlo después es una enmienda del protocolo.
 - **Proceso:** toda afirmación sobre versiones, sintaxis o límites de APIs y herramientas se verifica contra la fuente oficial o la integración continua. Por ejemplo, `astral-sh/setup-uv@v10` no existía, y la integración continua lo detectó.

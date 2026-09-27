@@ -60,4 +60,4 @@ Tablas y detalle: `docs/metodologia/reglas_metodologicas.md`.
 
 ## Estado actual
 
-Hito 0 completo (`v0.0.1`, repositorio público https://github.com/PhDJP/agentresearch). Sigue el hito 1, sub-hito 1a: ver `docs/especificaciones/hito_1_protocolo_y_trazabilidad.md`.
+Hito 0 completo (`v0.0.1`, repositorio público https://github.com/PhDJP/agentresearch). Hito 1 en curso: 1a, 1b y 1c completos (ADR-0006 y ADR-0008). Sigue el sub-hito 1d: ver `docs/especificaciones/hito_1_protocolo_y_trazabilidad.md`.

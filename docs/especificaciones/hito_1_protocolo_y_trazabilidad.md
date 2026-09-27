@@ -226,6 +226,16 @@ Las decisiones de este sub-hito (estados, eventos que se registran, P-E09 y ancl
 - **Anclaje del registro** (punto 10 del ADR-0006): `protocolo historial` y los reportes muestran el número de eventos y el hash del último, para detectar la eliminación de eventos finales.
 - **Pruebas:** aprobar con errores falla; editar un protocolo vigente sin enmienda produce P-E09; una enmienda incrementa la versión y registra el diff; una decisión tomada por un LLM se rechaza.
 
+Ajustes aprobados al implementar 1c (2026-09-26); el detalle está en el [ADR-0008](../decisiones/0008-ciclo-de-vida-del-protocolo.md):
+
+- **Confirmación.** `--confirmo` se reemplaza por `--aprobado-por` y `--enmendado-por`, que deben ser revisores humanos declarados, y por una confirmación interactiva que exige una consola. Es una barrera de procedimiento, no una garantía.
+- **Versiones.** Aprobar fija `1.0.0`. `--nivel mayor|menor` es obligatorio al enmendar, y el paquete asigna el parche cuando el diff estructural sale vacío. El contenido anterior del diff sale de copias exactas de cada versión en `protocolo/versiones/`.
+- **Atomicidad.** Se escriben, en este orden, la copia, el evento, el anclaje y el protocolo, con `fsync`. Una operación interrumpida se reconoce y se recupera con la copia.
+- **Decisiones en dos pasos.** `decision registrar` deja la decisión como propuesta, y `decision confirmar` la confirma en la terminal. `aprobar` y `enmendar` se niegan si hay decisiones pendientes. Se exigen además pros, contras y referencias en cada opción, un revisor humano declarado y el identificador exacto del modelo.
+- **Advertencias.** Aprobar exige una justificación por cada advertencia activa.
+- **Reglas nuevas.** P-E10 (registro íntegro y conforme a su anclaje) y P-A09 (piloto sin tamaño). P-E09 mira el registro y no solo el campo `estado`. P-E09 y P-E10 leen el directorio del estudio.
+- **Anclaje.** Tiene la forma `evt-NNNNNN@sha256:<hex>`, se verifica como prefijo y se guarda en `protocolo/anclaje.json`. Además lo muestran `historial`, `validar` y `registro verificar --anclaje`.
+
 ## 1d. Ecuaciones de búsqueda por fuente
 
 - **Entrada:** los bloques del protocolo (AND entre bloques, OR dentro de cada uno). Cada término es una palabra, una frase (entre comillas) o un truncamiento (`*`).
