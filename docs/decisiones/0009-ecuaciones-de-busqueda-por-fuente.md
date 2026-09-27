@@ -51,8 +51,11 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
    - comillas vacías o sin cerrar;
    - guiones o apóstrofos al inicio o al final de una palabra.
 
-   El mensaje nombra el bloque y el término. Referencia: PRISMA-ScR, ítem 8;
-   Petersen et al. (2015), §5.1.2. Como los demás errores, impide aprobar.
+   El mensaje nombra el bloque y el término. Cuando un operador aparece
+   dentro de una frase, ofrece alternativas: separar la frase en varios
+   términos del bloque o reformularla sin esa palabra, según lo que conserve
+   el significado. Referencia: PRISMA-ScR, ítem 8; Petersen et al. (2015),
+   §5.1.2. Como los demás errores, impide aprobar.
 3. **Variantes.** Cada bloque admite un campo opcional nuevo,
    `variantes: {término truncado: [variantes]}`, que escribe el
    investigador. Es un campo opcional, así que no cambia la versión del
@@ -164,10 +167,37 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
       | Tipos de documento | `DOCTYPE(código)` para los tipos conocidos | instrucción de la interfaz: no hay etiqueta de tipo documentada |
 
     - El protocolo guarda idiomas y tipos como texto libre. El paquete
-      reconoce los códigos ISO 639-1 en `idiomas.valores` y un vocabulario
-      de tipos en español (`articulo`, `revision`, `conferencia` o
-      `ponencia`, `capitulo`, `libro`, `editorial`, `carta`, `nota`), que
-      corresponden a los códigos `DOCTYPE` de Scopus.
+      solo reconoce los valores de un **vocabulario controlado**, sin
+      sinónimos. Un valor fuera de estas tablas genera un aviso y la
+      instrucción de filtrar en la interfaz tal como está escrito, nunca una
+      conversión en silencio.
+
+      Tipos de documento (verificados el 2026-09-26 en los [consejos de
+      búsqueda de Scopus](https://dev.elsevier.com/sc_search_tips.html) y en
+      [Document Types](https://webofscience.zendesk.com/hc/en-us/articles/26916283577745-Document-Types)
+      de Web of Science):
+
+      | Valor en el protocolo | Scopus (`DOCTYPE`) | Web of Science (filtro Document Types) |
+      |---|---|---|
+      | `articulo` | `ar` (Article) | Article |
+      | `revision` | `re` (Review) | Review |
+      | `conferencia` | `cp` (Conference Paper) | Proceedings Paper |
+      | `capitulo` | `ch` (Book Chapter) | Book Chapter |
+      | `libro` | `bk` (Book) | Book |
+      | `editorial` | `ed` (Editorial) | Editorial Material |
+      | `carta` | `le` (Letter) | Letter |
+      | `nota` | `no` (Note) | Note |
+
+      Web of Science no documenta una etiqueta de tipo para la búsqueda
+      avanzada (`DT` es una etiqueta de exportación), así que su columna es
+      el nombre del filtro de la interfaz. Un registro puede tener dos tipos
+      (Article y Proceedings Paper), y la instrucción lo advierte.
+
+      Idiomas: códigos ISO 639-1 `de`, `en`, `es`, `fr`, `it`, `ja`, `ko`,
+      `nl`, `pl`, `pt`, `ru`, `tr` y `zh`. En Scopus se escriben con su
+      nombre en inglés en minúsculas (`LANGUAGE(spanish)`, siguiendo el
+      ejemplo documentado `LANGUAGE(french)`); en Web of Science, con su
+      nombre en inglés en el filtro Languages de la interfaz.
     - Un límite se traduce solo si se reconocen **todos** sus valores:
       traducir una parte excluiría, por el `AND`, los valores no
       traducidos. Si alguno no se reconoce, todo ese límite va como
@@ -185,10 +215,17 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
       a ninguna versión. Sin `--escribir`, avisa del P-E09. Los demás
       errores del protocolo no impiden traducir.
     - Si alguna fuente queda bloqueada, escribe igual el archivo, con la
-      sección de esa fuente explicando qué falta, y sale con código 1. En
-      `--json`, un rechazo tiene `"resultado": null` y sus `errores`; una
-      generación con fuentes bloqueadas tiene `"exito": false`, `"errores":
-      []`, `"escrito": true` (si se pidió) y `"fuentes_bloqueadas": [...]`.
+      sección de esa fuente explicando qué falta, y sale con código 1.
+    - En `--json`, además de los campos comunes del ADR-0008 (punto 26), el
+      primer nivel lleva siempre `"escrito": true|false` y
+      `"fuentes_bloqueadas": [...]`, también en un rechazo. Así se
+      distinguen los casos sin depender de `resultado`:
+
+      | Caso | `exito` | `errores` | `escrito` | `fuentes_bloqueadas` |
+      |---|---|---|---|---|
+      | Todas las fuentes con ecuación | `true` | `[]` | según `--escribir` | `[]` |
+      | Alguna fuente bloqueada | `false` | `[]` | según `--escribir` | las bloqueadas |
+      | Rechazo (no se genera nada) | `false` | los motivos | `false` | `[]` |
     - No registra un evento: `ecuaciones.md` se deriva del protocolo de
       forma determinista, y lo versiona Git.
 12. **`protocolo/ecuaciones.md`** es determinista: no lleva marca de tiempo,
@@ -253,6 +290,11 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
 - **OpenAlex con truncamiento:** usar siempre `search.exact`: es más simple,
   pero pierde la lematización aunque el investigador ya haya escrito todas
   las variantes.
+- **Tipos de documento con sinónimos internos** (p. ej. "ponencia" como
+  `conferencia`): el paquete decidiría por su cuenta qué significa un valor
+  que el investigador escribió; el vocabulario controlado lo hace explícito.
+- **Distinguir un rechazo por `"resultado": null`:** obliga a quien lee el
+  JSON a conocer esa convención; los campos explícitos no.
 - **Tildes:** agregar de forma automática la forma sin tilde: es
   determinista, pero cambia los términos del investigador sin que lo
   decida, y ninguna fuente documenta que haga falta.
