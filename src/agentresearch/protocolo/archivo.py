@@ -14,7 +14,9 @@ ciclo de vida del protocolo registra el hash del archivo.
 """
 
 import io
+import re
 from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
@@ -82,10 +84,17 @@ class ErrorLecturaProtocolo(Exception):
 
 @dataclass(slots=True)
 class DocumentoProtocolo:
-    """Un protocolo leído: el YAML original con comentarios y su modelo validado."""
+    """Un protocolo leído: el YAML original con comentarios y su modelo validado.
+
+    `comentarios_de_seccion` guarda, por cada clave de primer nivel del texto
+    leído, las líneas de comentario que la precedían. La escritura las vuelve
+    a poner antes de su clave (ver `texto_protocolo()`). Es `None` si el
+    documento no se construyó desde un texto, y entonces no se restaura nada.
+    """
 
     datos: CommentedMap
     protocolo: Protocolo
+    comentarios_de_seccion: dict[str, tuple[str, ...]] | None = None
 
 
 def texto_plantilla() -> str:
@@ -141,14 +150,33 @@ def cargar_protocolo(texto: str) -> DocumentoProtocolo:
         raise ErrorLecturaProtocolo(
             [_problema_de_esquema(detalle, datos) for detalle in error.errors()]
         ) from None
-    return DocumentoProtocolo(datos=datos, protocolo=protocolo)
+    return DocumentoProtocolo(
+        datos=datos,
+        protocolo=protocolo,
+        comentarios_de_seccion=_comentarios_de_seccion(texto, set(datos)),
+    )
 
 
 def texto_protocolo(documento: DocumentoProtocolo) -> str:
-    """Serializa el documento a texto YAML, con fin de línea LF."""
+    """Serializa el documento a texto YAML, con fin de línea LF.
+
+    Restaura los comentarios de sección de primer nivel. ruamel.yaml guarda el
+    comentario que precede a una clave como comentario posterior al último
+    nodo de la sección anterior (ADR-0006, Consecuencias). Por eso, al vaciar
+    esa sección el comentario se pierde, y al agregarle un elemento al final
+    queda antes de ese elemento y no antes de su clave. Aquí cada clave de
+    primer nivel recupera las líneas de comentario que la precedían al leer el
+    archivo; en un estudio, el protocolo nace de la plantilla, así que son los
+    comentarios de la plantilla con las notas que agregue el investigador. Un
+    archivo que sigue la plantilla sale idéntico, y uno sin comentarios de
+    sección sigue sin ellos.
+    """
     salida = io.StringIO()
     crear_yaml().dump(documento.datos, salida)
-    return salida.getvalue()
+    texto = salida.getvalue()
+    if documento.comentarios_de_seccion is None:
+        return texto
+    return _restaurar_comentarios_de_seccion(texto, documento.comentarios_de_seccion)
 
 
 def escribir_protocolo(documento: DocumentoProtocolo, ruta: Path | str) -> None:
@@ -336,6 +364,52 @@ def _mensaje_de_esquema(detalle: ErrorDetails) -> str:
 def _resumir(valor: object, largo_maximo: int = 60) -> str:
     texto = repr(a_python(valor))
     return texto if len(texto) <= largo_maximo else texto[: largo_maximo - 1] + "…"
+
+
+# --- Comentarios de sección de primer nivel -----------------------------------
+
+_CLAVE_DE_PRIMER_NIVEL = re.compile(r"([A-Za-z_][A-Za-z0-9_]*):(?: |$)")
+
+
+def _clave_de_primer_nivel(linea: str, claves: AbstractSet[str]) -> str | None:
+    """La clave de primer nivel que abre `linea`, si es una de `claves`."""
+    coincidencia = _CLAVE_DE_PRIMER_NIVEL.match(linea)
+    if coincidencia is None or coincidencia.group(1) not in claves:
+        return None
+    return coincidencia.group(1)
+
+
+def _comentarios_de_seccion(texto: str, claves: AbstractSet[str]) -> dict[str, tuple[str, ...]]:
+    """Por cada clave de primer nivel, las líneas de comentario (columna 0) que la preceden."""
+    lineas = texto.split("\n")
+    comentarios: dict[str, tuple[str, ...]] = {}
+    for indice, linea in enumerate(lineas):
+        clave = _clave_de_primer_nivel(linea, claves)
+        if clave is None:
+            continue
+        inicio = indice
+        while inicio > 0 and lineas[inicio - 1].startswith("#"):
+            inicio -= 1
+        comentarios[clave] = tuple(lineas[inicio:indice])
+    return comentarios
+
+
+def _restaurar_comentarios_de_seccion(texto: str, esperados: Mapping[str, tuple[str, ...]]) -> str:
+    """Quita las líneas de comentario de sección donde estén y las pone antes de su clave.
+
+    Solo mueve líneas de columna 0 idénticas a un comentario de sección; los
+    demás comentarios se quedan donde los dejó ruamel.yaml.
+    """
+    de_seccion = {linea for bloque in esperados.values() for linea in bloque}
+    resultado: list[str] = []
+    for linea in texto.split("\n"):
+        if linea in de_seccion:
+            continue
+        clave = _clave_de_primer_nivel(linea, esperados.keys())
+        if clave is not None:
+            resultado.extend(esperados[clave])
+        resultado.append(linea)
+    return "\n".join(resultado)
 
 
 # --- Fusión del modelo sobre el YAML original ---------------------------------

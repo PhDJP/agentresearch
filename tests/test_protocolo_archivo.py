@@ -1,6 +1,9 @@
 """Pruebas de lectura y escritura del protocolo en YAML, conservando comentarios."""
 
+import copy
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic_core import ErrorDetails
@@ -20,7 +23,12 @@ from agentresearch.protocolo import (
     texto_plantilla,
     texto_protocolo,
 )
-from agentresearch.protocolo.archivo import _mensaje_de_esquema, a_python, formatear_ubicacion
+from agentresearch.protocolo.archivo import (
+    DocumentoProtocolo,
+    _mensaje_de_esquema,
+    a_python,
+    formatear_ubicacion,
+)
 from agentresearch.protocolo.modelo import Criterio
 
 RUTA_PROTOCOLO_SINTETICO = Path(__file__).parent / "datos" / "protocolo_sintetico.yaml"
@@ -282,6 +290,104 @@ def test_actualizar_elimina_las_claves_ausentes_del_modelo() -> None:
     actualizar_documento(documento, Protocolo.model_validate(datos))
 
     assert "registro:" not in texto_protocolo(documento)
+
+
+# --- Comentarios de sección de primer nivel (límite de ruamel.yaml, ADR-0006) --
+
+
+def _actualizar_con(documento: DocumentoProtocolo, cambio: Callable[[dict[str, Any]], None]) -> str:
+    datos = documento.protocolo.model_dump(mode="python", exclude_unset=True)
+    cambio(datos)
+    actualizar_documento(documento, Protocolo.model_validate(datos))
+    return texto_protocolo(documento)
+
+
+def _linea_anterior(texto: str, linea_buscada: str) -> str:
+    lineas = texto.splitlines()
+    return lineas[lineas.index(linea_buscada) - 1]
+
+
+COMENTARIO_SELECCION = next(
+    linea for linea in texto_plantilla().splitlines() if linea.startswith("# Revisores")
+)
+COMENTARIO_CALIDAD = next(
+    linea for linea in texto_plantilla().splitlines() if linea.startswith("# Evaluación de calidad")
+)
+
+
+def test_vaciar_la_ultima_lista_de_una_seccion_conserva_el_comentario_de_la_siguiente() -> None:
+    documento = cargar_protocolo(texto_plantilla())
+
+    texto = _actualizar_con(documento, lambda datos: datos["criterios"].update(exclusion=[]))
+
+    assert "  exclusion: []\n" in texto
+    assert _linea_anterior(texto, "seleccion:") == COMENTARIO_SELECCION
+    assert _lineas_de_comentario(texto) == _lineas_de_comentario(texto_plantilla())
+    assert texto_protocolo(cargar_protocolo(texto)) == texto
+
+
+def test_vaciar_una_lista_anidada_conserva_el_comentario_de_la_siguiente_seccion() -> None:
+    documento = cargar_protocolo(texto_plantilla())
+
+    texto = _actualizar_con(documento, lambda datos: datos["extraccion"].update(facetas=[]))
+
+    assert _linea_anterior(texto, "calidad:") == COMENTARIO_CALIDAD
+    assert _lineas_de_comentario(texto) == _lineas_de_comentario(texto_plantilla())
+
+
+def test_agregar_un_elemento_al_final_de_una_seccion_deja_el_comentario_ante_su_clave() -> None:
+    documento = cargar_protocolo(texto_plantilla())
+
+    def agregar_faceta(datos: dict[str, Any]) -> None:
+        faceta = copy.deepcopy(datos["extraccion"]["facetas"][-1])
+        faceta["id"] = "F3"
+        faceta["categorias"][0]["id"] = "F3.1"
+        datos["extraccion"]["facetas"].append(faceta)
+
+    texto = _actualizar_con(documento, agregar_faceta)
+
+    assert texto.index("- id: F3") < texto.index(COMENTARIO_CALIDAD)
+    assert _linea_anterior(texto, "calidad:") == COMENTARIO_CALIDAD
+    assert texto.count(COMENTARIO_CALIDAD) == 1
+
+
+def test_la_restauracion_conserva_las_notas_del_investigador_sobre_una_seccion() -> None:
+    nota = "# Nota del investigador: la regla A-F se decidió en la decisión O7."
+    base = texto_plantilla().replace("\nseleccion:\n", f"\n{nota}\nseleccion:\n")
+    documento = cargar_protocolo(base)
+
+    texto = _actualizar_con(documento, lambda datos: datos["criterios"].update(exclusion=[]))
+
+    assert _linea_anterior(texto, nota) == COMENTARIO_SELECCION
+    assert _linea_anterior(texto, "seleccion:") == nota
+
+
+def test_un_archivo_sin_comentarios_de_seccion_sigue_sin_ellos() -> None:
+    documento = cargar_protocolo(RUTA_PROTOCOLO_SINTETICO.read_text(encoding="utf-8"))
+
+    texto = _actualizar_con(documento, lambda datos: datos["analisis"].update(cruces=[]))
+
+    assert _lineas_de_comentario(texto) == _lineas_de_comentario(
+        RUTA_PROTOCOLO_SINTETICO.read_text(encoding="utf-8")
+    )
+
+
+def test_la_restauracion_es_idempotente() -> None:
+    documento = cargar_protocolo(texto_plantilla())
+    texto = _actualizar_con(documento, lambda datos: datos["criterios"].update(exclusion=[]))
+
+    assert texto_protocolo(documento) == texto
+    recargado = cargar_protocolo(texto)
+    assert _actualizar_con(recargado, lambda datos: None) == texto
+
+
+def test_un_documento_construido_sin_texto_no_restaura_comentarios() -> None:
+    leido = cargar_protocolo(texto_plantilla())
+    documento = DocumentoProtocolo(datos=leido.datos, protocolo=leido.protocolo)
+
+    texto = _actualizar_con(documento, lambda datos: datos["criterios"].update(exclusion=[]))
+
+    assert COMENTARIO_SELECCION not in texto
 
 
 # --- Errores de lectura (P-E00) ------------------------------------------------
