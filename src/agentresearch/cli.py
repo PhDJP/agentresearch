@@ -267,9 +267,8 @@ def ejecutar_protocolo_validar(ruta: Path, como_json: bool = False) -> int:
         print(f"registro: {registro['ruta']} ({registro['numero_eventos']} eventos{anclaje})")
         if registro["falta_anclaje"]:
             print(f"nota: {nota_falta_anclaje(RutasProtocolo.desde(ruta))}")
-    nota_ecuaciones = resultado.ecuaciones.nota() if resultado.ecuaciones else None
-    if nota_ecuaciones is not None:
-        print(f"nota: {nota_ecuaciones}")
+    for nota in resultado.notas():
+        print(f"nota: {nota}")
     for hallazgo in resultado.hallazgos:
         print(hallazgo)
     print(f"resultado: {_resumen(len(resultado.errores), len(resultado.advertencias))}")
@@ -458,9 +457,7 @@ def _describir_escritura(resultado: ResultadoEscritura) -> list[str]:
         f"hash {resultado.hash_protocolo}"
     )
     validacion = resultado.validacion
-    nota_ecuaciones = validacion.ecuaciones.nota() if validacion.ecuaciones else None
-    if nota_ecuaciones is not None:
-        lineas.append(f"nota: {nota_ecuaciones}")
+    lineas.extend(f"nota: {nota}" for nota in validacion.notas())
     lineas.extend(str(hallazgo) for hallazgo in validacion.hallazgos)
     lineas.append(f"validación: {_resumen(len(validacion.errores), len(validacion.advertencias))}")
     if resultado.pendiente_de_enmienda:

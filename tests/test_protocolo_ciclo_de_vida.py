@@ -345,13 +345,62 @@ def test_p_e10_se_evalua_aunque_haya_p_e00(protocolo_de_estudio: Path) -> None:
 
 
 def test_los_eventos_de_otros_tipos_se_ignoran(protocolo_de_estudio: Path) -> None:
-    _agregar_evento(protocolo_de_estudio, "estudio_creado", {"nombre": "prueba"})
+    _agregar_evento(protocolo_de_estudio, "nota_libre", {"texto": "prueba"})
 
     estado = leer_estado_registro(RutasProtocolo.desde(protocolo_de_estudio))
 
     assert estado.integro
     assert estado.versiones == []
+    assert estado.creacion is None
     assert _ids(protocolo_de_estudio) == []
+
+
+def _datos_creacion() -> dict[str, Any]:
+    archivo = {"ruta": "CLAUDE.md", "hash": "sha256:" + "a" * 64}
+    return {
+        "nombre": "prueba",
+        "titulo": "Estudio de prueba",
+        "modelo": "claude-opus-5-5",
+        "fuente_agente": "git+https://example.org/agentresearch@v0.0.0",
+        "archivos": [],
+        "instrucciones": [archivo],
+        "insumos": [],
+    }
+
+
+def test_el_evento_de_creacion_del_estudio_se_reconoce(protocolo_de_estudio: Path) -> None:
+    _agregar_evento(protocolo_de_estudio, "estudio_creado", _datos_creacion())
+
+    estado = leer_estado_registro(RutasProtocolo.desde(protocolo_de_estudio))
+
+    assert estado.integro
+    assert estado.creacion is not None
+    assert estado.creacion.evento.id == "evt-000001"
+    assert estado.creacion.datos.modelo == "claude-opus-5-5"
+
+
+def test_la_creacion_del_estudio_solo_puede_ser_el_primer_evento(
+    protocolo_de_estudio: Path,
+) -> None:
+    _agregar_evento(protocolo_de_estudio, "estudio_creado", _datos_creacion())
+    _agregar_evento(protocolo_de_estudio, "estudio_creado", _datos_creacion())
+
+    estado = leer_estado_registro(RutasProtocolo.desde(protocolo_de_estudio))
+
+    assert estado.problemas == [
+        "evt-000002 registra la creación del estudio, que solo puede ser el primer evento "
+        "(evt-000001)"
+    ]
+
+
+def test_una_creacion_mal_formada_es_p_e10(protocolo_de_estudio: Path) -> None:
+    _agregar_evento(protocolo_de_estudio, "estudio_creado", {"nombre": "prueba"})
+
+    estado = leer_estado_registro(RutasProtocolo.desde(protocolo_de_estudio))
+
+    assert not estado.integro
+    assert estado.creacion is None
+    assert all("el evento no cumple su esquema" in p for p in estado.problemas)
 
 
 # --- Decisiones en el registro -----------------------------------------------------

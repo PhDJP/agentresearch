@@ -34,6 +34,7 @@ from agentresearch.protocolo.ciclo_de_vida import (
 )
 from agentresearch.protocolo.ecuaciones.documento import EstadoEcuaciones, estado_ecuaciones
 from agentresearch.protocolo.estudio import RutasProtocolo
+from agentresearch.protocolo.instrucciones import EstadoInstrucciones, estado_instrucciones
 from agentresearch.protocolo.modelo import VERSION_ESQUEMA, Protocolo
 from agentresearch.protocolo.reglas import REGLAS, Severidad
 from agentresearch.protocolo.terminos import (
@@ -95,6 +96,8 @@ class ResultadoValidacion:
     """Resumen del registro de eventos del estudio, con su anclaje."""
     ecuaciones: EstadoEcuaciones | None = None
     """Si `ecuaciones.md` corresponde al protocolo actual (ADR-0009, punto 14)."""
+    instrucciones: EstadoInstrucciones | None = None
+    """Si las instrucciones del agente cambiaron desde su registro (ADR-0007)."""
 
     @property
     def errores(self) -> list[Hallazgo]:
@@ -124,7 +127,17 @@ class ResultadoValidacion:
             "registro": self.registro,
             "ecuaciones": self.ecuaciones.como_dict() if self.ecuaciones else None,
             "ecuaciones_desactualizadas": bool(self.ecuaciones and self.ecuaciones.desactualizadas),
+            "instrucciones": self.instrucciones.como_dict() if self.instrucciones else None,
+            "instrucciones_modificadas": bool(
+                self.instrucciones and self.instrucciones.modificadas
+            ),
         }
+
+    def notas(self) -> list[str]:
+        """Notas de estado que no son hallazgos: ecuaciones e instrucciones del agente."""
+        notas = [self.ecuaciones.nota() if self.ecuaciones else None]
+        notas.append(self.instrucciones.nota() if self.instrucciones else None)
+        return [nota for nota in notas if nota is not None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +199,7 @@ def validar_lectura(lectura: LecturaProtocolo, registro: EstadoRegistro) -> Resu
         ),
         registro=resumen_registro(registro),
         ecuaciones=estado_ecuaciones(registro.rutas, lectura.hash),
+        instrucciones=estado_instrucciones(registro),
     )
 
 

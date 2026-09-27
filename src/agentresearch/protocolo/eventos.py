@@ -1,4 +1,4 @@
-"""Esquemas de los eventos del ciclo de vida del protocolo (ADR-0008, punto 7).
+"""Esquemas de los eventos del registro del protocolo (ADR-0008, punto 7; ADR-0007).
 
 Cada evento de `protocolo/eventos.jsonl` guarda en `datos` un objeto con uno de
 estos esquemas. Se validan con pydantic estricto al leer el registro, para
@@ -28,6 +28,7 @@ TIPO_APROBADO = "protocolo_aprobado"
 TIPO_ENMENDADO = "protocolo_enmendado"
 TIPO_DECISION_PROPUESTA = "decision_propuesta"
 TIPO_DECISION_CONFIRMADA = "decision_confirmada"
+TIPO_ESTUDIO_CREADO = "estudio_creado"
 
 Nivel = Literal["mayor", "menor", "parche"]
 EstadoProtocolo = Literal["borrador", "vigente"]
@@ -217,6 +218,34 @@ class DatosDecisionConfirmada(ModeloEvento):
     evento_propuesta: IdEvento
     hash_evento_propuesta: HashSha256
     confirmado_por: PersonaHumana
+
+
+# --- Creación del estudio (ADR-0007) ---------------------------------------------
+
+
+class ArchivoRegistrado(ModeloEvento):
+    """Un archivo del estudio y su hash, en el momento de registrarlo."""
+
+    ruta: RutaRelativa
+    hash: HashSha256
+
+
+class DatosEstudioCreado(ModeloEvento):
+    """Datos del evento `estudio_creado`, el primero del registro.
+
+    `instrucciones` son los archivos que gobiernan al agente en el estudio
+    (`CLAUDE.md`, `.claude/settings.json` y las *skills*); `validar` e
+    `historial` avisan si cambian. `insumos` son los archivos que el
+    investigador aportó con `--contexto`.
+    """
+
+    nombre: TextoNoVacio
+    titulo: TextoNoVacio
+    modelo: TextoNoVacio
+    fuente_agente: TextoNoVacio
+    archivos: list[ArchivoRegistrado]
+    instrucciones: list[ArchivoRegistrado]
+    insumos: list[ArchivoRegistrado]
 
 
 # --- Anclaje ----------------------------------------------------------------------

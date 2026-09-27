@@ -24,11 +24,13 @@ from agentresearch.protocolo.eventos import (
     TIPO_DECISION_CONFIRMADA,
     TIPO_DECISION_PROPUESTA,
     TIPO_ENMENDADO,
+    TIPO_ESTUDIO_CREADO,
     ArchivoAnclaje,
     DatosAprobado,
     DatosDecisionConfirmada,
     DatosDecisionPropuesta,
     DatosEnmendado,
+    DatosEstudioCreado,
     Nivel,
 )
 from agentresearch.trazabilidad import (
@@ -43,6 +45,8 @@ VERSION_APROBADA = "1.0.0"
 """Versión que fija la aprobación (ADR-0008, punto 5)."""
 
 EstadoDecision = Literal["pendiente", "confirmada", "reemplazada"]
+
+ID_PRIMER_EVENTO = "evt-000001"
 
 
 def siguiente_version(version: str, nivel: Nivel) -> str:
@@ -98,6 +102,14 @@ class DecisionRegistrada:
         return "pendiente"
 
 
+@dataclass(frozen=True, slots=True)
+class CreacionRegistrada:
+    """El evento `estudio_creado` y sus datos validados (ADR-0007)."""
+
+    evento: EventoRegistro
+    datos: DatosEstudioCreado
+
+
 @dataclass(slots=True)
 class EstadoRegistro:
     """Lo que el directorio del estudio dice sobre el ciclo de vida del protocolo."""
@@ -115,6 +127,8 @@ class EstadoRegistro:
     """Si el registro cumple el anclaje guardado (como prefijo); `None` si no hay anclaje válido."""
     versiones: list[VersionRegistrada] = field(default_factory=list)
     decisiones: dict[str, DecisionRegistrada] = field(default_factory=dict)
+    creacion: CreacionRegistrada | None = None
+    """El evento inicial del estudio, si el registro lo tiene (lo crea `nuevo-estudio`)."""
     problemas: list[str] = field(default_factory=list)
     """Mensajes de la regla P-E10; vacío si el registro es íntegro y coherente."""
 
@@ -246,7 +260,23 @@ def _interpretar_eventos(estado: EstadoRegistro) -> None:
             confirmada = _validar_datos(estado, evento, DatosDecisionConfirmada)
             if confirmada is not None:
                 _registrar_confirmacion(estado, evento, confirmada, propuestas_por_evento)
-        # Otros tipos (p. ej. el evento inicial del estudio) no afectan el ciclo de vida.
+        elif evento.tipo == TIPO_ESTUDIO_CREADO:
+            creado = _validar_datos(estado, evento, DatosEstudioCreado)
+            if creado is not None:
+                _registrar_creacion(estado, evento, creado)
+        # Otros tipos no afectan el ciclo de vida.
+
+
+def _registrar_creacion(
+    estado: EstadoRegistro, evento: EventoRegistro, datos: DatosEstudioCreado
+) -> None:
+    if evento.id != ID_PRIMER_EVENTO:
+        estado.problemas.append(
+            f"{evento.id} registra la creación del estudio, que solo puede ser el primer "
+            f"evento ({ID_PRIMER_EVENTO})"
+        )
+        return
+    estado.creacion = CreacionRegistrada(evento, datos)
 
 
 def _registrar_aprobacion(
