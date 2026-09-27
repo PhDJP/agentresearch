@@ -71,6 +71,14 @@ PLANTILLAS: dict[str, str] = {
 }
 """Plantilla del paquete (en `agentresearch/estudio/plantillas/`) y su ruta en el estudio."""
 
+ADMINISTRADOS: dict[str, str] = {
+    origen: destino
+    for origen, destino in PLANTILLAS.items()
+    if destino not in ("README.md", "pyproject.toml")
+}
+"""Plantillas que `estudio actualizar` regenera: las instrucciones del agente, `.gitignore`
+y `.gitattributes`. `README.md` y `pyproject.toml` son del investigador después de crearlos."""
+
 _MARCADOR = re.compile(r"\{\{([a-z_]+)\}\}")
 _NOMBRE_VALIDO = re.compile(r"^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$")
 
@@ -199,10 +207,9 @@ def _exigir_argumentos_validos(
         raise ErrorCreacion(errores)
 
 
-def _escribir_estudio(
-    raiz: Path, estudio: Estudio, contexto: Path | None, momento: datetime
-) -> tuple[EventoRegistro, Anclaje]:
-    valores = {
+def valores_de_plantilla(estudio: Estudio) -> dict[str, str]:
+    """Valores de los marcadores `{{clave}}` de las plantillas para un estudio."""
+    return {
         "titulo": estudio.titulo,
         "nombre": estudio.nombre,
         "modelo": estudio.modelo,
@@ -210,6 +217,12 @@ def _escribir_estudio(
         "fuente_agente": estudio.agente.fuente,
         "fecha": estudio.fecha_creacion,
     }
+
+
+def _escribir_estudio(
+    raiz: Path, estudio: Estudio, contexto: Path | None, momento: datetime
+) -> tuple[EventoRegistro, Anclaje]:
+    valores = valores_de_plantilla(estudio)
     for origen, destino in PLANTILLAS.items():
         _escribir(raiz, destino, renderizar(texto_de_plantilla(origen), valores))
     _escribir(raiz, NOMBRE_ARCHIVO, texto_estudio(estudio))

@@ -1,6 +1,6 @@
 # {{titulo}}
 
-Estudio de mapeo sistemático de la literatura conducido con [agentresearch](https://github.com/PhDJP/agentresearch) {{version_agente}}, siguiendo a Kitchenham (proceso), Petersen et al. (2008, 2015; mapeo) y PRISMA-ScR (Tricco et al., 2018; reporte).
+Estudio de mapeo sistemático de la literatura conducido con [agentresearch](https://github.com/PhDJP/agentresearch), siguiendo a Kitchenham (proceso), Petersen et al. (2008, 2015; mapeo) y PRISMA-ScR (Tricco et al., 2018; reporte).
 
 Este repositorio contiene los datos y la evidencia del estudio. La herramienta está en su propio repositorio, y este la fija a una versión exacta.
 
@@ -12,7 +12,9 @@ Requiere [uv](https://docs.astral.sh/uv/) y Git.
 uv sync
 ```
 
-`uv sync` instala Python 3.12 y agentresearch {{version_agente}} (`{{fuente_agente}}`), y crea o respeta `uv.lock`, que fija todas las dependencias y se versiona.
+`uv sync` instala Python 3.12 y la versión de agentresearch que fija `pyproject.toml` (la que registra `estudio.yaml`), y crea o respeta `uv.lock`, que fija todas las dependencias y se versiona.
+
+Para pasar el estudio a otra versión del agente: cambie la versión en `pyproject.toml`, ejecute `uv sync` y luego, en su terminal, `uv run agentresearch estudio actualizar --actualizado-por <id> --justificacion "…"`. El comando regenera las instrucciones del agente, muestra el diff, pide confirmación y registra la actualización. Haga el commit con el anclaje que muestra.
 
 ## Uso
 

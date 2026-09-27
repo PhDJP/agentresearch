@@ -9,6 +9,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Protocol
 
+from agentresearch.estudio.actualizacion import ResultadoActualizacion, actualizar_estudio
 from agentresearch.estudio.creacion import ErrorCreacion, ResultadoCreacion, crear_estudio
 from agentresearch.protocolo import RutasProtocolo, validar_archivo
 from agentresearch.protocolo.aprobacion import (
@@ -72,6 +73,36 @@ def construir_analizador() -> argparse.ArgumentParser:
         help="insumo del investigador que se copia en protocolo/insumos/",
     )
     _argumento_json(nuevo_estudio)
+
+    estudio = subcomandos.add_parser("estudio", help="Operaciones sobre el repositorio del estudio")
+    subcomandos_estudio = estudio.add_subparsers(dest="subcomando", required=True)
+    actualizar = subcomandos_estudio.add_parser(
+        "actualizar",
+        help="Pasa el estudio a la versión instalada del agente y regenera sus instrucciones "
+        "(exige una terminal interactiva)",
+    )
+    actualizar.add_argument(
+        "--actualizado-por",
+        required=True,
+        metavar="ID",
+        help="revisor humano declarado en seleccion.revisores que actualiza el estudio",
+    )
+    justificacion = actualizar.add_mutually_exclusive_group(required=True)
+    justificacion.add_argument("--justificacion", metavar="TEXTO", help="por qué se actualiza")
+    justificacion.add_argument(
+        "--archivo",
+        type=Path,
+        metavar="ARCHIVO",
+        help='JSON con {"justificacion": "…"}, en lugar de --justificacion',
+    )
+    actualizar.add_argument(
+        "--estudio",
+        type=Path,
+        default=Path("."),
+        metavar="RUTA",
+        help="raíz del estudio (por defecto, el directorio actual)",
+    )
+    _argumento_json(actualizar)
 
     registro = subcomandos.add_parser("registro", help="Operaciones sobre registros encadenados")
     subcomandos_registro = registro.add_subparsers(dest="subcomando", required=True)
@@ -289,6 +320,46 @@ def _describir_creacion(resultado: ResultadoCreacion) -> list[str]:
         *[f"  {archivo}" for archivo in resultado.archivos],
         "pasos siguientes:",
         *[f"  {numero}. {paso}" for numero, paso in enumerate(resultado.pasos_siguientes(), 1)],
+    ]
+
+
+def ejecutar_estudio_actualizar(
+    actualizado_por: str,
+    justificacion: str | None = None,
+    archivo: Path | None = None,
+    estudio: Path = Path("."),
+    como_json: bool = False,
+    terminal: Terminal | None = None,
+    reloj: Reloj | None = None,
+) -> int:
+    """Actualiza el agente del estudio tras la confirmación interactiva del investigador."""
+    return _ejecutar_operacion(
+        "estudio actualizar",
+        como_json,
+        lambda: actualizar_estudio(
+            estudio, actualizado_por, _terminal(terminal), justificacion, archivo, reloj
+        ),
+        _describir_actualizacion,
+    )
+
+
+def _describir_actualizacion(resultado: ResultadoActualizacion) -> list[str]:
+    if resultado.completada:
+        return [
+            f"se completó la actualización a agentresearch {resultado.version_nueva} "
+            f"registrada en {resultado.evento.id}, que se había interrumpido",
+            f"archivos escritos: {', '.join(resultado.archivos_cambiados) or 'ninguno'}",
+            f"anclaje: {resultado.anclaje}",
+        ]
+    return [
+        f"estudio actualizado: agentresearch {resultado.version_anterior} → "
+        f"{resultado.version_nueva}",
+        f"archivos regenerados: {', '.join(resultado.archivos_cambiados) or 'ninguno'}",
+        f"evento: {resultado.evento.id} ({resultado.evento.tipo})",
+        f"anclaje: {resultado.anclaje}",
+        *_aviso_anclaje(resultado.anclaje_recreado),
+        f'haga el commit con el anclaje en el mensaje, p. ej.: git commit -am "Actualizar el '
+        f'agente a {resultado.version_nueva} (anclaje {resultado.anclaje})"',
     ]
 
 
@@ -701,6 +772,17 @@ def main() -> None:
                 argumentos.titulo,
                 argumentos.modelo,
                 argumentos.contexto,
+                argumentos.como_json,
+            )
+        )
+
+    if argumentos.comando == "estudio" and argumentos.subcomando == "actualizar":
+        sys.exit(
+            ejecutar_estudio_actualizar(
+                argumentos.actualizado_por,
+                argumentos.justificacion,
+                argumentos.archivo,
+                argumentos.estudio,
                 argumentos.como_json,
             )
         )

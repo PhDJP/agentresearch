@@ -55,6 +55,14 @@ class Historial:
         return {
             "ruta_protocolo": self.rutas.relativa(self.rutas.protocolo),
             "estudio": _creacion_como_dict(self.registro),
+            "actualizaciones_agente": [
+                {
+                    "evento": actualizacion.evento.id,
+                    "fecha_hora_utc": actualizacion.evento.fecha_hora_utc,
+                    "datos": actualizacion.datos.model_dump(mode="json"),
+                }
+                for actualizacion in self.registro.actualizaciones
+            ],
             "estado": self.estado,
             "version_protocolo": self.version_protocolo,
             "hash_archivo": self.hash_archivo,
@@ -128,6 +136,13 @@ def texto_historial(historial: Historial) -> list[str]:
             f"estudio: {creado.titulo} ({creado.nombre}), creado el {evento.fecha_hora_utc} "
             f"con agentresearch {evento.version_agente} ({evento.id}); modelo fijado: "
             f"{creado.modelo}"
+        )
+    for actualizacion in registro.actualizaciones:
+        datos = actualizacion.datos
+        lineas.append(
+            f"agente actualizado: {datos.version_anterior} → {datos.version_nueva}, el "
+            f"{actualizacion.evento.fecha_hora_utc} por {datos.actualizado_por.id} "
+            f"({actualizacion.evento.id}): {datos.justificacion}"
         )
     eventos_rel = rutas.relativa(rutas.eventos)
     if not registro.existe_registro:

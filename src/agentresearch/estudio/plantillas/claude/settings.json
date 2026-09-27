@@ -26,6 +26,8 @@
       "Bash(*agentresearch protocolo decision confirmar*)",
       "PowerShell(*agentresearch protocolo aprobar*)",
       "PowerShell(*agentresearch protocolo decision confirmar*)",
+      "Bash(*agentresearch estudio actualizar*)",
+      "PowerShell(*agentresearch estudio actualizar*)",
       "Edit(/protocolo/**)",
       "Edit(/estudio.yaml)",
       "Edit(/CLAUDE.md)",

@@ -6,7 +6,7 @@ Claude Code conversa con el investigador y propone. El paquete `agentresearch` v
 
 ## Reglas del agente en este estudio
 
-1. **El LLM propone; el investigador decide.** Nunca apruebes el protocolo, registres una enmienda ni confirmes decisiones. Esos comandos (`protocolo aprobar`, `protocolo enmendar` y `protocolo decision confirmar`) los ejecuta el investigador en su propia terminal: PowerShell o la terminal de VS Code, no Git Bash abierto como aplicación independiente. Pídeselo con el comando exacto y espera su resultado.
+1. **El LLM propone; el investigador decide.** Nunca apruebes el protocolo, registres una enmienda, confirmes decisiones ni actualices el agente del estudio. Esos comandos (`protocolo aprobar`, `protocolo enmendar`, `protocolo decision confirmar` y `estudio actualizar`) los ejecuta el investigador en su propia terminal: PowerShell o la terminal de VS Code, no Git Bash abierto como aplicación independiente. Pídeselo con el comando exacto y espera su resultado.
 2. **Nada entra al estudio sin un comando del paquete.** No edites `protocolo/`, `estudio.yaml`, `CLAUDE.md`, `.claude/`, `pyproject.toml` ni `uv.lock`, ni leas `.env`; los permisos lo niegan. El protocolo se escribe con `protocolo escribir`, y los archivos que prepares para los comandos van en `.borradores/`.
 3. **Opciones cuando falta un dato.** Si el investigador no sabe qué responder, propón de 2 a 4 opciones construidas con lo que ya dijo, cada una con pros, contras y su referencia metodológica. La elección y las alternativas se registran con `protocolo decision registrar`.
 4. **Nunca inventes** referencias, DOI, cifras, artículos ni términos de búsqueda. Si no puedes verificar una referencia, dilo.
@@ -31,6 +31,7 @@ Se ejecutan desde la raíz del estudio con `uv run agentresearch …`.
 | `protocolo decision confirmar --confirmado-por <id>` | el investigador, en su terminal | Confirmar las decisiones pendientes |
 | `protocolo aprobar --aprobado-por <id> [--justificaciones <archivo>]` | el investigador, en su terminal | Aprobar el protocolo como `1.0.0` |
 | `protocolo enmendar --nivel mayor\|menor --enmendado-por <id> --archivo-enmienda <archivo>` | el investigador, en su terminal | Registrar una enmienda |
+| `estudio actualizar --actualizado-por <id> --justificacion "…"` | el investigador, en su terminal | Pasar el estudio a la versión del agente instalada con `uv sync` y regenerar sus instrucciones |
 | `registro verificar protocolo/eventos.jsonl [--anclaje <anclaje>]` | cualquiera | Verificar la cadena del registro |
 
 ## Archivos
@@ -38,7 +39,7 @@ Se ejecutan desde la raíz del estudio con `uv run agentresearch …`.
 - `estudio.yaml`: metadatos del estudio, versión exacta del agente y modelo fijado.
 - `protocolo/protocolo.yaml`: el protocolo. `protocolo/eventos.jsonl` y `protocolo/anclaje.json`: registro encadenado de creación, aprobación, enmiendas y decisiones. `protocolo/versiones/`: copia de cada versión registrada. `protocolo/ecuaciones.md`: ecuaciones por fuente. `protocolo/insumos/`: insumos del investigador.
 - `.borradores/`: archivos intermedios que preparas para los comandos. No se versiona; su contenido queda en los eventos.
-- Este `CLAUDE.md`, `.claude/settings.json` y `.claude/skills/` son las instrucciones del agente. Su hash quedó registrado al crear el estudio, y `validar` avisa si cambian.
+- Este `CLAUDE.md`, `.claude/settings.json` y `.claude/skills/` son las instrucciones del agente. Su hash quedó registrado al crear el estudio (y en cada `estudio actualizar`), y `validar` avisa si cambian.
 
 ## Modelo
 

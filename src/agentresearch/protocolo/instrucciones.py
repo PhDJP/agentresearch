@@ -3,7 +3,8 @@
 Las instrucciones son los archivos que gobiernan a Claude Code en el
 repositorio del estudio: `CLAUDE.md`, `.claude/settings.json` (modelo fijado
 y permisos) y las *skills* de `.claude/skills/`. `nuevo-estudio` registra su
-hash en el evento `estudio_creado`. `validar` e `historial` los comparan con
+hash en el evento `estudio_creado`, y `estudio actualizar` en
+`estudio_actualizado`. `validar` e `historial` comparan el último registro con
 los archivos actuales y, si difieren, muestran una nota de estado
 ("instrucciones del agente modificadas"). No es un error ni una advertencia:
 el protocolo sigue siendo válido, pero el reporte debe poder decir con qué
@@ -23,6 +24,11 @@ from agentresearch.trazabilidad import hash_archivo
 RUTA_CLAUDE_MD = "CLAUDE.md"
 RUTA_CONFIGURACION = ".claude/settings.json"
 DIRECTORIO_SKILLS = ".claude/skills"
+
+
+def es_ruta_de_instrucciones(ruta: str) -> bool:
+    """Indica si la ruta relativa (con `/`) es un archivo de instrucciones del agente."""
+    return ruta in (RUTA_CLAUDE_MD, RUTA_CONFIGURACION) or ruta.startswith(f"{DIRECTORIO_SKILLS}/")
 
 
 def rutas_de_instrucciones(estudio: Path) -> list[str]:
@@ -73,9 +79,9 @@ class EstadoInstrucciones:
             partes.append(f"no estaban registrados {', '.join(self.agregados)}")
         return (
             f"instrucciones del agente modificadas desde su registro en {self.evento}: "
-            f"{'; '.join(partes)}. Si el cambio no fue deliberado, restáurelo con Git; si lo "
-            "fue, el reporte debe declararlo (un comando para registrar la actualización está "
-            "previsto en la hoja de ruta)"
+            f"{'; '.join(partes)}. Si el cambio no fue deliberado, restáurelo con Git; para "
+            "actualizar el agente del estudio, use `agentresearch estudio actualizar` en su "
+            "terminal"
         )
 
     def como_dict(self) -> dict[str, Any]:
@@ -89,18 +95,21 @@ class EstadoInstrucciones:
 
 
 def estado_instrucciones(registro: EstadoRegistro) -> EstadoInstrucciones | None:
-    """Compara las instrucciones registradas al crear el estudio con las actuales.
+    """Compara las últimas instrucciones registradas con las actuales.
 
-    Devuelve `None` si el registro no tiene el evento `estudio_creado` (por
-    ejemplo, un protocolo que no se creó con `nuevo-estudio`).
+    El último registro es el evento `estudio_actualizado` más reciente o, si no
+    hay ninguno, `estudio_creado`. Devuelve `None` si el registro no tiene
+    ninguno de los dos (por ejemplo, un protocolo que no se creó con
+    `nuevo-estudio`).
     """
-    creacion = registro.creacion
-    if creacion is None:
+    registro_instrucciones = registro.instrucciones_registradas
+    if registro_instrucciones is None:
         return None
-    registradas = {archivo.ruta: archivo.hash for archivo in creacion.datos.instrucciones}
+    evento, instrucciones = registro_instrucciones
+    registradas = {archivo.ruta: archivo.hash for archivo in instrucciones}
     actuales = hashes_de_instrucciones(registro.rutas.estudio)
     return EstadoInstrucciones(
-        evento=creacion.evento.id,
+        evento=evento.id,
         modificados=sorted(
             ruta
             for ruta, hash_registrado in registradas.items()

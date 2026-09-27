@@ -159,7 +159,10 @@ def test_claude_md_nombra_el_modelo_y_las_reglas(tmp_path: Path) -> None:
     assert texto.startswith(f"# {TITULO}\n")
     assert f"fija el modelo `{MODELO}`" in texto
     assert "es de mejor esfuerzo" in texto
-    assert "`protocolo aprobar`, `protocolo enmendar` y `protocolo decision confirmar`" in texto
+    assert (
+        "`protocolo aprobar`, `protocolo enmendar`, `protocolo decision confirmar` y "
+        "`estudio actualizar`"
+    ) in texto
 
 
 # --- Configuración de Claude Code -----------------------------------------------------
@@ -188,6 +191,7 @@ def test_la_configuracion_niega_aprobar_y_confirmar_y_pregunta_al_enmendar(
 
     assert f"{herramienta}(*agentresearch protocolo aprobar*)" in permisos["deny"]
     assert f"{herramienta}(*agentresearch protocolo decision confirmar*)" in permisos["deny"]
+    assert f"{herramienta}(*agentresearch estudio actualizar*)" in permisos["deny"]
     assert f"{herramienta}(*agentresearch protocolo enmendar*)" in permisos["ask"]
     for regla in permisos["allow"]:
         assert "aprobar" not in regla and "confirmar" not in regla and "enmendar" not in regla

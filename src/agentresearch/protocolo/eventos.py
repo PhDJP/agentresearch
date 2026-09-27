@@ -29,6 +29,7 @@ TIPO_ENMENDADO = "protocolo_enmendado"
 TIPO_DECISION_PROPUESTA = "decision_propuesta"
 TIPO_DECISION_CONFIRMADA = "decision_confirmada"
 TIPO_ESTUDIO_CREADO = "estudio_creado"
+TIPO_ESTUDIO_ACTUALIZADO = "estudio_actualizado"
 
 Nivel = Literal["mayor", "menor", "parche"]
 EstadoProtocolo = Literal["borrador", "vigente"]
@@ -246,6 +247,35 @@ class DatosEstudioCreado(ModeloEvento):
     archivos: list[ArchivoRegistrado]
     instrucciones: list[ArchivoRegistrado]
     insumos: list[ArchivoRegistrado]
+
+
+class ArchivoActualizado(ModeloEvento):
+    """Un archivo que el paquete administra en el estudio, antes y después de actualizarlo.
+
+    `hash_anterior` es `None` si el archivo no existía (una plantilla nueva).
+    """
+
+    ruta: RutaRelativa
+    hash_anterior: HashSha256 | None
+    hash_nuevo: HashSha256
+
+
+class DatosEstudioActualizado(ModeloEvento):
+    """Datos del evento `estudio_actualizado`: el estudio pasa a otra versión del agente.
+
+    `instrucciones` son los hashes de todas las instrucciones del agente
+    después de actualizar; con ellos compara la nota «instrucciones del
+    agente modificadas».
+    """
+
+    version_anterior: TextoNoVacio
+    version_nueva: TextoNoVacio
+    fuente_anterior: TextoNoVacio
+    fuente_nueva: TextoNoVacio
+    archivos: list[ArchivoActualizado]
+    instrucciones: list[ArchivoRegistrado]
+    justificacion: TextoNoVacio
+    actualizado_por: PersonaHumana
 
 
 # --- Anclaje ----------------------------------------------------------------------

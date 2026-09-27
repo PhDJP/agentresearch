@@ -24,12 +24,15 @@ from agentresearch.protocolo.eventos import (
     TIPO_DECISION_CONFIRMADA,
     TIPO_DECISION_PROPUESTA,
     TIPO_ENMENDADO,
+    TIPO_ESTUDIO_ACTUALIZADO,
     TIPO_ESTUDIO_CREADO,
     ArchivoAnclaje,
+    ArchivoRegistrado,
     DatosAprobado,
     DatosDecisionConfirmada,
     DatosDecisionPropuesta,
     DatosEnmendado,
+    DatosEstudioActualizado,
     DatosEstudioCreado,
     Nivel,
 )
@@ -110,6 +113,14 @@ class CreacionRegistrada:
     datos: DatosEstudioCreado
 
 
+@dataclass(frozen=True, slots=True)
+class ActualizacionRegistrada:
+    """Un evento `estudio_actualizado` y sus datos validados (ADR-0007)."""
+
+    evento: EventoRegistro
+    datos: DatosEstudioActualizado
+
+
 @dataclass(slots=True)
 class EstadoRegistro:
     """Lo que el directorio del estudio dice sobre el ciclo de vida del protocolo."""
@@ -129,6 +140,8 @@ class EstadoRegistro:
     decisiones: dict[str, DecisionRegistrada] = field(default_factory=dict)
     creacion: CreacionRegistrada | None = None
     """El evento inicial del estudio, si el registro lo tiene (lo crea `nuevo-estudio`)."""
+    actualizaciones: list[ActualizacionRegistrada] = field(default_factory=list)
+    """Actualizaciones del agente en el estudio (`estudio actualizar`), en orden."""
     problemas: list[str] = field(default_factory=list)
     """Mensajes de la regla P-E10; vacío si el registro es íntegro y coherente."""
 
@@ -144,6 +157,23 @@ class EstadoRegistro:
     def falta_anclaje(self) -> bool:
         """El registro existe sin `anclaje.json` (ADR-0008, punto 21)."""
         return self.existe_registro and not self.existe_anclaje
+
+    @property
+    def version_agente_registrada(self) -> str | None:
+        """Versión del agente según el registro: la de la creación o la última actualización."""
+        if self.actualizaciones:
+            return self.actualizaciones[-1].datos.version_nueva
+        return self.creacion.evento.version_agente if self.creacion is not None else None
+
+    @property
+    def instrucciones_registradas(self) -> tuple[EventoRegistro, list[ArchivoRegistrado]] | None:
+        """Las últimas instrucciones del agente registradas y el evento que las registró."""
+        if self.actualizaciones:
+            ultima = self.actualizaciones[-1]
+            return ultima.evento, ultima.datos.instrucciones
+        if self.creacion is not None:
+            return self.creacion.evento, self.creacion.datos.instrucciones
+        return None
 
     @property
     def pendientes(self) -> list[DecisionRegistrada]:
@@ -264,6 +294,10 @@ def _interpretar_eventos(estado: EstadoRegistro) -> None:
             creado = _validar_datos(estado, evento, DatosEstudioCreado)
             if creado is not None:
                 _registrar_creacion(estado, evento, creado)
+        elif evento.tipo == TIPO_ESTUDIO_ACTUALIZADO:
+            actualizado = _validar_datos(estado, evento, DatosEstudioActualizado)
+            if actualizado is not None:
+                _registrar_actualizacion(estado, evento, actualizado)
         # Otros tipos no afectan el ciclo de vida.
 
 
@@ -277,6 +311,24 @@ def _registrar_creacion(
         )
         return
     estado.creacion = CreacionRegistrada(evento, datos)
+
+
+def _registrar_actualizacion(
+    estado: EstadoRegistro, evento: EventoRegistro, datos: DatosEstudioActualizado
+) -> None:
+    anterior = estado.version_agente_registrada
+    if anterior is None:
+        estado.problemas.append(
+            f"{evento.id} registra una actualización del agente sin la creación del estudio"
+        )
+        return
+    if datos.version_anterior != anterior:
+        estado.problemas.append(
+            f"{evento.id} actualiza el agente desde {datos.version_anterior}, pero la versión "
+            f"registrada es {anterior}"
+        )
+        return
+    estado.actualizaciones.append(ActualizacionRegistrada(evento, datos))
 
 
 def _registrar_aprobacion(
