@@ -71,11 +71,14 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
    `openalex`, `pubmed`, `scopus` o `wos`, más la genérica siempre. Una
    fuente declarada sin traductor se lista en `ecuaciones.md` con la
    indicación de usar la ecuación genérica.
-5. **Estructura común.** Todas las ecuaciones ponen entre paréntesis cada
-   bloque y la unión de bloques, aunque la precedencia de la fuente no lo
-   exija. Elsevier anuncia que en 2026 cambiará la precedencia de los
-   operadores de Scopus, y los paréntesis hacen la ecuación independiente
-   de ese cambio.
+5. **Estructura común.** Todas las ecuaciones ponen cada bloque entre
+   paréntesis, y también la unión de bloques cuando hay más de uno (en
+   Scopus y Web of Science, los paréntesis del campo la encierran), aunque
+   la precedencia de la fuente no lo exija. Así la ecuación se puede
+   combinar con límites sin depender de la precedencia. Elsevier anuncia
+   que en 2026 cambiará la precedencia de los operadores de Scopus, y los
+   paréntesis hacen la ecuación independiente de ese cambio. Los límites
+   que se traducen se agregan con `AND` después de la unión (punto 10).
 
 ### Sintaxis verificada (2026-09-26)
 
@@ -122,9 +125,12 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
      a la API confirma que existe y que admite booleanos, frases y comodines
      (y su variante `.search.exact`). Si no, se usa `search`, que incluye el
      texto completo, y la diferencia se declara como amenaza a la validez.
+     La ecuación es el valor del filtro
+     (`title_and_abstract.search:(…)` o `title_and_abstract.search.exact:(…)`).
      *Pendiente:* la consulta se hace con la clave de `.env`, que el
-     investigador está creando. Este punto se completa con el resultado
-     antes de aceptar el ADR.
+     investigador está creando; tampoco está verificado cómo trata OpenAlex
+     los guiones. Este punto se completa con el resultado antes de aceptar
+     el ADR, y el traductor se ajusta si hace falta.
    - **Truncamiento.** `search` lematiza pero no admite comodines;
      `search.exact` admite comodines pero no lematiza, y solo se usa uno por
      solicitud. Se elige así:
@@ -153,29 +159,36 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
 
       | Límite | Scopus | Web of Science |
       |---|---|---|
-      | Periodo | `PUBYEAR > desde-1` y `PUBYEAR < hasta+1` (`>` y `<` son estrictos: "after", "before") | `PY=(desde-hasta)` si están los dos años; si falta uno, instrucción de la interfaz (periodo) |
+      | Periodo | `PUBYEAR > desde-1` y `PUBYEAR < hasta+1` (`>` y `<` son estrictos: "after", "before") | `PY=(desde-hasta)` si están los dos años, con una nota si el intervalo pasa de 5 años (la ayuda lo recomienda por rendimiento); si falta uno, instrucción de la interfaz |
       | Idiomas | `LANGUAGE(nombre en inglés)` para los códigos ISO 639-1 conocidos | instrucción de la interfaz: no hay etiqueta de idioma documentada |
       | Tipos de documento | `DOCTYPE(código)` para los tipos conocidos | instrucción de la interfaz: no hay etiqueta de tipo documentada |
 
     - El protocolo guarda idiomas y tipos como texto libre. El paquete
       reconoce los códigos ISO 639-1 en `idiomas.valores` y un vocabulario
-      de tipos en español (`articulo`, `revision`, `conferencia`,
-      `capitulo`, `libro`, `editorial`, `carta`, `nota`). Un valor que no
-      reconoce se traduce como instrucción de la interfaz, con un aviso.
+      de tipos en español (`articulo`, `revision`, `conferencia` o
+      `ponencia`, `capitulo`, `libro`, `editorial`, `carta`, `nota`), que
+      corresponden a los códigos `DOCTYPE` de Scopus.
+    - Un límite se traduce solo si se reconocen **todos** sus valores:
+      traducir una parte excluiría, por el `AND`, los valores no
+      traducidos. Si alguno no se reconoce, todo ese límite va como
+      instrucción de la interfaz, con un aviso.
 
 ### Salida
 
 11. **Comando `agentresearch protocolo ecuaciones [ruta] [--escribir] [--json]`.**
     - Sin `--escribir` muestra las ecuaciones; con `--escribir` además
       guarda `protocolo/ecuaciones.md`. No exige terminal.
-    - Se niega si hay P-E00, P-E10 o P-E11. Con `--escribir` también se
-      niega con P-E09, porque unas ecuaciones de un protocolo con cambios
-      sin registrar no corresponden a ninguna versión. Sin `--escribir`,
-      avisa del P-E09.
+    - Se niega si hay P-E00, P-E10, P-E11, o un P-E04 de la búsqueda (no
+      hay bloques, o un bloque no tiene términos: la ecuación no tendría
+      sentido). Con `--escribir` también se niega con P-E09, porque unas
+      ecuaciones de un protocolo con cambios sin registrar no corresponden
+      a ninguna versión. Sin `--escribir`, avisa del P-E09. Los demás
+      errores del protocolo no impiden traducir.
     - Si alguna fuente queda bloqueada, escribe igual el archivo, con la
       sección de esa fuente explicando qué falta, y sale con código 1. En
-      `--json`, `"escrito": true` y `"fuentes_bloqueadas": [...]` lo
-      distinguen de un rechazo, que tiene `"exito": false` y no escribe.
+      `--json`, un rechazo tiene `"resultado": null` y sus `errores`; una
+      generación con fuentes bloqueadas tiene `"exito": false`, `"errores":
+      []`, `"escrito": true` (si se pidió) y `"fuentes_bloqueadas": [...]`.
     - No registra un evento: `ecuaciones.md` se deriva del protocolo de
       forma determinista, y lo versiona Git.
 12. **`protocolo/ecuaciones.md`** es determinista: no lleva marca de tiempo,
