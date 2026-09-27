@@ -125,6 +125,9 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
   `os.replace`, y el registro encadenado lo hace al crear su archivo, para
   que los nombres nuevos sobrevivan a un corte de energía. En Windows, que
   no lo admite, se sigue omitiendo.
+- Integración continua: los sistemas quedan fijados en `ubuntu-24.04` y
+  `windows-2025`, en vez de `ubuntu-latest` y `windows-latest`, para que el
+  entorno de pruebas no cambie sin una decisión explícita.
 
 ### Corregido
 
