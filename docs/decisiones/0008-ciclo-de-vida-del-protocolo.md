@@ -3,6 +3,8 @@
 - Estado: Aceptada
 - Fecha: 2026-09-26
 - Participantes: investigador doctoral y Claude Code
+- Revisión: 2026-09-26, ajustes de la revisión del asesor al PR #1 (puntos 7,
+  10, 11, 12 y 21, y Consecuencias)
 
 ## Contexto
 
@@ -101,7 +103,7 @@ consideradas".
    | Tipo | `datos` |
    |---|---|
    | `protocolo_aprobado` | `version_anterior`, `version_protocolo` (`1.0.0`), `hash_revisado`, `hash_protocolo`, `ruta_protocolo`, `ruta_version`, `aprobado_por` (`{tipo: humano, id}`), `advertencias` (cada una con `id_regla`, `ubicacion`, `mensaje`, `referencia`, `justificacion` y `origen`: `archivo` o `terminal`) |
-   | `protocolo_enmendado` | `version_anterior`, `version_protocolo`, `nivel` (`mayor`, `menor` o `parche`), `hash_protocolo_anterior`, `hash_revisado`, `hash_protocolo`, `ruta_protocolo`, `ruta_version`, `justificacion`, `efecto_esperado`, `enmendado_por` (`{tipo: humano, id}`), `cambios` (punto 13), `solo_formato`, `advertencias` (`id_regla`, `ubicacion`, `mensaje`, `referencia`) |
+   | `protocolo_enmendado` | `version_anterior`, `version_protocolo`, `nivel` (`mayor`, `menor` o `parche`), `hash_protocolo_anterior`, `hash_revisado`, `hash_protocolo`, `ruta_protocolo`, `ruta_version`, `justificacion`, `efecto_esperado`, `enmendado_por` (`{tipo: humano, id}`), `cambios` (punto 13), `solo_formato`, `advertencias` (`id_regla`, `ubicacion`, `mensaje`, `referencia`, `nueva` y, solo si es nueva, `justificacion` y `origen`; punto 10) |
    | `decision_propuesta` | `decision` (el JSON de entrada ya validado, punto 16), `version_protocolo`, `estado_protocolo`, `hash_protocolo` |
    | `decision_confirmada` | `id_decision`, `evento_propuesta` (ID del evento `decision_propuesta`), `hash_evento_propuesta`, `confirmado_por` (`{tipo: humano, id}`) |
 
@@ -136,16 +138,22 @@ consideradas".
    Si todo está en orden, pasa el estado a `vigente` y la versión a `1.0.0`,
    conservando comentarios y comillas (escritura por fusión del ADR-0006), y
    registra `protocolo_aprobado`.
-10. **Justificación de cada advertencia.** Cada advertencia P-A activa
-    necesita una justificación no vacía, que queda en el evento. La
-    justificación puede venir de dos lados:
+10. **Justificación de cada advertencia.** Al aprobar, cada advertencia P-A
+    activa necesita una justificación no vacía, que queda en el evento. Al
+    enmendar, la necesita cada advertencia **nueva**: activa ahora y no
+    registrada como activa en el evento de la versión anterior, comparando por
+    `(id_regla, ubicacion)`. Las que ya estaban activas se registran con
+    `nueva: false` y sin justificación, porque ya se justificaron (o se
+    registraron) antes. La justificación puede venir de dos lados, igual al
+    aprobar que al enmendar:
     - de un archivo `{"justificaciones": [{"id_regla", "ubicacion", "justificacion"}]}`,
       donde cada entrada se empareja con una advertencia por
       `(id_regla, ubicacion)`, los campos que ya da `protocolo validar --json`.
       Una entrada que no corresponde a ninguna advertencia activa, o una
-      repetida, es un error;
+      repetida, es un error. Al enmendar, también lo es una entrada para una
+      advertencia que ya estaba activa en la versión anterior;
     - de la confirmación interactiva, que pide las que falten. Una respuesta
-      vacía cancela la aprobación.
+      vacía cancela la operación.
 
     La confirmación muestra todas las justificaciones, incluidas las del
     archivo (que pudo proponer el LLM), antes de pedir la frase de
@@ -168,7 +176,10 @@ consideradas".
       interactiva: la entrada estándar es una tubería o el dispositivo nulo,
       y ninguno de los dos es una consola. El LLM no puede completar la
       confirmación desde sus herramientas, y el investigador ejecuta estos
-      comandos en su propia terminal.
+      comandos en su propia terminal. En Windows, Git Bash abierto como
+      aplicación independiente (mintty) tampoco ofrece una consola a Python,
+      así que el mensaje de rechazo recomienda PowerShell o la terminal de
+      VS Code.
     - **No es una garantía.** Es una barrera de procedimiento. Depende de
       cómo funciona hoy la herramienta, y se puede eludir emulando una
       terminal (p. ej. con `script` en Linux o `winpty` en Windows). Su
@@ -187,7 +198,7 @@ consideradas".
 
 ### Enmendar
 
-12. **`agentresearch protocolo enmendar [ruta] --nivel mayor|menor --enmendado-por ID (--justificacion T --efecto-esperado T | --archivo-enmienda enmienda.json) [--simular] [--json]`.**
+12. **`agentresearch protocolo enmendar [ruta] --nivel mayor|menor --enmendado-por ID (--justificacion T --efecto-esperado T | --archivo-enmienda enmienda.json) [--justificaciones archivo.json] [--simular] [--json]`.**
     - `enmienda.json` tiene la forma `{"justificacion": "…", "efecto_esperado": "…"}`,
       y su contenido se muestra completo en la confirmación. Se da el
       archivo o las dos opciones, no ambos.
@@ -206,12 +217,14 @@ consideradas".
 
       El P-E09 de "cambio sin enmienda registrada" es justamente lo que la
       enmienda resuelve, así que no la impide.
-    - Registra `protocolo_enmendado` con las advertencias activas. A
-      diferencia de la aprobación, no exige justificarlas.
-    - `--simular` calcula el diff y la versión siguiente, y lista lo que
-      impediría enmendar, sin escribir nada y sin exigir terminal. Sirve para
-      que Claude Code muestre el diff al investigador antes de que este
-      confirme.
+    - Registra `protocolo_enmendado` con las advertencias activas. Exige
+      justificar las nuevas, con `--justificaciones` o en la terminal
+      (punto 10).
+    - `--simular` calcula el diff y la versión siguiente, lista las
+      advertencias nuevas que habrá que justificar y lo que impediría
+      enmendar, sin escribir nada y sin exigir terminal. Sirve para que
+      Claude Code muestre el diff al investigador y prepare el archivo de
+      justificaciones antes de que este confirme.
 13. **Diff estructural,** generado por el paquete y no por el LLM. Compara el
     modelo pydantic completo (con los valores por defecto) de la copia de la
     última versión con el del archivo actual. Así, escribir un valor por
@@ -342,9 +355,18 @@ consideradas".
 
     Los comandos que escriben eventos se niegan si el registro no cumple
     `anclaje.json`. Si `anclaje.json` falta pero el registro existe, no es un
-    error: el siguiente comando lo vuelve a crear. La evidencia de un borrado
-    deliberado del anclaje y del final del registro a la vez es el historial
-    de Git (ADR-0006, punto 9).
+    error: el siguiente comando lo vuelve a crear. Como mientras falta no se
+    detecta que se quiten eventos finales, se informa:
+    - el comando que lo vuelve a crear lo dice en su salida de texto, con un
+      aviso que recomienda comparar el anclaje nuevo con uno guardado fuera
+      del estudio, y en `--json` con `"anclaje_recreado": true` (es `false`
+      en los demás casos, incluida la primera aprobación, que lo crea por
+      primera vez);
+    - `validar` e `historial` muestran una nota mientras el registro exista
+      sin él, y su bloque `registro` en `--json` lleva `"falta_anclaje": true`.
+
+    La evidencia de un borrado deliberado del anclaje y del final del
+    registro a la vez es el historial de Git (ADR-0006, punto 9).
 
 ### Reglas que leen el directorio del estudio
 
@@ -475,6 +497,8 @@ consideradas".
   registro, no el deliberado: quien trunque a propósito puede editar ambos
   archivos. La evidencia de fondo sigue siendo Git más Zenodo (ADR-0006,
   punto 9), y los reportes deben declararlo.
-- Una enmienda no exige justificar las advertencias. Si una enmienda
-  introduce una advertencia nueva, queda registrada sin justificación. Se
-  reevaluará con el uso.
+- Una enmienda exige justificar solo las advertencias nuevas. Así, cada
+  advertencia activa queda justificada una vez en el registro, en la
+  aprobación o en la enmienda que la introdujo. Si una versión nueva del
+  paquete agrega una regla, sus advertencias cuentan como nuevas en la
+  siguiente enmienda, aunque el protocolo no haya cambiado en ese punto.
