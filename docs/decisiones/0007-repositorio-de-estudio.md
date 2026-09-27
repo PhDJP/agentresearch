@@ -228,11 +228,14 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
     - Las pruebas cubren vaciar una lista, vaciar una lista anidada, agregar
       un elemento al final de una sección y conservar las notas del
       investigador sobre una sección.
-    - **Fuente de los comentarios:** los del propio archivo. En un estudio,
-      el protocolo nace de la plantilla, así que son los de la plantilla más
-      las notas que agregue el investigador. Un archivo con el formato de la
-      plantilla sale idéntico byte a byte, y uno sin comentarios de sección
-      sigue sin ellos (ADR-0006, punto 12).
+    - **Fuente de los comentarios: el propio archivo, no la plantilla.** La
+      nota de la hoja de ruta proponía tomarlos de la plantilla; se toman de
+      las líneas que el archivo tenía antes de cada clave al leerlo. En un
+      estudio, el protocolo nace de la plantilla, así que son los de la
+      plantilla más las notas que agregue el investigador. Un archivo con el
+      formato de la plantilla sale idéntico byte a byte, y uno sin
+      comentarios de sección sigue sin ellos (ADR-0006, punto 12). Tomarlos
+      siempre de la plantilla se descartó (ver «Alternativas consideradas»).
 
 ### Configuración de Claude Code en el estudio
 
