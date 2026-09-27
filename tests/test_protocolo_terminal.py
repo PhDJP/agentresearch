@@ -7,7 +7,20 @@ from pathlib import Path
 
 import pytest
 
-from agentresearch.protocolo.terminal import TerminalDelSistema, es_consola_interactiva
+from agentresearch.protocolo.terminal import (
+    MENSAJE_SIN_TERMINAL,
+    TerminalDelSistema,
+    es_consola_interactiva,
+)
+
+
+def test_el_mensaje_sin_terminal_orienta_al_investigador() -> None:
+    """Nombra las terminales que sirven y advierte que Git Bash (mintty) no ofrece consola."""
+    assert "PowerShell" in MENSAJE_SIN_TERMINAL
+    assert "la terminal de VS Code" in MENSAJE_SIN_TERMINAL
+    assert "Git Bash abierto como aplicación independiente (mintty)" in MENSAJE_SIN_TERMINAL
+    assert "no ofrece una consola" in MENSAJE_SIN_TERMINAL
+    assert "CLAUDE.md, regla 1" in MENSAJE_SIN_TERMINAL
 
 
 def test_el_dispositivo_nulo_no_es_una_consola() -> None:

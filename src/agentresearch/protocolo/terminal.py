@@ -19,7 +19,9 @@ from typing import Protocol, TextIO
 MENSAJE_SIN_TERMINAL = (
     "este comando exige una terminal interactiva: ejecútelo en su propia terminal "
     "(PowerShell, cmd, Windows Terminal, la terminal de VS Code, o una terminal de Linux o "
-    "macOS). El LLM propone; el investigador decide (CLAUDE.md, regla 1)"
+    "macOS). En Windows, Git Bash abierto como aplicación independiente (mintty) no ofrece "
+    "una consola: use PowerShell o la terminal de VS Code. El LLM propone; el investigador "
+    "decide (CLAUDE.md, regla 1)"
 )
 
 
