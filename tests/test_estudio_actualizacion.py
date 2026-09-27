@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from agentresearch.cli import ejecutar_estudio_actualizar, main
 from agentresearch.estudio import actualizacion
@@ -16,11 +17,13 @@ from agentresearch.estudio.creacion import crear_estudio
 from agentresearch.estudio.modelo import leer_estudio
 from agentresearch.protocolo import RutasProtocolo, leer_estado_registro, validar_archivo
 from agentresearch.protocolo.aprobacion import ErrorCicloDeVida, OperacionCancelada
+from agentresearch.protocolo.eventos import DatosEstudioActualizado
 from agentresearch.protocolo.historial import construir_historial, texto_historial
 from agentresearch.protocolo.terminal import MENSAJE_SIN_TERMINAL
 from agentresearch.trazabilidad import RegistroEncadenado, hash_archivo, hash_bytes
 
-from .apoyo import TerminalSimulada, agregar_evento, reloj_incremental
+from .apoyo import TerminalSimulada, agregar_evento, aprobar_protocolo, reloj_incremental
+from .conftest import RUTA_PROTOCOLO_SINTETICO
 
 MOMENTO = datetime(2026, 9, 27, 15, 30, 0, tzinfo=UTC)
 MODELO = "claude-opus-5-5"
@@ -149,6 +152,62 @@ def test_registra_el_evento_con_los_hashes_y_actualiza_el_anclaje(
     )
 
 
+def test_con_el_protocolo_en_borrador_no_advierte_desviacion(
+    estudio: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _instalar(estudio, monkeypatch)
+    terminal = TerminalSimulada([f"actualizar {NUEVA}"])
+
+    resultado = _actualizar(estudio, terminal=terminal)
+
+    assert "protocolo: borrador" in terminal.texto
+    assert "desviación" not in terminal.texto
+    assert resultado.evento.datos["estado_protocolo"] == "borrador"
+    assert resultado.evento.datos["version_protocolo"] is None
+
+
+def test_con_el_protocolo_vigente_advierte_desviacion_y_la_registra(
+    estudio: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _protocolo(estudio).write_bytes(RUTA_PROTOCOLO_SINTETICO.read_bytes())
+    aprobacion = aprobar_protocolo(_protocolo(estudio))
+    _instalar(estudio, monkeypatch)
+    terminal = TerminalSimulada([f"actualizar {NUEVA}"])
+    advertida_al_preguntar: list[bool] = []
+    terminal.al_preguntar = lambda: advertida_al_preguntar.append("Advertencia:" in terminal.texto)
+
+    resultado = _actualizar(estudio, terminal=terminal)
+
+    assert advertida_al_preguntar == [True]
+    assert "protocolo: vigente, versión 1.0.0" in terminal.texto
+    assert (
+        f"Advertencia: el protocolo está vigente (versión 1.0.0, registrada en "
+        f"{aprobacion.evento.id}). Cambiar la versión del agente o sus instrucciones con el "
+        "protocolo vigente es una desviación que el reporte debe declarar (PRISMA-ScR, "
+        "ítem 20)."
+    ) in terminal.texto
+    assert resultado.evento.datos["estado_protocolo"] == "vigente"
+    assert resultado.evento.datos["version_protocolo"] == "1.0.0"
+    texto = "\n".join(texto_historial(construir_historial(_protocolo(estudio))))
+    assert "con el protocolo vigente 1.0.0, desviación que el reporte declara" in texto
+    assert validar_archivo(_protocolo(estudio)).valido
+
+
+@pytest.mark.parametrize(
+    ("estado", "version_protocolo"), [("vigente", None), ("borrador", "1.0.0")]
+)
+def test_el_evento_exige_version_si_y_solo_si_esta_vigente(
+    estado: str, version_protocolo: str | None
+) -> None:
+    datos = _datos_actualizacion("1.0.0") | {
+        "estado_protocolo": estado,
+        "version_protocolo": version_protocolo,
+    }
+
+    with pytest.raises(ValidationError, match="si y solo si el protocolo está vigente"):
+        DatosEstudioActualizado.model_validate(datos)
+
+
 def test_despues_de_actualizar_no_hay_nota_de_instrucciones(
     estudio: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -181,7 +240,9 @@ def test_historial_muestra_la_actualizacion(estudio: Path, monkeypatch: pytest.M
 
     texto = "\n".join(texto_historial(historial))
     assert f"agente actualizado: {INSTALADA} → {NUEVA}, el " in texto
-    assert f"por investigador-1 (evt-000002): {JUSTIFICACION}" in texto
+    assert (
+        f"por investigador-1 (evt-000002), con el protocolo en borrador: {JUSTIFICACION}" in texto
+    )
     [actualizacion_json] = historial.como_dict()["actualizaciones_agente"]
     assert actualizacion_json["evento"] == "evt-000002"
 
@@ -483,6 +544,8 @@ def _datos_actualizacion(version_anterior: str) -> dict[str, Any]:
         "fuente_nueva": "g",
         "archivos": [],
         "instrucciones": [],
+        "estado_protocolo": "borrador",
+        "version_protocolo": None,
         "justificacion": "j",
         "actualizado_por": {"tipo": "humano", "id": "investigador-1"},
     }

@@ -18,6 +18,10 @@ el LLM no actualiza sus propias instrucciones. El evento es el punto de
 confirmación: se escribe antes que los archivos, y si algo falla después,
 volver a ejecutar el comando completa la actualización, sin otro evento, si los
 archivos que genera coinciden con los hashes registrados.
+
+Con el protocolo vigente, el resumen advierte que la actualización es una
+desviación que el reporte debe declarar (PRISMA-ScR, ítem 20), y el evento
+registra el estado y la versión del protocolo en ese momento.
 """
 
 import difflib
@@ -53,6 +57,7 @@ from agentresearch.protocolo.aprobacion import (
 )
 from agentresearch.protocolo.ciclo_de_vida import (
     ActualizacionRegistrada,
+    VersionRegistrada,
     escribir_anclaje,
     falta_anclaje,
     leer_estado_registro,
@@ -213,10 +218,13 @@ def actualizar_estudio(
             ]
         )
 
+    vigente = registro.ultima_version
     exigir_terminal(terminal)
     terminal.mostrar(
         "\n".join(
-            _resumen(estudio.agente, nuevo.agente, cambios, texto_justificacion, actualizado_por)
+            _resumen(
+                estudio.agente, nuevo.agente, cambios, texto_justificacion, actualizado_por, vigente
+            )
         )
     )
     confirmar_frase(terminal, f"actualizar {instalada}")
@@ -240,6 +248,8 @@ def actualizar_estudio(
             for cambio in cambios
         ],
         instrucciones=_instrucciones_despues(raiz, cambios),
+        estado_protocolo="vigente" if vigente is not None else "borrador",
+        version_protocolo=vigente.version if vigente is not None else None,
         justificacion=texto_justificacion,
         actualizado_por=PersonaHumana(tipo="humano", id=actualizado_por),
     )
@@ -423,6 +433,7 @@ def _resumen(
     cambios: list[CambioArchivo],
     justificacion: str,
     actualizado_por: str,
+    vigente: VersionRegistrada | None,
 ) -> list[str]:
     lineas = [
         "Actualización del agente en el estudio",
@@ -430,8 +441,18 @@ def _resumen(
         f"  fuente: {anterior.fuente} → {nuevo.fuente}",
         f"  actualiza: {actualizado_por}",
         f"  justificación: {justificacion}",
+        "  protocolo: "
+        + (f"vigente, versión {vigente.version}" if vigente is not None else "borrador"),
         "",
     ]
+    if vigente is not None:
+        lineas += [
+            f"Advertencia: el protocolo está vigente (versión {vigente.version}, registrada en "
+            f"{vigente.evento.id}). Cambiar la versión del agente o sus instrucciones con el "
+            "protocolo vigente es una desviación que el reporte debe declarar (PRISMA-ScR, "
+            "ítem 20). El evento registrará el estado y la versión del protocolo.",
+            "",
+        ]
     cambiados = [cambio for cambio in cambios if cambio.cambia]
     sin_cambio = [cambio.ruta for cambio in cambios if not cambio.cambia]
     lineas.append(f"Archivos que cambian: {len(cambiados)}")

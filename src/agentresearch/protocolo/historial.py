@@ -139,10 +139,15 @@ def texto_historial(historial: Historial) -> list[str]:
         )
     for actualizacion in registro.actualizaciones:
         datos = actualizacion.datos
+        protocolo = (
+            f"con el protocolo vigente {datos.version_protocolo}, desviación que el reporte declara"
+            if datos.version_protocolo is not None
+            else "con el protocolo en borrador"
+        )
         lineas.append(
             f"agente actualizado: {datos.version_anterior} → {datos.version_nueva}, el "
             f"{actualizacion.evento.fecha_hora_utc} por {datos.actualizado_por.id} "
-            f"({actualizacion.evento.id}): {datos.justificacion}"
+            f"({actualizacion.evento.id}), {protocolo}: {datos.justificacion}"
         )
     eventos_rel = rutas.relativa(rutas.eventos)
     if not registro.existe_registro:

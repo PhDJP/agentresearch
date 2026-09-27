@@ -265,7 +265,9 @@ class DatosEstudioActualizado(ModeloEvento):
 
     `instrucciones` son los hashes de todas las instrucciones del agente
     después de actualizar; con ellos compara la nota «instrucciones del
-    agente modificadas».
+    agente modificadas». `estado_protocolo` y `version_protocolo` son los del
+    registro en ese momento: con el protocolo vigente, la actualización es
+    una desviación que el reporte declara (PRISMA-ScR, ítem 20).
     """
 
     version_anterior: TextoNoVacio
@@ -274,8 +276,16 @@ class DatosEstudioActualizado(ModeloEvento):
     fuente_nueva: TextoNoVacio
     archivos: list[ArchivoActualizado]
     instrucciones: list[ArchivoRegistrado]
+    estado_protocolo: EstadoProtocolo
+    version_protocolo: VersionProtocolo | None
     justificacion: TextoNoVacio
     actualizado_por: PersonaHumana
+
+    @model_validator(mode="after")
+    def _version_si_esta_vigente(self) -> "DatosEstudioActualizado":
+        if (self.estado_protocolo == "vigente") != (self.version_protocolo is not None):
+            raise ValueError("version_protocolo se registra si y solo si el protocolo está vigente")
+        return self
 
 
 # --- Anclaje ----------------------------------------------------------------------

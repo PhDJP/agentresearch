@@ -116,8 +116,11 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
     pasa el estudio a la versión instalada del agente, regenera desde las
     plantillas sus instrucciones, `.gitignore` y `.gitattributes`
     (conservando el modelo fijado), muestra el diff, exige terminal
-    interactiva y un revisor humano, y registra `estudio_actualizado`. Si
-    la escritura se interrumpe, volver a ejecutarlo la completa;
+    interactiva y un revisor humano, y registra `estudio_actualizado` con
+    el estado y la versión del protocolo. Con el protocolo vigente advierte,
+    antes de confirmar, que es una desviación que el reporte debe declarar
+    (PRISMA-ScR, ítem 20). Si la escritura se interrumpe, volver a
+    ejecutarlo la completa;
   - el estudio niega a Claude Code leer `.env` y editar `pyproject.toml` y
     `uv.lock`, y su `.gitignore` versiona `.env.ejemplo`.
 

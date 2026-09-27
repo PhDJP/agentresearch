@@ -14,7 +14,7 @@ uv sync
 
 `uv sync` instala Python 3.12 y la versión de agentresearch que fija `pyproject.toml` (la que registra `estudio.yaml`), y crea o respeta `uv.lock`, que fija todas las dependencias y se versiona.
 
-Para pasar el estudio a otra versión del agente: cambie la versión en `pyproject.toml`, ejecute `uv sync` y luego, en su terminal, `uv run agentresearch estudio actualizar --actualizado-por <id> --justificacion "…"`. El comando regenera las instrucciones del agente, muestra el diff, pide confirmación y registra la actualización. Haga el commit con el anclaje que muestra.
+Para pasar el estudio a otra versión del agente: cambie la versión en `pyproject.toml`, ejecute `uv sync` y luego, en su terminal, `uv run agentresearch estudio actualizar --actualizado-por <id> --justificacion "…"`. El comando regenera las instrucciones del agente, muestra el diff, pide confirmación y registra la actualización. Haga el commit con el anclaje que muestra. Con el protocolo vigente, la actualización es una desviación que el reporte debe declarar (PRISMA-ScR, ítem 20): el comando lo advierte antes de confirmar y registra el estado y la versión del protocolo.
 
 ## Uso
 

@@ -333,11 +333,20 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
       interactiva, la frase `actualizar <versión>` y un revisor humano
       declarado en `seleccion.revisores`. Los permisos del estudio lo niegan
       a Claude Code;
+    - si el protocolo está vigente (el registro tiene una aprobación), el
+      resumen que se muestra antes de confirmar advierte que cambiar la
+      versión del agente o sus instrucciones con el protocolo vigente es
+      una desviación que el reporte debe declarar (PRISMA-ScR, ítem 20). No
+      se impide: una corrección del agente puede ser necesaria a mitad del
+      estudio, y lo que exige el rigor es que quede registrada y declarada;
     - registra el evento `estudio_actualizado` (versión y fuente anteriores
       y nuevas, hash anterior y nuevo de cada archivo, hashes de las
-      instrucciones resultantes, justificación y quién actualizó) y el
+      instrucciones resultantes, estado y versión del protocolo en ese
+      momento según el registro, justificación y quién actualizó) y el
       anclaje, y después escribe los archivos de forma atómica, con
-      `estudio.yaml` al final.
+      `estudio.yaml` al final. `version_protocolo` es la de la última
+      aprobación o enmienda, y va vacía si y solo si el protocolo está en
+      borrador.
 21. **Coherencia y recuperación.**
     - P-E10 exige que `estudio_actualizado` siga a `estudio_creado` y
       encadene versiones: su versión anterior es la de la creación o la de
@@ -347,7 +356,12 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
       volver a ejecutar el comando lo reconoce y completa la escritura, sin
       otro evento ni otra confirmación, solo si los archivos que genera
       tienen los hashes registrados.
-    - `historial` muestra cada actualización.
+    - `historial` muestra cada actualización con el estado del protocolo, y
+      marca como desviación la que ocurrió con el protocolo vigente.
+    - Los eventos `estudio_creado` y `estudio_actualizado` forman la línea
+      de tiempo del agente en el estudio (versión, modelo e instrucciones
+      vigentes en cada fase), con la que el hito 10 construye la
+      declaración de uso de IA del reporte.
 22. **Procedimiento para actualizar el agente en un estudio:**
     1. el investigador cambia la versión en `pyproject.toml`
        (`…@v<versión nueva>`) y ejecuta `uv sync`;
@@ -414,6 +428,13 @@ demostración, en la terminal del investigador.
 - **Actualizar el agente de un estudio a mano** (editar las instrucciones y
   `estudio.yaml`): el registro no sabría cuándo ni por qué cambiaron, y la
   nota de instrucciones modificadas quedaría activa para siempre.
+- **Con el protocolo vigente:**
+  - negar `estudio actualizar`: impediría corregir a mitad del estudio un
+    defecto del agente o de sus permisos;
+  - exigir una enmienda del protocolo: la versión del agente no es
+    contenido del protocolo, y la enmienda cambiaría su versión sin
+    cambiar su texto. Basta registrar el estado del protocolo en el evento
+    y declarar la desviación en el reporte.
 - **Borrar la etiqueta `v0.1.0rc1`:** dejaría sin fuente el `uv.lock` y el
   primer evento del estudio de demostración; una etiqueta publicada se
   reemplaza con otra, no se borra.
