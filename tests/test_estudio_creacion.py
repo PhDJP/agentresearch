@@ -146,6 +146,8 @@ def test_git_normaliza_a_lf_e_ignora_lo_que_no_se_versiona(tmp_path: Path) -> No
     ignorados = _texto(destino, ".gitignore").splitlines()
     for patron in (".env", ".venv/", ".borradores/", ".claude/settings.local.json", "*.pdf"):
         assert patron in ignorados
+    # El ejemplo de variables de entorno, sin claves, sí se versiona.
+    assert ignorados[ignorados.index(".env.*") + 1] == "!.env.ejemplo"
 
 
 def test_claude_md_nombra_el_modelo_y_las_reglas(tmp_path: Path) -> None:

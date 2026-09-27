@@ -5,6 +5,7 @@ __pycache__/
 # Secretos: nunca se versionan
 .env
 .env.*
+!.env.ejemplo
 
 # Archivos intermedios que prepara Claude Code (su contenido queda en los eventos)
 .borradores/
