@@ -1,7 +1,8 @@
 # ADR-0009: Ecuaciones de búsqueda por fuente
 
-- Estado: Propuesta
-- Fecha: 2026-09-26
+- Estado: Aceptada
+- Fecha: 2026-09-26 (propuesta); 2026-09-27 (aceptada, tras la revisión del
+  asesor del PR #2)
 - Participantes: investigador doctoral y Claude Code
 
 ## Contexto
@@ -82,6 +83,8 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
    que en 2026 cambiará la precedencia de los operadores de Scopus, y los
    paréntesis hacen la ecuación independiente de ese cambio. Los límites
    que se traducen se agregan con `AND` después de la unión (punto 10).
+   En OpenAlex, cada bloque es un filtro y los filtros se unen por coma,
+   que la API combina con AND (punto 9).
 
 ### Sintaxis verificada (2026-09-26)
 
@@ -105,7 +108,7 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
    |---|---|---|---|
    | OpenAlex | `"…"` (la lematizada lematiza y quita palabras vacías también dentro de la frase) | solo con `search.exact` (sin lematización), al menos 3 letras antes; no al inicio; admitido en frases | sin comillas, AND de las partes; entre comillas, frase: el traductor lo pone entre comillas |
    | PubMed | `"…"[tiab]` | al menos 4 letras antes del primer `*`; admitido en frases y tras guion (`breast-feed*`) | busca la frase; si no está en el índice de frases, no devuelve nada |
-   | Scopus | `"…"` (aproximada: ignora la puntuación e incluye plurales) | al menos 3 letras; admitido en frases aproximadas; se descarta si va justo después de un guion | se busca como frase aproximada |
+   | Scopus | `"…"` (aproximada: ignora la puntuación e incluye plurales) | al menos 3 letras; admitido en frases aproximadas; se descarta si va justo después de un guion | documentado solo dentro de una frase aproximada, donde se ignora: el traductor pone entre comillas todo término con guion |
    | Web of Science | `"…"` (exacta: desactiva la lematización) | al menos 3 letras antes; en frases, **no documentado** | `TS=hydro-power` recupera `hydro-power` y `hydro power` |
    | Genérica | `"…"` | se deja el `*`, con una nota | se deja el guion |
 
@@ -155,6 +158,8 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
      | `title_and_abstract.search:"X product"`, con X = by, for, with, in, of, the, and | 200 | 6 769 981 | palabras vacías: se quitan |
      | `title_and_abstract.search:"X product"`, con X = via, per, co, non, post, pre | 200 | 603 a 9 782 | no son palabras vacías |
      | `title_and_abstract.search:liofilización` y `:liofilizacion` | 200 | 595 y 277 | las tildes cuentan (igual en la exacta) |
+     | `title_and_abstract.search:(dehydration OR lyophilization),title_and_abstract.search:(mango)` | 200 | 516 | dos filtros separados por coma se combinan con AND (igual que un solo filtro con AND) |
+     | `title_and_abstract.search:(dehydration OR lyophilization),title_and_abstract.search.exact:(mango*)` | 200 | 535 | una solicitud admite un filtro lematizado y otro exacto (todo exacto con AND: 357; solo `mango*` exacto: 62 133) |
 
    - **Alcance.** Se usa `title_and_abstract.search`, confirmado por la
      verificación: busca en título y resumen, como las demás fuentes, y
@@ -163,10 +168,14 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
      `title_and_abstract.search.exact:(…)`).
    - **Guiones.** Un término con guion va siempre entre comillas, porque sin
      ellas OpenAlex busca sus partes con AND.
-   - **Modo de búsqueda.** La lematizada busca plurales y otras formas,
-     pero no admite comodines y quita las palabras vacías también dentro de
-     frases. La exacta admite comodines y conserva las palabras vacías, pero
-     no lematiza. Solo se usa una por solicitud. Se elige así:
+   - **Modo de búsqueda, por bloque.** La lematizada busca plurales y otras
+     formas, pero no admite comodines y quita las palabras vacías también
+     dentro de frases. La exacta admite comodines y conserva las palabras
+     vacías, pero no lematiza. Una solicitud admite varios filtros separados
+     por coma, que se combinan con AND y pueden mezclar los dos modos. Por
+     eso cada bloque es un filtro con su propio modo, y solo pierde la
+     lematización el bloque que la necesita. El aviso nombra el bloque y el
+     motivo. Para cada bloque se elige así:
      - sin términos truncados ni palabras vacías en frases o guiones:
        búsqueda lematizada;
      - con términos truncados y **todos** con variantes: búsqueda
@@ -176,19 +185,27 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
        recupera solo las variantes que escribió el investigador, no todas
        las palabras con esa raíz;
      - con términos truncados y alguno sin variantes: `search.exact` con los
-       comodines y un aviso de que se pierde la lematización en toda la
-       ecuación. Si alguna raíz tiene menos de 3 letras y no tiene
-       variantes, OpenAlex queda bloqueada;
+       comodines y un aviso de que el bloque pierde la lematización. Si
+       alguna raíz tiene menos de 3 letras y no tiene variantes, OpenAlex
+       queda bloqueada;
      - con una palabra vacía dentro de una frase o de un término con guion
        (en los términos que irían en la búsqueda lematizada, incluidas las
        variantes): `search.exact`, con un aviso que nombra los términos. En
        la lematizada, `"by-product"` se buscaría como `product` y
-       recuperaría 57 veces más registros. La lista de palabras vacías es la
-       de inglés de Lucene: se verificaron siete, y el resto se infiere. Una
-       palabra tratada de más como vacía solo cuesta la lematización; una
-       tratada de menos ampliaría la búsqueda sin aviso.
-   - **Longitud.** La URL completa admite unos 4 KB. Se avisa cuando la
-     ecuación codificada para URL supera ese límite.
+       recuperaría 57 veces más registros. El aviso sugiere agregar la forma
+       sin la palabra vacía (p. ej. `byproduct`) como término aparte, sin
+       reemplazar el original, que las demás fuentes buscan como frase; o
+       aceptar la búsqueda exacta en ese bloque. No sugiere reformular el
+       término, porque eso reduciría el alcance en las demás fuentes. La
+       lista de palabras vacías es la de inglés de Lucene: se verificaron
+       siete, y el resto se infiere. Una palabra tratada de más como vacía
+       solo cuesta la lematización del bloque; una tratada de menos
+       ampliaría la búsqueda sin aviso.
+   - **Longitud.** La URL completa admite unos 4 KB (4096 caracteres). La
+     ecuación se mide como una URL con solo el filtro, pero el conector
+     agregará `api_key` y otros parámetros (`per-page`, `cursor`, `select`).
+     Por eso el aviso salta a partir de 3900 caracteres, con margen para
+     ellos.
 
 ### Límites de la búsqueda
 
@@ -331,7 +348,13 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
 - **OpenAlex con truncamiento:** usar siempre `search.exact`: es más simple,
   pero pierde la lematización aunque el investigador ya haya escrito todas
   las variantes.
+- **OpenAlex con un solo modo para toda la ecuación:** es más simple, pero
+  un término con una palabra vacía o un truncado sin variantes quitaría la
+  lematización también a los bloques que no la necesitan.
 - **OpenAlex con palabras vacías en frases o guiones:**
+  - sugerir reformular el término en el protocolo (p. ej. `byproduct` en
+    lugar de `by-product`): reduciría el alcance en las demás fuentes, que
+    sí lo buscan como frase;
   - mantener la búsqueda lematizada con un aviso: la ecuación recuperaría,
     por ejemplo, todo lo que contiene "product" en lugar de "by-product";
   - bloquear OpenAlex hasta que el investigador reformule el término: es
@@ -341,6 +364,9 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
 - **OpenAlex con el parámetro `search` (texto completo):** recupera unas
   cinco veces más registros que el filtro de título y resumen, con otro
   alcance que las demás fuentes.
+- **Scopus con el guion sin comillas:** Elsevier solo documenta el guion
+  dentro de una frase aproximada, y lo no documentado se trata como no
+  admitido.
 - **Tipos de documento con sinónimos internos** (p. ej. "ponencia" como
   `conferencia`): el paquete decidiría por su cuenta qué significa un valor
   que el investigador escribió; el vocabulario controlado lo hace explícito.

@@ -77,7 +77,7 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
   P-A09 (piloto de cribado sin tamaño definido). P-E09 y P-E10 leen el
   directorio del estudio y se evalúan aunque haya P-E00.
 - ADR-0008 aceptado: ciclo de vida del protocolo.
-- Ecuaciones de búsqueda por fuente (sub-hito 1d, ADR-0009 en propuesta):
+- Ecuaciones de búsqueda por fuente (sub-hito 1d, ADR-0009):
   - `protocolo ecuaciones [ruta] [--escribir] [--json]`: traduce los
     bloques del protocolo para las fuentes declaradas (OpenAlex, PubMed,
     Scopus y Web of Science) y una ecuación genérica, y guarda
@@ -90,8 +90,11 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
   - error P-E11 (término de búsqueda no traducible) y nota de estado de
     ecuaciones desactualizadas en `validar` e `historial`;
   - OpenAlex busca en título y resumen, verificado con consultas reales a
-    la API: los términos con guion van entre comillas, y las palabras
-    vacías en frases o guiones llevan a la búsqueda exacta.
+    la API: cada bloque es un filtro con su propio modo, los términos con
+    guion van entre comillas, y un bloque con palabras vacías en frases o
+    guiones, o con truncados sin variantes, usa la búsqueda exacta;
+  - en Scopus, los términos con guion van entre comillas.
+- ADR-0009 aceptado: ecuaciones de búsqueda por fuente.
 
 ### Cambiado
 

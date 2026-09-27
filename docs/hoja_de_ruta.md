@@ -31,7 +31,7 @@ Cada hito cerrado se etiqueta con una versión (`v0.N.0`).
 
 **Criterio de terminado:** CI en verde en ambos sistemas, y `uv run agentresearch --version` funciona en Windows.
 
-## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · en curso: 1a ✅, 1b ✅ y 1c ✅ (2026-09-26); 1d en revisión (PR #2)
+## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · en curso: 1a ✅, 1b ✅ y 1c ✅ (2026-09-26) y 1d ✅ (2026-09-27), sigue 1e
 
 Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/hito_1_protocolo_y_trazabilidad.md](especificaciones/hito_1_protocolo_y_trazabilidad.md).
 
