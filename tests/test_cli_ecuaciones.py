@@ -72,6 +72,8 @@ def test_en_json(protocolo_de_estudio: Path, capsys: pytest.CaptureFixture[str])
     assert datos["exito"] is True
     assert datos["errores"] == []
     assert datos["version_agente"] == version("agentresearch")
+    assert datos["escrito"] is False
+    assert datos["fuentes_bloqueadas"] == []
     resultado = datos["resultado"]
     assert resultado["escrito"] is False
     assert resultado["fuentes_bloqueadas"] == []
@@ -133,8 +135,8 @@ def test_con_una_fuente_bloqueada_el_json_la_distingue_de_un_rechazo(
     assert codigo == 1
     assert datos["exito"] is False
     assert datos["errores"] == []
-    assert datos["resultado"]["escrito"] is True
-    assert datos["resultado"]["fuentes_bloqueadas"] == ["openalex", "scopus"]
+    assert datos["escrito"] is True
+    assert datos["fuentes_bloqueadas"] == ["openalex", "scopus"]
 
 
 def test_una_fuente_bloqueada_sin_escribir_tambien_sale_con_uno(
@@ -174,7 +176,8 @@ def test_se_niega_si_el_protocolo_no_se_puede_traducir(
     datos = _json(capsys)
     assert codigo == 1
     assert datos["exito"] is False
-    assert datos["resultado"] is None
+    assert datos["escrito"] is False
+    assert datos["fuentes_bloqueadas"] == []
     assert any(regla in error for error in datos["errores"])
     assert not _ecuaciones(protocolo_de_estudio).exists()
 
@@ -377,7 +380,7 @@ def test_ecuaciones_por_subproceso(protocolo_de_estudio: Path) -> None:
 
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
     datos = json.loads(resultado.stdout)
-    assert datos["resultado"]["escrito"] is True
+    assert datos["escrito"] is True
     assert _ecuaciones(protocolo_de_estudio).is_file()
 
 

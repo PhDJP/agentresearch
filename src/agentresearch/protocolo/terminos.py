@@ -121,8 +121,11 @@ def analizar_termino(texto: str) -> Termino:
 def _analizar_palabra(texto: str) -> Palabra:
     if texto.lower() in OPERADORES:
         raise TerminoNoValido(
-            f"«{texto}» es un operador de búsqueda; los operadores los pone el paquete (OR "
-            "dentro del bloque, AND entre bloques). Si es parte de una frase, omítalo"
+            f"«{texto}» es un operador de búsqueda en alguna fuente, y los operadores los pone el "
+            "paquete (OR dentro del bloque, AND entre bloques). Si es parte de una frase, puede "
+            "separarla en varios términos del bloque (cada uno entre comillas si tiene varias "
+            f"palabras) o reformularla sin la palabra «{texto}»; elija lo que conserve el "
+            "significado que busca"
         )
     especiales = sorted({c for c in texto if c in _SINTAXIS_DE_FUENTE})
     if especiales:

@@ -180,3 +180,12 @@ def test_las_variantes_se_leen_y_escriben_conservando_los_comentarios(
 
 def test_un_bloque_sin_variantes_no_las_escribe(datos_sinteticos: dict[str, Any]) -> None:
     assert "variantes" not in datos_sinteticos["busqueda"]["bloques"][1]
+
+
+def test_un_operador_en_una_frase_ofrece_alternativas() -> None:
+    with pytest.raises(TerminoNoValido) as error:
+        analizar_termino('"salt and pepper"')
+
+    mensaje = str(error.value)
+    assert "separarla en varios términos del bloque" in mensaje
+    assert "reformularla sin la palabra «and»" in mensaje

@@ -316,3 +316,19 @@ def test_una_fuente_sin_limites_lo_dice(datos_sinteticos: dict[str, Any]) -> Non
 
     assert "- Límites: no hay límites que aplicar" in texto
     assert "2. No hace falta aplicar filtros en la interfaz" in texto
+
+
+def test_un_tipo_fuera_del_vocabulario_no_se_convierte(datos_sinteticos: dict[str, Any]) -> None:
+    datos = _protocolo(datos_sinteticos, "con_variantes").model_dump()
+    datos["busqueda"]["tipos_documento"] = ["articulo", "ponencia"]
+    fuentes = {e.fuente: e for e in generar_ecuaciones(Protocolo.model_validate(datos)).ecuaciones}
+
+    scopus = fuentes["scopus"]
+    assert scopus.texto is not None
+    assert "DOCTYPE" not in scopus.texto  # ni parcial ni convertido a cp
+    assert any("'ponencia'" in a.mensaje and "sin convertirlos" in a.mensaje for a in scopus.avisos)
+    assert (
+        "Tipo de documento: en los resultados, limite por tipo (Document type) a artículo, ponencia"
+        in scopus.limites.instrucciones
+    )
+    assert "a Article, ponencia (" in fuentes["wos"].limites.instrucciones[-1]

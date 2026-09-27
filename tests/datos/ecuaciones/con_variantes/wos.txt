@@ -6,4 +6,4 @@ avisos:
 - nota: la ayuda de Web of Science recomienda intervalos de 5 años o menos en PY=, porque los más largos hacen lenta la búsqueda; si ocurre, quite PY= de la ecuación y ajuste los años de publicación en la interfaz
 instrucciones de la interfaz:
 - Idioma: en los resultados, filtre por idioma (Languages) a English, Spanish
-- Tipo de documento: en los resultados, filtre por tipo (Document Types) a los equivalentes de artículo, revisión; los nombres de los tipos varían entre bases
+- Tipo de documento: en los resultados, filtre por tipo (Document Types) a Article, Review (un registro puede tener dos tipos, p. ej. Article y Proceedings Paper)

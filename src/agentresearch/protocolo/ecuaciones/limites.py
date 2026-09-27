@@ -1,10 +1,12 @@
 """Límites de la búsqueda: periodo, idiomas y tipos de documento (ADR-0009, punto 10).
 
 El protocolo guarda idiomas y tipos como texto libre. El paquete reconoce los
-códigos ISO 639-1 de `idiomas.valores` y un vocabulario de tipos en español.
-Un límite se traduce a la sintaxis de la fuente solo si se reconocen todos
-sus valores: traducir una parte y dejar otra como instrucción de la interfaz
-excluiría, por el AND, los valores no traducidos.
+códigos ISO 639-1 de `idiomas.valores` y un vocabulario controlado de tipos
+(las tablas del ADR-0009, punto 10). No hay sinónimos: un valor fuera del
+vocabulario genera un aviso y la instrucción de filtrar en la interfaz, nunca
+una conversión en silencio. Un límite se traduce a la sintaxis de la fuente
+solo si se reconocen todos sus valores: traducir una parte y dejar otra como
+instrucción de la interfaz excluiría, por el AND, los valores no traducidos.
 """
 
 from dataclasses import dataclass
@@ -29,18 +31,30 @@ IDIOMAS: dict[str, tuple[str, str]] = {
 }
 """Código ISO 639-1 → (nombre en español, nombre en inglés, como lo usan las bases)."""
 
-TIPOS_DOCUMENTO: dict[str, tuple[str, str]] = {
-    "articulo": ("artículo", "ar"),
-    "revision": ("revisión", "re"),
-    "conferencia": ("artículo de conferencia", "cp"),
-    "ponencia": ("ponencia", "cp"),
-    "capitulo": ("capítulo de libro", "ch"),
-    "libro": ("libro", "bk"),
-    "editorial": ("editorial", "ed"),
-    "carta": ("carta", "le"),
-    "nota": ("nota", "no"),
+
+@dataclass(frozen=True, slots=True)
+class TipoDocumento:
+    """Un tipo del vocabulario controlado y su equivalente en cada fuente manual."""
+
+    nombre: str
+    """Nombre legible en español."""
+    scopus: str
+    """Código de `DOCTYPE` en Scopus (Scopus Search Tips, verificado 2026-09-26)."""
+    wos: str
+    """Nombre del tipo en el filtro Document Types de Web of Science (verificado 2026-09-26)."""
+
+
+TIPOS_DOCUMENTO: dict[str, TipoDocumento] = {
+    "articulo": TipoDocumento("artículo", "ar", "Article"),
+    "revision": TipoDocumento("revisión", "re", "Review"),
+    "conferencia": TipoDocumento("artículo de conferencia", "cp", "Proceedings Paper"),
+    "capitulo": TipoDocumento("capítulo de libro", "ch", "Book Chapter"),
+    "libro": TipoDocumento("libro", "bk", "Book"),
+    "editorial": TipoDocumento("editorial", "ed", "Editorial Material"),
+    "carta": TipoDocumento("carta", "le", "Letter"),
+    "nota": TipoDocumento("nota", "no", "Note"),
 }
-"""Tipo en el protocolo → (nombre legible, código DOCTYPE de Scopus)."""
+"""Vocabulario controlado de tipos de documento: valor del protocolo → equivalentes."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +116,7 @@ def _idioma_legible(valor: str) -> str:
 
 def _tipo_legible(valor: str) -> str:
     conocido = TIPOS_DOCUMENTO.get(valor.strip().lower())
-    return conocido[0] if conocido else f"{valor} (no reconocido)"
+    return conocido.nombre if conocido else f"{valor} (no reconocido)"
 
 
 def _idioma_para_interfaz(valor: str) -> str:
@@ -112,7 +126,12 @@ def _idioma_para_interfaz(valor: str) -> str:
 
 def _tipo_para_interfaz(valor: str) -> str:
     conocido = TIPOS_DOCUMENTO.get(valor.strip().lower())
-    return conocido[0] if conocido else valor
+    return conocido.nombre if conocido else valor
+
+
+def _tipo_para_wos(valor: str) -> str:
+    conocido = TIPOS_DOCUMENTO.get(valor.strip().lower())
+    return conocido.wos if conocido else valor
 
 
 def _desconocidos(valores: list[str], vocabulario: dict[str, Any]) -> list[str]:
@@ -130,8 +149,8 @@ def _aviso_idiomas(fuente: str, desconocidos: list[str]) -> str:
 def _aviso_tipos(fuente: str, desconocidos: list[str]) -> str:
     return (
         f"tipos de documento no reconocidos ({', '.join(repr(v) for v in desconocidos)}): el "
-        f"filtro de tipo de {fuente} se da como instrucción de la interfaz. Tipos reconocidos: "
-        + ", ".join(TIPOS_DOCUMENTO)
+        f"filtro de tipo de {fuente} se da como instrucción de la interfaz, sin convertirlos. "
+        "Tipos del vocabulario controlado (ADR-0009, punto 10): " + ", ".join(TIPOS_DOCUMENTO)
     )
 
 
@@ -161,7 +180,7 @@ def limites_scopus(busqueda: Busqueda) -> LimitesTraducidos:
     tipos = busqueda.tipos_documento
     desconocidos = _desconocidos(tipos, TIPOS_DOCUMENTO)
     if tipos and not desconocidos:
-        codigos = [TIPOS_DOCUMENTO[v.strip().lower()][1] for v in tipos]
+        codigos = [TIPOS_DOCUMENTO[v.strip().lower()].scopus for v in tipos]
         partes.append(_unir_o([f"DOCTYPE({codigo})" for codigo in codigos]))
     elif tipos:
         avisos.append(_aviso_tipos("Scopus", desconocidos))
@@ -229,13 +248,13 @@ def limites_wos(busqueda: Busqueda) -> LimitesTraducidos:
             avisos.append(
                 "tipos de documento no reconocidos "
                 f"({', '.join(repr(v) for v in desconocidos)}): van a la instrucción de la "
-                "interfaz tal como están escritos. Tipos reconocidos: " + ", ".join(TIPOS_DOCUMENTO)
+                "interfaz tal como están escritos, sin convertirlos. Tipos del vocabulario "
+                "controlado (ADR-0009, punto 10): " + ", ".join(TIPOS_DOCUMENTO)
             )
         instrucciones.append(
-            "Tipo de documento: en los resultados, filtre por tipo (Document Types) a los "
-            "equivalentes de "
-            + ", ".join(_tipo_para_interfaz(v) for v in tipos)
-            + "; los nombres de los tipos varían entre bases"
+            "Tipo de documento: en los resultados, filtre por tipo (Document Types) a "
+            + ", ".join(_tipo_para_wos(v) for v in tipos)
+            + " (un registro puede tener dos tipos, p. ej. Article y Proceedings Paper)"
         )
     return LimitesTraducidos(
         sufijo=sufijo,

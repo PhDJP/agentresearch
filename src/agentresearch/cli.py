@@ -369,17 +369,34 @@ def ejecutar_protocolo_ecuaciones(
 
     Devuelve 0 si todas las fuentes tienen ecuación, y 1 si se rechaza o si
     alguna fuente queda bloqueada (el archivo se escribe igual; ADR-0009, punto 11).
+    En `--json`, `escrito` y `fuentes_bloqueadas` van siempre en el primer nivel,
+    también en un rechazo, para distinguir los casos sin mirar `resultado`.
     """
     _tolerar_caracteres_no_representables()
     comando = "protocolo ecuaciones"
     try:
         resultado = generar_ecuaciones_del_protocolo(ruta, escribir)
     except ErrorEcuaciones as error:
-        return _informar_fallo(comando, como_json, "no se pudieron generar", error.errores)
+        if como_json:
+            _imprimir_json(
+                comando,
+                False,
+                error.errores,
+                None,
+                {"escrito": False, "fuentes_bloqueadas": []},
+            )
+            return 1
+        return _informar_fallo(comando, False, "no se pudieron generar", error.errores)
     bloqueadas = resultado.conjunto.bloqueadas
     codigo = 1 if bloqueadas else 0
     if como_json:
-        _imprimir_json(comando, not bloqueadas, [], resultado.como_dict())
+        _imprimir_json(
+            comando,
+            not bloqueadas,
+            [],
+            resultado.como_dict(),
+            {"escrito": resultado.escrito, "fuentes_bloqueadas": bloqueadas},
+        )
         return codigo
     if escribir:
         print(f"ecuaciones escritas en {resultado.ruta_ecuaciones}")
@@ -510,14 +527,23 @@ def _informar_fallo(comando: str, como_json: bool, motivo: str, errores: list[st
 
 
 def _imprimir_json(
-    comando: str, exito: bool, errores: list[str], resultado: dict[str, Any] | None
+    comando: str,
+    exito: bool,
+    errores: list[str],
+    resultado: dict[str, Any] | None,
+    adicionales: dict[str, Any] | None = None,
 ) -> None:
-    """Salida JSON común de los comandos del ciclo de vida (ADR-0008, punto 26)."""
+    """Salida JSON común de los comandos (ADR-0008, punto 26).
+
+    `adicionales` son campos propios de un comando que van en el primer nivel,
+    antes de `resultado`.
+    """
     datos = {
         "comando": comando,
         "exito": exito,
         "errores": errores,
         "version_agente": version("agentresearch"),
+        **(adicionales or {}),
         "resultado": resultado,
     }
     # ASCII escapado: JSON válido aunque la consola no use UTF-8.

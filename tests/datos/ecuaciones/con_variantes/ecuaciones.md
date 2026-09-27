@@ -100,7 +100,7 @@ Pasos para ejecutarla:
 1. Abra la búsqueda avanzada de la Web of Science Core Collection y pegue la ecuación completa en el cuadro que admite etiquetas de campo (TS=).
 2. Aplique en la interfaz estos filtros:
    - Idioma: en los resultados, filtre por idioma (Languages) a English, Spanish.
-   - Tipo de documento: en los resultados, filtre por tipo (Document Types) a los equivalentes de artículo, revisión; los nombres de los tipos varían entre bases.
+   - Tipo de documento: en los resultados, filtre por tipo (Document Types) a Article, Review (un registro puede tener dos tipos, p. ej. Article y Proceedings Paper).
 3. Exporte todos los resultados como texto plano con etiquetas (.txt), con el registro completo. Es el formato que importará el hito 2 (ADR-0003).
 4. Anote la fecha y la hora de la búsqueda y el número de resultados que mostró la interfaz: el hito 2 los pedirá al importar la exportación (PRISMA-ScR, ítem 7).
 

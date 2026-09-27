@@ -58,7 +58,7 @@ Avisos:
 - bloqueante [B2, "freeze dr*"]: Scopus exige al menos 3 letras antes del *, y '"freeze dr*"' tiene una raíz más corta. Agregue en busqueda.bloques[B2].variantes las variantes de '"freeze dr*"' que Scopus debe buscar en su lugar
 - advertencia [B2, liofilización]: Scopus no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
 - advertencia: idiomas no reconocidos ('español'): el filtro de idioma de Scopus se da como instrucción de la interfaz. Use códigos ISO 639-1 (p. ej. es, en) para que se traduzca
-- advertencia: tipos de documento no reconocidos ('poster'): el filtro de tipo de Scopus se da como instrucción de la interfaz. Tipos reconocidos: articulo, revision, conferencia, ponencia, capitulo, libro, editorial, carta, nota
+- advertencia: tipos de documento no reconocidos ('poster'): el filtro de tipo de Scopus se da como instrucción de la interfaz, sin convertirlos. Tipos del vocabulario controlado (ADR-0009, punto 10): articulo, revision, conferencia, capitulo, libro, editorial, carta, nota
 
 ## Web of Science
 
@@ -74,7 +74,7 @@ Avisos:
 - bloqueante [B2, "fruto sec*"]: Web of Science no documenta el truncamiento dentro de una frase entre comillas, y lo no documentado se trata como no admitido. Agregue en busqueda.bloques[B2].variantes las variantes de '"fruto sec*"' que Web of Science debe buscar en su lugar
 - advertencia [B2, liofilización]: Web of Science no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
 - advertencia: idiomas no reconocidos ('español'): van a la instrucción de la interfaz tal como están escritos. Use códigos ISO 639-1 (p. ej. es, en) para que salgan con el nombre en inglés que usa la base
-- advertencia: tipos de documento no reconocidos ('poster'): van a la instrucción de la interfaz tal como están escritos. Tipos reconocidos: articulo, revision, conferencia, ponencia, capitulo, libro, editorial, carta, nota
+- advertencia: tipos de documento no reconocidos ('poster'): van a la instrucción de la interfaz tal como están escritos, sin convertirlos. Tipos del vocabulario controlado (ADR-0009, punto 10): articulo, revision, conferencia, capitulo, libro, editorial, carta, nota
 
 ## La ecuación genérica
 
