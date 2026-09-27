@@ -15,9 +15,11 @@ from agentresearch.protocolo.terminal import MENSAJE_SIN_TERMINAL
 from agentresearch.trazabilidad import (
     RegistroEncadenado,
     escribir_atomico,
+    escritura,
     hash_archivo,
     hash_bytes,
 )
+from agentresearch.trazabilidad import registro as registro_encadenado
 
 from .apoyo import (
     TerminalSimulada,
@@ -398,19 +400,29 @@ def test_orden_de_escritura_y_sincronizacion(
         operaciones.append(f"replace {Path(destino).name}")
         replace_original(origen, destino)
 
+    def _directorio(directorio: Path | str) -> None:
+        # Solo sincroniza en POSIX; aquí se registra en todos los sistemas.
+        operaciones.append(f"directorio {Path(directorio).name}")
+
     monkeypatch.setattr(os, "fsync", _fsync)
     monkeypatch.setattr(os, "replace", _replace)
+    monkeypatch.setattr(escritura, "sincronizar_directorio", _directorio)
+    monkeypatch.setattr(registro_encadenado, "sincronizar_directorio", _directorio)
 
     aprobar_protocolo(protocolo_de_estudio)
 
     assert operaciones == [
         "fsync",
         "replace 1.0.0.yaml",
+        "directorio versiones",
         "fsync",  # el evento, antes de tocar el protocolo
+        "directorio protocolo",  # el registro se acaba de crear
         "fsync",
         "replace anclaje.json",
+        "directorio protocolo",
         "fsync",
         "replace protocolo.yaml",
+        "directorio protocolo",
     ]
 
 
