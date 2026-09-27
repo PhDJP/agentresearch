@@ -18,6 +18,7 @@ from agentresearch.protocolo.ciclo_de_vida import (
     nota_falta_anclaje,
 )
 from agentresearch.protocolo.diferencias import Cambio
+from agentresearch.protocolo.ecuaciones.documento import EstadoEcuaciones, estado_ecuaciones
 from agentresearch.protocolo.estudio import RutasProtocolo
 from agentresearch.protocolo.eventos import DatosAprobado, DatosEnmendado
 from agentresearch.protocolo.validacion import (
@@ -39,6 +40,8 @@ class Historial:
     registro: EstadoRegistro
     hallazgos: list[Hallazgo]
     """Hallazgos de P-E09 y P-E10."""
+    ecuaciones: EstadoEcuaciones
+    """Si `ecuaciones.md` corresponde al protocolo actual (ADR-0009, punto 14)."""
 
     @property
     def integro(self) -> bool:
@@ -56,6 +59,8 @@ class Historial:
             "versiones": [_version_como_dict(v) for v in self.registro.versiones],
             "decisiones": [_decision_como_dict(d) for d in self.registro.decisiones.values()],
             "hallazgos": [hallazgo.como_dict() for hallazgo in self.hallazgos],
+            "ecuaciones": self.ecuaciones.como_dict(),
+            "ecuaciones_desactualizadas": self.ecuaciones.desactualizadas,
         }
 
 
@@ -75,6 +80,7 @@ def construir_historial(ruta: Path | str) -> Historial:
         hash_archivo=lectura.hash,
         registro=registro,
         hallazgos=hallazgos_de_directorio(registro, lectura.hash, estado),
+        ecuaciones=estado_ecuaciones(rutas, lectura.hash),
     )
 
 
@@ -121,6 +127,9 @@ def texto_historial(historial: Historial) -> list[str]:
         lineas.append(f"anclaje guardado en {rutas.relativa(rutas.anclaje)}: {detalle}")
     if registro.falta_anclaje:
         lineas.append(f"nota: {nota_falta_anclaje(rutas)}")
+    nota_ecuaciones = historial.ecuaciones.nota()
+    if nota_ecuaciones is not None:
+        lineas.append(f"nota: {nota_ecuaciones}")
 
     lineas.append("versiones:" if registro.versiones else "versiones: ninguna registrada")
     for version in registro.versiones:

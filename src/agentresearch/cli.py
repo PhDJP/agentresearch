@@ -27,6 +27,8 @@ from agentresearch.protocolo.decisiones import (
     confirmar_decisiones,
     registrar_decision,
 )
+from agentresearch.protocolo.ecuaciones.servicio import ErrorEcuaciones
+from agentresearch.protocolo.ecuaciones.servicio import generar as generar_ecuaciones_del_protocolo
 from agentresearch.protocolo.historial import construir_historial, texto_historial
 from agentresearch.protocolo.terminal import Terminal, TerminalDelSistema
 from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
@@ -129,6 +131,18 @@ def construir_analizador() -> argparse.ArgumentParser:
     )
     _argumento_ruta(historial)
     _argumento_json(historial)
+
+    ecuaciones = subcomandos_protocolo.add_parser(
+        "ecuaciones",
+        help="Genera las ecuaciones de búsqueda por fuente desde los bloques del protocolo",
+    )
+    _argumento_ruta(ecuaciones)
+    ecuaciones.add_argument(
+        "--escribir",
+        action="store_true",
+        help="guarda protocolo/ecuaciones.md (sin esta opción, solo las muestra)",
+    )
+    _argumento_json(ecuaciones)
 
     decision = subcomandos_protocolo.add_parser(
         "decision", help="Decisiones del protocolo: registrar la propuesta y confirmarla"
@@ -237,6 +251,9 @@ def ejecutar_protocolo_validar(ruta: Path, como_json: bool = False) -> int:
         print(f"registro: {registro['ruta']} ({registro['numero_eventos']} eventos{anclaje})")
         if registro["falta_anclaje"]:
             print(f"nota: {nota_falta_anclaje(RutasProtocolo.desde(ruta))}")
+    nota_ecuaciones = resultado.ecuaciones.nota() if resultado.ecuaciones else None
+    if nota_ecuaciones is not None:
+        print(f"nota: {nota_ecuaciones}")
     for hallazgo in resultado.hallazgos:
         print(hallazgo)
     print(f"resultado: {_resumen(len(resultado.errores), len(resultado.advertencias))}")
@@ -342,6 +359,40 @@ def ejecutar_protocolo_historial(ruta: Path, como_json: bool = False) -> int:
         return codigo
     for linea in texto_historial(historial):
         print(linea)
+    return codigo
+
+
+def ejecutar_protocolo_ecuaciones(
+    ruta: Path, escribir: bool = False, como_json: bool = False
+) -> int:
+    """Genera las ecuaciones por fuente y, con `escribir`, guarda `ecuaciones.md`.
+
+    Devuelve 0 si todas las fuentes tienen ecuación, y 1 si se rechaza o si
+    alguna fuente queda bloqueada (el archivo se escribe igual; ADR-0009, punto 11).
+    """
+    _tolerar_caracteres_no_representables()
+    comando = "protocolo ecuaciones"
+    try:
+        resultado = generar_ecuaciones_del_protocolo(ruta, escribir)
+    except ErrorEcuaciones as error:
+        return _informar_fallo(comando, como_json, "no se pudieron generar", error.errores)
+    bloqueadas = resultado.conjunto.bloqueadas
+    codigo = 1 if bloqueadas else 0
+    if como_json:
+        _imprimir_json(comando, not bloqueadas, [], resultado.como_dict())
+        return codigo
+    if escribir:
+        print(f"ecuaciones escritas en {resultado.ruta_ecuaciones}")
+        for ecuacion in resultado.conjunto.ecuaciones:
+            estado = "bloqueada" if ecuacion.bloqueada else "generada"
+            print(f"  - {ecuacion.nombre}: {estado} ({len(ecuacion.avisos)} avisos)")
+    else:
+        print(resultado.texto, end="")
+        print(f"(no se escribió {resultado.ruta_ecuaciones}; use --escribir para guardarlo)")
+    for aviso in resultado.avisos:
+        print(f"aviso: {aviso}")
+    if bloqueadas:
+        print(f"fuentes bloqueadas, sin ecuación: {', '.join(bloqueadas)}")
     return codigo
 
 
@@ -530,6 +581,13 @@ def main() -> None:
 
     if argumentos.comando == "protocolo" and argumentos.subcomando == "historial":
         sys.exit(ejecutar_protocolo_historial(argumentos.ruta, argumentos.como_json))
+
+    if argumentos.comando == "protocolo" and argumentos.subcomando == "ecuaciones":
+        sys.exit(
+            ejecutar_protocolo_ecuaciones(
+                argumentos.ruta, argumentos.escribir, argumentos.como_json
+            )
+        )
 
     if argumentos.comando == "protocolo" and argumentos.subcomando == "decision":
         if argumentos.accion == "registrar":

@@ -274,3 +274,45 @@ def test_ecuaciones_md_es_determinista(datos_sinteticos: dict[str, Any]) -> None
     assert primero == segundo
     assert "\r" not in primero
     assert primero.endswith("\n")
+
+
+def test_web_of_science_usa_variantes_si_la_raiz_es_corta(
+    datos_sinteticos: dict[str, Any],
+) -> None:
+    datos = _protocolo(datos_sinteticos, "con_variantes").model_dump()
+    datos["busqueda"]["bloques"][0]["terminos"].append("ze*")
+    protocolo = Protocolo.model_validate(datos)
+    [wos] = [e for e in generar_ecuaciones(protocolo).ecuaciones if e.fuente == "wos"]
+
+    assert wos.bloqueada
+    [aviso] = [a for a in wos.avisos if a.tipo == "bloqueante"]
+    assert aviso.termino == "ze*"
+    assert "exige al menos 3 letras antes del *" in aviso.mensaje
+
+
+def test_periodo_solo_con_anio_final(datos_sinteticos: dict[str, Any]) -> None:
+    datos = _protocolo(datos_sinteticos, "con_variantes").model_dump()
+    datos["busqueda"]["periodo"] = {"desde": None, "hasta": 2020, "justificacion": "j"}
+    conjunto = generar_ecuaciones(Protocolo.model_validate(datos))
+    textos = {e.fuente: e for e in conjunto.ecuaciones}
+
+    assert textos["scopus"].texto is not None
+    assert " AND PUBYEAR < 2021 AND " in textos["scopus"].texto
+    assert "Periodo: hasta 2020, inclusive" in textos["generica"].limites.descripcion
+    assert (
+        textos["wos"]
+        .limites.instrucciones[0]
+        .startswith("Periodo: ajuste los años de publicación en la interfaz: hasta 2020, inclusive")
+    )
+
+
+def test_una_fuente_sin_limites_lo_dice(datos_sinteticos: dict[str, Any]) -> None:
+    datos = _protocolo(datos_sinteticos, "con_variantes").model_dump()
+    datos["busqueda"]["periodo"] = {"desde": None, "hasta": None, "justificacion": ""}
+    datos["busqueda"]["idiomas"] = {"valores": [], "justificacion": ""}
+    datos["busqueda"]["tipos_documento"] = []
+
+    texto = texto_ecuaciones(generar_ecuaciones(Protocolo.model_validate(datos)), ORIGEN)
+
+    assert "- Límites: no hay límites que aplicar" in texto
+    assert "2. No hace falta aplicar filtros en la interfaz" in texto

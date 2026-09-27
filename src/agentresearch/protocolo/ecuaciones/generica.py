@@ -6,8 +6,6 @@ truncamiento y las frases a su manera.
 """
 
 from agentresearch.protocolo.ecuaciones.comun import Traductor
-from agentresearch.protocolo.ecuaciones.limites import LimitesTraducidos
-from agentresearch.protocolo.modelo import Busqueda
 from agentresearch.protocolo.terminos import Termino
 
 
@@ -38,6 +36,3 @@ class TraductorGenerico(Traductor):
                 "forma sin tilde como término aparte"
             )
         return avisos
-
-    def limites(self, busqueda: Busqueda) -> LimitesTraducidos:
-        return LimitesTraducidos.como_texto(busqueda)

@@ -32,6 +32,7 @@ from agentresearch.protocolo.ciclo_de_vida import (
     leer_estado_registro,
     problemas_p_e09,
 )
+from agentresearch.protocolo.ecuaciones.documento import EstadoEcuaciones, estado_ecuaciones
 from agentresearch.protocolo.estudio import RutasProtocolo
 from agentresearch.protocolo.modelo import VERSION_ESQUEMA, Protocolo
 from agentresearch.protocolo.reglas import REGLAS, Severidad
@@ -92,6 +93,8 @@ class ResultadoValidacion:
     version_protocolo: str | None = None
     registro: dict[str, Any] | None = None
     """Resumen del registro de eventos del estudio, con su anclaje."""
+    ecuaciones: EstadoEcuaciones | None = None
+    """Si `ecuaciones.md` corresponde al protocolo actual (ADR-0009, punto 14)."""
 
     @property
     def errores(self) -> list[Hallazgo]:
@@ -119,6 +122,8 @@ class ResultadoValidacion:
             "advertencias": len(self.advertencias),
             "hallazgos": [hallazgo.como_dict() for hallazgo in self.hallazgos],
             "registro": self.registro,
+            "ecuaciones": self.ecuaciones.como_dict() if self.ecuaciones else None,
+            "ecuaciones_desactualizadas": bool(self.ecuaciones and self.ecuaciones.desactualizadas),
         }
 
 
@@ -180,6 +185,7 @@ def validar_lectura(lectura: LecturaProtocolo, registro: EstadoRegistro) -> Resu
             documento.protocolo.metadatos.version_protocolo if documento is not None else None
         ),
         registro=resumen_registro(registro),
+        ecuaciones=estado_ecuaciones(registro.rutas, lectura.hash),
     )
 
 

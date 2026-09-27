@@ -588,7 +588,10 @@ def test_como_dict_incluye_version_del_agente_y_hash() -> None:
         "advertencias",
         "hallazgos",
         "registro",
+        "ecuaciones",
+        "ecuaciones_desactualizadas",
     }
+    assert datos["ecuaciones_desactualizadas"] is False
     assert datos["hash_archivo"].startswith("sha256:")
     assert datos["version_esquema"] == 1
     assert datos["registro"]["ruta"] == "datos/eventos.jsonl"

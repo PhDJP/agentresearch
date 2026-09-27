@@ -112,11 +112,9 @@ class TerminoDeBloque:
 
 
 def terminos_de(bloque: Bloque) -> Iterator[TerminoDeBloque]:
-    """Los términos de un bloque ya analizados. Supone que no hay P-E11."""
+    """Los términos de un bloque ya analizados. Supone que no hay P-E04 ni P-E11."""
     variantes = {clave.strip(): lista for clave, lista in bloque.variantes.items()}
     for texto in bloque.terminos:
-        if not texto.strip():
-            continue
         termino = analizar_termino(texto)
         lista = variantes.get(texto.strip())
         yield TerminoDeBloque(
@@ -142,11 +140,11 @@ class Traductor:
 
     def escribir(self, termino: Termino) -> str | None:
         """La forma del término en la fuente, o `None` si no lo admite (se usan variantes)."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def motivo(self, termino: Termino) -> str:
         """Por qué la fuente no admite el término tal como está."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def avisos_de_termino(self, termino: Termino) -> list[str]:
         """Advertencias no bloqueantes sobre un término que sí se escribió."""
@@ -220,7 +218,7 @@ class Traductor:
         formas = []
         for variante in item.variantes:
             forma_variante = self.escribir(variante)
-            if forma_variante is None:  # una variante sin * siempre se admite
+            if forma_variante is None:  # pragma: no cover - una variante sin * siempre se admite
                 raise AssertionError(f"{self.nombre} no admite la variante {variante}")
             formas.append(forma_variante)
             avisos.extend(
