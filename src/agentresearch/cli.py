@@ -30,6 +30,7 @@ from agentresearch.protocolo.decisiones import (
 from agentresearch.protocolo.ecuaciones.servicio import ErrorEcuaciones
 from agentresearch.protocolo.ecuaciones.servicio import generar as generar_ecuaciones_del_protocolo
 from agentresearch.protocolo.historial import construir_historial, texto_historial
+from agentresearch.protocolo.secciones import SECCIONES, ResultadoEscritura, escribir_seccion
 from agentresearch.protocolo.terminal import Terminal, TerminalDelSistema
 from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
 
@@ -143,6 +144,21 @@ def construir_analizador() -> argparse.ArgumentParser:
         help="guarda protocolo/ecuaciones.md (sin esta opción, solo las muestra)",
     )
     _argumento_json(ecuaciones)
+
+    escribir = subcomandos_protocolo.add_parser(
+        "escribir",
+        help="Escribe una sección del protocolo desde un fragmento YAML, validando el esquema",
+    )
+    escribir.add_argument("seccion", choices=SECCIONES, help="sección de primer nivel")
+    escribir.add_argument(
+        "--archivo",
+        type=Path,
+        required=True,
+        metavar="ARCHIVO",
+        help="YAML con una sola clave de primer nivel, la sección, y su contenido completo",
+    )
+    _argumento_protocolo(escribir)
+    _argumento_json(escribir)
 
     decision = subcomandos_protocolo.add_parser(
         "decision", help="Decisiones del protocolo: registrar la propuesta y confirmarla"
@@ -413,6 +429,49 @@ def ejecutar_protocolo_ecuaciones(
     return codigo
 
 
+def ejecutar_protocolo_escribir(
+    seccion: str,
+    archivo: Path,
+    protocolo: Path = RUTA_PROTOCOLO_POR_DEFECTO,
+    como_json: bool = False,
+) -> int:
+    """Escribe una sección del protocolo y muestra la validación del resultado.
+
+    Devuelve 0 si la sección se escribió (aunque el protocolo, incompleto, tenga
+    errores de contenido) y 1 si se rechazó sin escribir nada.
+    """
+    return _ejecutar_operacion(
+        "protocolo escribir",
+        como_json,
+        lambda: escribir_seccion(protocolo, seccion, archivo),
+        _describir_escritura,
+    )
+
+
+def _describir_escritura(resultado: ResultadoEscritura) -> list[str]:
+    if resultado.cambio:
+        lineas = [f"sección «{resultado.seccion}» escrita en {resultado.ruta_protocolo}"]
+    else:
+        lineas = [f"sin cambios: la sección «{resultado.seccion}» ya tenía ese contenido"]
+    lineas.append(
+        f"protocolo: {resultado.estado}, versión {resultado.version_protocolo}, "
+        f"hash {resultado.hash_protocolo}"
+    )
+    validacion = resultado.validacion
+    nota_ecuaciones = validacion.ecuaciones.nota() if validacion.ecuaciones else None
+    if nota_ecuaciones is not None:
+        lineas.append(f"nota: {nota_ecuaciones}")
+    lineas.extend(str(hallazgo) for hallazgo in validacion.hallazgos)
+    lineas.append(f"validación: {_resumen(len(validacion.errores), len(validacion.advertencias))}")
+    if resultado.pendiente_de_enmienda:
+        lineas.append(
+            "nota: el protocolo está vigente, así que el cambio queda sin registrar (P-E09) "
+            "hasta que el investigador registre la enmienda en su terminal; "
+            "`agentresearch protocolo enmendar --simular` muestra el diff"
+        )
+    return lineas
+
+
 def ejecutar_decision_registrar(
     archivo: Path,
     protocolo: Path = RUTA_PROTOCOLO_POR_DEFECTO,
@@ -612,6 +671,13 @@ def main() -> None:
         sys.exit(
             ejecutar_protocolo_ecuaciones(
                 argumentos.ruta, argumentos.escribir, argumentos.como_json
+            )
+        )
+
+    if argumentos.comando == "protocolo" and argumentos.subcomando == "escribir":
+        sys.exit(
+            ejecutar_protocolo_escribir(
+                argumentos.seccion, argumentos.archivo, argumentos.protocolo, argumentos.como_json
             )
         )
 

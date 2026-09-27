@@ -199,6 +199,36 @@ def actualizar_documento(documento: DocumentoProtocolo, protocolo: Protocolo) ->
     documento.protocolo = protocolo
 
 
+def analizar_fragmento(contenido: bytes) -> CommentedMap:
+    """Decodifica en UTF-8 y analiza un fragmento YAML, sin validarlo contra el esquema.
+
+    Sirve para leer una sección que se va a escribir en el protocolo. Lanza
+    `ErrorLecturaProtocolo` si no es UTF-8, no es YAML válido, tiene claves
+    duplicadas o su raíz no es un mapa.
+    """
+    try:
+        texto = contenido.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ErrorLecturaProtocolo(
+            [ProblemaLectura("el archivo no está codificado en UTF-8")]
+        ) from None
+    return _analizar_yaml(texto)
+
+
+def reemplazar_seccion(
+    documento: DocumentoProtocolo, seccion: str, valor: Any, protocolo: Protocolo
+) -> None:
+    """Reemplaza la sección de primer nivel `seccion` por `valor`, leído con ruamel.yaml.
+
+    `protocolo` es el modelo ya validado con la sección nueva. La sección se
+    fusiona como en `actualizar_documento()`: lo que no está en `valor` se
+    elimina, lo que no cambia conserva sus comentarios y su estilo, y lo nuevo
+    conserva las comillas con que se escribió en `valor`.
+    """
+    documento.datos[seccion] = _fusionar_valor(documento.datos[seccion], valor)
+    documento.protocolo = protocolo
+
+
 def a_python(valor: Any) -> Any:
     """Convierte los tipos de ruamel.yaml en tipos simples de Python."""
     if isinstance(valor, Mapping):
@@ -247,7 +277,7 @@ def _analizar_yaml(texto: str) -> CommentedMap:
         raise ErrorLecturaProtocolo([ProblemaLectura("el archivo está vacío")])
     if not isinstance(datos, CommentedMap):
         raise ErrorLecturaProtocolo(
-            [ProblemaLectura("la raíz del protocolo debe ser un mapa de claves y valores")]
+            [ProblemaLectura("la raíz del documento debe ser un mapa de claves y valores")]
         )
     return datos
 
@@ -480,6 +510,7 @@ def _fusionar_lista_por_posicion(destino: CommentedSeq, origen: list[Any]) -> No
 def _iguales(actual: Any, nuevo: Any) -> bool:
     """Igualdad que no confunde `True` con `1`, pero sí iguala `1` y `1.0`."""
     anterior = a_python(actual)
+    nuevo = a_python(nuevo)
     if isinstance(anterior, bool) or isinstance(nuevo, bool):
         return type(anterior) is type(nuevo) and anterior == nuevo
     if isinstance(anterior, int | float) and isinstance(nuevo, int | float):
