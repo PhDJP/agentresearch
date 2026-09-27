@@ -1,0 +1,9 @@
+ecuacion: title_and_abstract.search:((zarambo OR "Zarambus fictus" OR by-product OR by-products OR post-extraction OR fruit OR fruits OR "zarambina") AND (secado OR dehydration OR dehydrated OR "freeze drying" OR "freeze dried" OR "fruto seco" OR "frutos secos" OR liofilización))
+avisos:
+- nota [B1, by-product*]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: by-product, by-products
+- nota [B1, fru*]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: fruit, fruits
+- nota [B2, dehydrat*]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: dehydration, dehydrated
+- nota [B2, "freeze dr*"]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: "freeze drying", "freeze dried"
+- nota [B2, "fruto sec*"]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: "fruto seco", "frutos secos"
+- advertencia [B2, liofilización]: OpenAlex no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
+instrucciones de la interfaz:

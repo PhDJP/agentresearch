@@ -1,0 +1,9 @@
+ecuacion: (bloqueada)
+avisos:
+- bloqueante [B2, "freeze dr*"]: Scopus exige al menos 3 letras antes del *, y '"freeze dr*"' tiene una raíz más corta. Agregue en busqueda.bloques[B2].variantes las variantes de '"freeze dr*"' que Scopus debe buscar en su lugar
+- advertencia [B2, liofilización]: Scopus no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
+- advertencia: idiomas no reconocidos ('español'): el filtro de idioma de Scopus se da como instrucción de la interfaz. Use códigos ISO 639-1 (p. ej. es, en) para que se traduzca
+- advertencia: tipos de documento no reconocidos ('poster'): el filtro de tipo de Scopus se da como instrucción de la interfaz. Tipos reconocidos: articulo, revision, conferencia, ponencia, capitulo, libro, editorial, carta, nota
+instrucciones de la interfaz:
+- Idioma: en los resultados, limite por idioma (Language) a inglés, español
+- Tipo de documento: en los resultados, limite por tipo (Document type) a artículo, poster

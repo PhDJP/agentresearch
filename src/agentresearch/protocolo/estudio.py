@@ -2,7 +2,8 @@
 
 Junto a `protocolo/protocolo.yaml` viven el registro de eventos
 (`eventos.jsonl`), su anclaje (`anclaje.json`) y las copias de cada versión
-registrada (`versiones/X.Y.Z.yaml`). Se localizan por convención, sin
+registrada (`versiones/X.Y.Z.yaml`), además de las ecuaciones de búsqueda
+(`ecuaciones.md`, ADR-0009). Se localizan por convención, sin
 configuración (ADR-0008, punto 1). El estudio es el directorio padre del
 directorio del protocolo.
 
@@ -16,6 +17,7 @@ from pathlib import Path, PurePosixPath
 NOMBRE_EVENTOS = "eventos.jsonl"
 NOMBRE_ANCLAJE = "anclaje.json"
 NOMBRE_VERSIONES = "versiones"
+NOMBRE_ECUACIONES = "ecuaciones.md"
 
 
 def es_ruta_relativa_valida(texto: str) -> bool:
@@ -55,6 +57,11 @@ class RutasProtocolo:
     @property
     def versiones(self) -> Path:
         return self.directorio / NOMBRE_VERSIONES
+
+    @property
+    def ecuaciones(self) -> Path:
+        """Ecuaciones de búsqueda generadas desde el protocolo (ADR-0009, punto 12)."""
+        return self.directorio / NOMBRE_ECUACIONES
 
     def copia_de_version(self, version: str) -> Path:
         return self.versiones / f"{version}.yaml"

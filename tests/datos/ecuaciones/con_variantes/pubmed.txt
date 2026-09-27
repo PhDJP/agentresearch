@@ -1,0 +1,9 @@
+ecuacion: ((zarambo[tiab] OR "Zarambus fictus"[tiab] OR by-product*[tiab] OR post-extraction[tiab] OR fruit[tiab] OR fruits[tiab] OR "zarambina"[tiab]) AND (secado[tiab] OR dehydrat*[tiab] OR "freeze drying"[tiab] OR "freeze dried"[tiab] OR "fruto seco"[tiab] OR "frutos secos"[tiab] OR liofilización[tiab]))
+avisos:
+- advertencia [B1, by-product*]: PubMed busca un término con guion como frase y, si no está en su índice de frases, no devuelve resultados; compruébelo en la interfaz o agregue la forma sin guion como frase aparte
+- advertencia [B1, post-extraction]: PubMed busca un término con guion como frase y, si no está en su índice de frases, no devuelve resultados; compruébelo en la interfaz o agregue la forma sin guion como frase aparte
+- nota [B1, fru*]: PubMed exige al menos 4 letras antes del *, y 'fru*' tiene una raíz más corta; se usan sus variantes: fruit, fruits
+- nota [B2, "freeze dr*"]: PubMed exige al menos 4 letras antes del *, y '"freeze dr*"' tiene una raíz más corta; se usan sus variantes: "freeze drying", "freeze dried"
+- nota [B2, "fruto sec*"]: PubMed exige al menos 4 letras antes del *, y '"fruto sec*"' tiene una raíz más corta; se usan sus variantes: "fruto seco", "frutos secos"
+- advertencia [B2, liofilización]: PubMed no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
+instrucciones de la interfaz:

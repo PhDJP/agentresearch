@@ -1,0 +1,9 @@
+ecuacion: ((zarambo OR "Zarambus fictus" OR by-product* OR post-extraction OR fru* OR "zarambina") AND (secado OR dehydrat* OR "freeze dr*" OR "fruto sec*" OR liofilización))
+avisos:
+- advertencia [B1, by-product*]: cada base trata el * a su manera (largo mínimo de la raíz, frases con truncamiento): compruébelo en la documentación de la base
+- advertencia [B1, fru*]: cada base trata el * a su manera (largo mínimo de la raíz, frases con truncamiento): compruébelo en la documentación de la base
+- advertencia [B2, dehydrat*]: cada base trata el * a su manera (largo mínimo de la raíz, frases con truncamiento): compruébelo en la documentación de la base
+- advertencia [B2, "freeze dr*"]: cada base trata el * a su manera (largo mínimo de la raíz, frases con truncamiento): compruébelo en la documentación de la base
+- advertencia [B2, "fruto sec*"]: cada base trata el * a su manera (largo mínimo de la raíz, frases con truncamiento): compruébelo en la documentación de la base
+- advertencia [B2, liofilización]: compruebe cómo trata la base las letras con tilde; si hace falta, agregue la forma sin tilde como término aparte
+instrucciones de la interfaz:
