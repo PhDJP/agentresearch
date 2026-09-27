@@ -8,6 +8,8 @@ avanzada de Scopus (actualizada el 2026-08-24):
   AUTHKEY, INDEXTERMS, TRADENAME y CHEMNAME.
 - Las comillas buscan una frase aproximada: ignoran la puntuación (el
   guion), incluyen plurales y admiten comodines.
+  Un guion fuera de comillas no está documentado, así que los términos con
+  guion se escriben entre comillas.
 - `*` exige al menos 3 caracteres; se descarta si va justo tras un guion.
 - `PUBYEAR > 1994` es "después de 1994" (estricto), `LANGUAGE(french)` usa el
   nombre en inglés, y `DOCTYPE(ar)` usa los códigos de tipo.
@@ -48,7 +50,19 @@ class TraductorScopus(Traductor):
     def escribir(self, termino: Termino) -> str | None:
         if raiz_corta(termino, MINIMO_RAIZ):
             return None
+        if termino.tiene_guion and not termino.entre_comillas:
+            # Elsevier solo documenta el guion dentro de una frase aproximada.
+            return f'"{termino.texto}"'
         return str(termino)
+
+    def notas_de_termino(self, termino: Termino) -> list[str]:
+        if termino.tiene_guion and not termino.entre_comillas:
+            return [
+                "se escribe entre comillas: Elsevier solo documenta el guion dentro de una frase "
+                "aproximada (lo ignora y admite comodines), y lo no documentado se trata como no "
+                "admitido"
+            ]
+        return []
 
     def motivo(self, termino: Termino) -> str:
         return (

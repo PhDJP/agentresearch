@@ -21,6 +21,9 @@ ADR-0009, punto 9):
   como frase.
 - Las letras con tilde son distintas de las sin tilde (`liofilización` y
   `liofilizacion` recuperan conjuntos distintos).
+- Una solicitud admite varios filtros de búsqueda separados por coma, que
+  se combinan con AND, y pueden mezclar el lematizado y el exacto. Por eso
+  cada bloque es un filtro con su propio modo.
 - La URL completa admite unos 4 KB; más allá, la API responde 400.
 """
 
@@ -36,13 +39,20 @@ from agentresearch.protocolo.ecuaciones.comun import (
     terminos_de,
 )
 from agentresearch.protocolo.ecuaciones.limites import LimitesTraducidos
-from agentresearch.protocolo.modelo import Busqueda
+from agentresearch.protocolo.modelo import Bloque, Busqueda
 from agentresearch.protocolo.terminos import SEPARADORES_INTERNOS, Termino
 
 MINIMO_RAIZ = 3
 URL_BASE = "https://api.openalex.org/works?"
-MAXIMO_URL = 4096
-""""About 4 KB" según la ayuda de OpenAlex."""
+LIMITE_URL = 4096
+""""About 4 KB" según la ayuda de OpenAlex: el límite de la URL completa."""
+UMBRAL_URL = 3900
+"""Longitud a partir de la cual se avisa (ADR-0009, punto 9).
+
+La ecuación se mide como una URL con solo el filtro. El conector agregará
+`api_key` y otros parámetros (`per-page`, `cursor`, `select`), así que el aviso
+deja un margen bajo el límite de unos 4 KB.
+"""
 
 CAMPO = "title_and_abstract.search"
 """Filtro de búsqueda en título y resumen; `.exact` al final para la búsqueda sin lematizar."""
@@ -85,7 +95,8 @@ class TraductorOpenalex(Traductor):
     id = "openalex"
     nombre = "OpenAlex"
     campos = "título y resumen (title_and_abstract.search)"
-    maximo = MAXIMO_URL
+    maximo = UMBRAL_URL
+    union_de_bloques = ","
     documentacion = (
         Documentacion(
             "Search – Querying (OpenAlex Help Center)",
@@ -117,7 +128,7 @@ class TraductorOpenalex(Traductor):
         if not self.exacta:
             return (
                 "la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos "
-                "truncados tienen variantes"
+                "truncados del bloque tienen variantes"
             )
         return (
             f"OpenAlex exige al menos {MINIMO_RAIZ} letras antes del *, y {str(termino)!r} "
@@ -132,16 +143,24 @@ class TraductorOpenalex(Traductor):
                 "2026-09-27); si quiere recuperar también la forma sin tilde, agréguela como "
                 "término aparte (ADR-0009, punto 8)"
             )
-        if termino.tiene_guion and not termino.entre_comillas:
-            avisos.append(
-                "se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con "
-                "guion unidas por AND, no como frase"
-            )
         return avisos
 
+    def notas_de_termino(self, termino: Termino) -> list[str]:
+        if termino.tiene_guion and not termino.entre_comillas:
+            return [
+                "se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con "
+                "guion unidas por AND, no como frase"
+            ]
+        return []
+
     def envolver(self, nucleo: str, varios_bloques: bool) -> str:
-        filtro = CAMPO + (".exact" if self.exacta else "")
-        return f"{filtro}:{super().envolver(nucleo, varios_bloques)}"
+        return nucleo  # cada bloque ya es un filtro completo, unidos por coma
+
+    def _texto_maximo(self) -> str:
+        return (
+            f"el umbral de aviso de OpenAlex ({UMBRAL_URL}), que deja margen para api_key y los "
+            f"demás parámetros bajo el límite de unos 4 KB de la URL ({LIMITE_URL})"
+        )
 
     def medir(self, texto: str) -> int:
         return len(URL_BASE + urlencode({"filter": texto}))
@@ -153,41 +172,52 @@ class TraductorOpenalex(Traductor):
         return LimitesTraducidos.como_texto(busqueda, pendientes_del_conector=True)
 
     def traducir(self, busqueda: Busqueda) -> Ecuacion:
-        items = [item for bloque in busqueda.bloques for item in terminos_de(bloque)]
-        truncados = [item for item in items if item.termino.truncado]
-        sin_variantes = [item.clave for item in truncados if item.variantes is None]
+        avisos: list[Aviso] = []
+        bloques = [self._filtro_de_bloque(bloque, avisos) for bloque in busqueda.bloques]
+        return self._ecuacion(busqueda, bloques, avisos)
+
+    def _filtro_de_bloque(self, bloque: Bloque, avisos: list[Aviso]) -> str | None:
+        """El bloque como filtro, con su propio modo (ADR-0009, punto 9)."""
+        items = list(terminos_de(bloque))
+        sin_variantes = [i.clave for i in items if i.termino.truncado and i.variantes is None]
         con_vacias = _terminos_con_palabras_vacias(items)
         self.exacta = bool(sin_variantes or con_vacias)
-        avisos: list[Aviso] = []
+        sin_lematizar = (
+            f"el bloque {bloque.id} usa la búsqueda sin lematizar (search.exact): en este "
+            "bloque, OpenAlex no buscará plurales ni otras formas de los términos sin *. "
+        )
         if sin_variantes:
             avisos.append(
                 Aviso(
                     "advertencia",
-                    "se usa la búsqueda sin lematizar (search.exact) porque hay términos "
-                    f"truncados sin variantes ({', '.join(sin_variantes)}): OpenAlex no buscará "
-                    "plurales ni otras formas de los términos sin * de toda la ecuación. Para "
-                    "conservar la lematización, escriba las variantes de todos los términos "
-                    "truncados",
+                    sin_lematizar + "Motivo: tiene términos truncados sin variantes "
+                    f"({', '.join(sin_variantes)}). Para conservar la lematización en el bloque, "
+                    "escriba sus variantes",
+                    bloque.id,
                 )
             )
         if con_vacias:
             avisos.append(
                 Aviso(
                     "advertencia",
-                    "se usa la búsqueda sin lematizar (search.exact) porque la lematizada de "
-                    "OpenAlex quita las palabras vacías también dentro de frases y términos con "
-                    'guion (por ejemplo, "by-product" se buscaría como "product"). Términos '
-                    f"afectados: {', '.join(con_vacias)}. OpenAlex no buscará plurales ni otras "
-                    "formas de los demás términos; para conservar la lematización, reformule esos "
-                    "términos sin palabras vacías (p. ej. byproduct)",
+                    sin_lematizar
+                    + "Motivo: la búsqueda lematizada quita las palabras vacías también dentro de "
+                    'frases y términos con guion ("by-product" se buscaría como "product"); '
+                    f"términos afectados: {', '.join(con_vacias)}. Si quiere recuperar también "
+                    "la forma sin la palabra vacía (p. ej. byproduct), agréguela como término "
+                    "aparte, sin reemplazar el original, que las demás fuentes buscan como frase; "
+                    "si no, acepte la búsqueda exacta en este bloque",
+                    bloque.id,
                 )
             )
-        bloques = [self._bloque(bloque, avisos) for bloque in busqueda.bloques]
-        return self._ecuacion(busqueda, bloques, avisos)
+        cuerpo = self._bloque(bloque, avisos)
+        if cuerpo is None:
+            return None
+        return f"{CAMPO}{'.exact' if self.exacta else ''}:{cuerpo}"
 
 
 def _terminos_con_palabras_vacias(items: list[TerminoDeBloque]) -> list[str]:
-    """Términos que la búsqueda lematizada escribiría con palabras vacías.
+    """Términos de un bloque que la búsqueda lematizada escribiría con palabras vacías.
 
     Se miran los términos que irían en esa búsqueda: los no truncados, y las
     variantes de los truncados que las tienen.

@@ -18,19 +18,21 @@ Generado por agentresearch a partir del protocolo; no lo edite a mano. Regenére
 
 - Campos: título y resumen (title_and_abstract.search)
 - Límites: se aplicarán con el conector de OpenAlex (hito 3)
-- Longitud: 314 caracteres de URL codificada, de un máximo de 4096
+- Longitud: 368 caracteres de URL codificada, de un máximo de 3900
 - Sintaxis verificada en: [Search – Querying (OpenAlex Help Center)](https://help.openalex.org/api/searching/) (2026-09-26); [Searching guide (OpenAlex)](https://help.openalex.org/guides/searching) (2026-09-26); [Consultas de verificación a la API de OpenAlex (ADR-0009, punto 9)](https://api.openalex.org/works) (2026-09-27)
 
 ```text
-title_and_abstract.search.exact:((zarambo OR "Zarambus fictus" OR "by-product*" OR "post-extraction" OR fru* OR "zarambina") AND (secado OR dehydrat* OR "freeze drying" OR "freeze dried" OR "fruto sec*" OR liofilización))
+title_and_abstract.search.exact:(zarambo OR "Zarambus fictus" OR "by-product*" OR "post-extraction" OR fru* OR "zarambina"),title_and_abstract.search:(secado OR dehydration OR dehydrated OR "freeze drying" OR "freeze dried" OR "fruto seco" OR "frutos secos" OR liofilización)
 ```
 
 Avisos:
 
-- advertencia: se usa la búsqueda sin lematizar (search.exact) porque la lematizada de OpenAlex quita las palabras vacías también dentro de frases y términos con guion (por ejemplo, "by-product" se buscaría como "product"). Términos afectados: by-product, by-products. OpenAlex no buscará plurales ni otras formas de los demás términos; para conservar la lematización, reformule esos términos sin palabras vacías (p. ej. byproduct)
-- advertencia [B1, by-product*]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
-- advertencia [B1, post-extraction]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
-- nota [B2, "freeze dr*"]: OpenAlex exige al menos 3 letras antes del *, y '"freeze dr*"' tiene una raíz más corta; se usan sus variantes: "freeze drying", "freeze dried"
+- advertencia [B1]: el bloque B1 usa la búsqueda sin lematizar (search.exact): en este bloque, OpenAlex no buscará plurales ni otras formas de los términos sin *. Motivo: la búsqueda lematizada quita las palabras vacías también dentro de frases y términos con guion ("by-product" se buscaría como "product"); términos afectados: by-product, by-products. Si quiere recuperar también la forma sin la palabra vacía (p. ej. byproduct), agréguela como término aparte, sin reemplazar el original, que las demás fuentes buscan como frase; si no, acepte la búsqueda exacta en este bloque
+- nota [B1, by-product*]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- nota [B1, post-extraction]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- nota [B2, dehydrat*]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados del bloque tienen variantes; se usan sus variantes: dehydration, dehydrated
+- nota [B2, "freeze dr*"]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados del bloque tienen variantes; se usan sus variantes: "freeze drying", "freeze dried"
+- nota [B2, "fruto sec*"]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados del bloque tienen variantes; se usan sus variantes: "fruto seco", "frutos secos"
 - advertencia [B2, liofilización]: OpenAlex distingue las letras con tilde de las sin tilde (verificado el 2026-09-27); si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
 
 ## PubMed
@@ -57,15 +59,17 @@ Avisos:
 
 - Campos: título, resumen y palabras clave (TITLE-ABS-KEY); las palabras clave incluyen las del autor, los términos indexados, los nombres comerciales y los nombres químicos
 - Límites: en la ecuación (PUBYEAR > 2009 AND PUBYEAR < 2026 AND (LANGUAGE(english) OR LANGUAGE(spanish)) AND (DOCTYPE(ar) OR DOCTYPE(re)))
-- Longitud: 314 caracteres, sin máximo documentado
+- Longitud: 318 caracteres, sin máximo documentado
 - Sintaxis verificada en: [Scopus Search Tips (Elsevier Developer Portal)](https://dev.elsevier.com/sc_search_tips.html) (2026-09-26); [How can I best use the Advanced search? (Scopus)](https://www.elsevier.support/scopus/answer/how-can-i-best-use-the-advanced-search) (2026-09-26)
 
 ```text
-TITLE-ABS-KEY((zarambo OR "Zarambus fictus" OR by-product* OR post-extraction OR fru* OR "zarambina") AND (secado OR dehydrat* OR "freeze drying" OR "freeze dried" OR "fruto sec*" OR liofilización)) AND PUBYEAR > 2009 AND PUBYEAR < 2026 AND (LANGUAGE(english) OR LANGUAGE(spanish)) AND (DOCTYPE(ar) OR DOCTYPE(re))
+TITLE-ABS-KEY((zarambo OR "Zarambus fictus" OR "by-product*" OR "post-extraction" OR fru* OR "zarambina") AND (secado OR dehydrat* OR "freeze drying" OR "freeze dried" OR "fruto sec*" OR liofilización)) AND PUBYEAR > 2009 AND PUBYEAR < 2026 AND (LANGUAGE(english) OR LANGUAGE(spanish)) AND (DOCTYPE(ar) OR DOCTYPE(re))
 ```
 
 Avisos:
 
+- nota [B1, by-product*]: se escribe entre comillas: Elsevier solo documenta el guion dentro de una frase aproximada (lo ignora y admite comodines), y lo no documentado se trata como no admitido
+- nota [B1, post-extraction]: se escribe entre comillas: Elsevier solo documenta el guion dentro de una frase aproximada (lo ignora y admite comodines), y lo no documentado se trata como no admitido
 - nota [B2, "freeze dr*"]: Scopus exige al menos 3 letras antes del *, y '"freeze dr*"' tiene una raíz más corta; se usan sus variantes: "freeze drying", "freeze dried"
 - advertencia [B2, liofilización]: Scopus no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
 

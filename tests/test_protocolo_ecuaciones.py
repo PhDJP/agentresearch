@@ -27,7 +27,7 @@ from agentresearch.protocolo.ecuaciones.documento import (
     texto_ecuaciones,
 )
 from agentresearch.protocolo.ecuaciones.openalex import (
-    MAXIMO_URL,
+    UMBRAL_URL,
     TraductorOpenalex,
     palabras_vacias_en,
 )
@@ -214,10 +214,14 @@ def test_openalex_usa_search_exact_si_falta_alguna_variante(
     ecuacion = _openalex(datos)
 
     assert ecuacion.texto is not None
-    assert ecuacion.texto.startswith("title_and_abstract.search.exact:(")
-    assert "dehydrat*" in ecuacion.texto
-    assert '"freeze drying"' in ecuacion.texto  # raíz corta: usa sus variantes
+    b1, b2 = ecuacion.texto.split(",")  # un filtro por bloque, unidos por coma (AND)
+    assert b1.startswith("title_and_abstract.search:(")  # B1 conserva la lematización
+    assert b2.startswith("title_and_abstract.search.exact:(")
+    assert "dehydrat*" in b2
+    assert '"freeze drying"' in b2  # raíz corta: usa sus variantes
     [aviso] = [a for a in ecuacion.avisos if "search.exact" in a.mensaje]
+    assert aviso.bloque == "B2"
+    assert aviso.mensaje.startswith("el bloque B2 usa la búsqueda sin lematizar")
     assert "(dehydrat*)" in aviso.mensaje
 
 
@@ -227,10 +231,15 @@ def test_openalex_usa_search_exact_con_palabras_vacias_en_una_frase_o_un_guion(
     ecuacion = _openalex(_protocolo(datos_sinteticos, "con_variantes").model_dump())
 
     assert ecuacion.texto is not None
-    assert ecuacion.texto.startswith("title_and_abstract.search.exact:(")
-    assert '"by-product*"' in ecuacion.texto  # en modo exacto se conserva el truncamiento
+    b1, b2 = ecuacion.texto.split(",")
+    assert b1.startswith("title_and_abstract.search.exact:(")
+    assert '"by-product*"' in b1  # en modo exacto se conserva el truncamiento
+    assert b2.startswith("title_and_abstract.search:(")  # B2 no tiene palabras vacías
     [aviso] = [a for a in ecuacion.avisos if "palabras vacías" in a.mensaje]
-    assert "Términos afectados: by-product, by-products." in aviso.mensaje
+    assert aviso.bloque == "B1"
+    assert "términos afectados: by-product, by-products." in aviso.mensaje
+    assert "agréguela como término aparte, sin reemplazar el original" in aviso.mensaje
+    assert "reformule" not in aviso.mensaje
 
 
 @pytest.mark.parametrize(
@@ -261,8 +270,8 @@ def test_openalex_avisa_si_la_url_supera_el_maximo(datos_sinteticos: dict[str, A
 
     ecuacion = TraductorOpenalex().traducir(Protocolo.model_validate(datos).busqueda)
 
-    assert ecuacion.longitud is not None and ecuacion.longitud > MAXIMO_URL
-    assert any("supera el máximo conocido de OpenAlex" in a.mensaje for a in ecuacion.avisos)
+    assert ecuacion.longitud is not None and ecuacion.longitud > UMBRAL_URL
+    assert any("supera el umbral de aviso de OpenAlex (3900)" in a.mensaje for a in ecuacion.avisos)
     assert ecuacion.texto is not None  # es una advertencia, no un bloqueo
 
 
@@ -382,3 +391,24 @@ def test_un_tipo_fuera_del_vocabulario_no_se_convierte(datos_sinteticos: dict[st
         in scopus.limites.instrucciones
     )
     assert "a Article, ponencia (" in fuentes["wos"].limites.instrucciones[-1]
+
+
+def test_scopus_pone_entre_comillas_una_variante_con_guion(
+    datos_sinteticos: dict[str, Any],
+) -> None:
+    datos = _protocolo(datos_sinteticos, "con_variantes").model_dump()
+    bloque = datos["busqueda"]["bloques"][1]
+    bloque["terminos"].append("dr*")
+    bloque["variantes"]["dr*"] = ["drying", "freeze-drying"]
+    [scopus] = [
+        e
+        for e in generar_ecuaciones(Protocolo.model_validate(datos)).ecuaciones
+        if e.fuente == "scopus"
+    ]
+
+    assert scopus.texto is not None
+    assert 'drying OR "freeze-drying"' in scopus.texto
+    assert any(
+        a.tipo == "nota" and a.termino == "freeze-drying" and "entre comillas" in a.mensaje
+        for a in scopus.avisos
+    )

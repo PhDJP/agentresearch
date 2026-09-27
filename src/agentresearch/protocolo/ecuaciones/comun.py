@@ -137,6 +137,8 @@ class Traductor:
     manual: bool = False
     maximo: int | None = None
     documentacion: tuple[Documentacion, ...] = ()
+    union_de_bloques: str = " AND "
+    """Cómo se unen los bloques; OpenAlex los une como filtros separados por coma."""
 
     def escribir(self, termino: Termino) -> str | None:
         """La forma del término en la fuente, o `None` si no lo admite (se usan variantes)."""
@@ -156,6 +158,10 @@ class Traductor:
                 "(ADR-0009, punto 8)"
             )
         return avisos
+
+    def notas_de_termino(self, termino: Termino) -> list[str]:
+        """Información sobre la forma en que se escribió un término, que no exige nada."""
+        return []
 
     def envolver(self, nucleo: str, varios_bloques: bool) -> str:
         """Pone la unión de bloques en el campo de la fuente.
@@ -202,6 +208,10 @@ class Traductor:
                 Aviso("advertencia", mensaje, bloque_id, item.clave)
                 for mensaje in self.avisos_de_termino(item.termino)
             )
+            avisos.extend(
+                Aviso("nota", mensaje, bloque_id, item.clave)
+                for mensaje in self.notas_de_termino(item.termino)
+            )
             return [forma]
         motivo = self.motivo(item.termino)
         if item.variantes is None:
@@ -225,6 +235,10 @@ class Traductor:
                 Aviso("advertencia", mensaje, bloque_id, str(variante))
                 for mensaje in self.avisos_de_termino(variante)
             )
+            avisos.extend(
+                Aviso("nota", mensaje, bloque_id, str(variante))
+                for mensaje in self.notas_de_termino(variante)
+            )
         avisos.append(
             Aviso(
                 "nota",
@@ -243,7 +257,7 @@ class Traductor:
         avisos += [Aviso("nota", mensaje) for mensaje in limites.notas]
         if any(bloque is None for bloque in bloques):
             return self._armar(None, avisos, limites)
-        nucleo = " AND ".join(bloque for bloque in bloques if bloque is not None)
+        nucleo = self.union_de_bloques.join(bloque for bloque in bloques if bloque is not None)
         texto = self.envolver(nucleo, len(bloques) > 1)
         if limites.sufijo:
             texto += limites.sufijo
@@ -257,9 +271,9 @@ class Traductor:
             avisos = avisos + [
                 Aviso(
                     "advertencia",
-                    f"la ecuación mide {longitud} {self._descripcion_longitud()} y supera el "
-                    f"máximo conocido de {self.nombre} ({self.maximo}); divida los bloques en "
-                    "varias consultas y una los resultados",
+                    f"la ecuación mide {longitud} {self._descripcion_longitud()} y supera "
+                    f"{self._texto_maximo()}; divida los bloques en varias consultas y una los "
+                    "resultados",
                 )
             ]
         return Ecuacion(
@@ -278,6 +292,9 @@ class Traductor:
 
     def _descripcion_longitud(self) -> str:
         return "caracteres"
+
+    def _texto_maximo(self) -> str:  # pragma: no cover - hoy solo OpenAlex tiene máximo
+        return f"el máximo conocido de {self.nombre} ({self.maximo})"
 
 
 def raiz_corta(termino: Termino, minimo: int) -> bool:

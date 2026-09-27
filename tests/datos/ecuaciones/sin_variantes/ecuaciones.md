@@ -24,9 +24,10 @@ Generado por agentresearch a partir del protocolo; no lo edite a mano. Regenére
 
 Avisos:
 
-- advertencia: se usa la búsqueda sin lematizar (search.exact) porque hay términos truncados sin variantes (by-product*, fru*, dehydrat*, "freeze dr*", "fruto sec*"): OpenAlex no buscará plurales ni otras formas de los términos sin * de toda la ecuación. Para conservar la lematización, escriba las variantes de todos los términos truncados
-- advertencia [B1, by-product*]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
-- advertencia [B1, post-extraction]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- advertencia [B1]: el bloque B1 usa la búsqueda sin lematizar (search.exact): en este bloque, OpenAlex no buscará plurales ni otras formas de los términos sin *. Motivo: tiene términos truncados sin variantes (by-product*, fru*). Para conservar la lematización en el bloque, escriba sus variantes
+- nota [B1, by-product*]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- nota [B1, post-extraction]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- advertencia [B2]: el bloque B2 usa la búsqueda sin lematizar (search.exact): en este bloque, OpenAlex no buscará plurales ni otras formas de los términos sin *. Motivo: tiene términos truncados sin variantes (dehydrat*, "freeze dr*", "fruto sec*"). Para conservar la lematización en el bloque, escriba sus variantes
 - bloqueante [B2, "freeze dr*"]: OpenAlex exige al menos 3 letras antes del *, y '"freeze dr*"' tiene una raíz más corta. Agregue en busqueda.bloques[B2].variantes las variantes de '"freeze dr*"' que OpenAlex debe buscar en su lugar
 - advertencia [B2, liofilización]: OpenAlex distingue las letras con tilde de las sin tilde (verificado el 2026-09-27); si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
 
@@ -57,6 +58,8 @@ Avisos:
 
 Avisos:
 
+- nota [B1, by-product*]: se escribe entre comillas: Elsevier solo documenta el guion dentro de una frase aproximada (lo ignora y admite comodines), y lo no documentado se trata como no admitido
+- nota [B1, post-extraction]: se escribe entre comillas: Elsevier solo documenta el guion dentro de una frase aproximada (lo ignora y admite comodines), y lo no documentado se trata como no admitido
 - bloqueante [B2, "freeze dr*"]: Scopus exige al menos 3 letras antes del *, y '"freeze dr*"' tiene una raíz más corta. Agregue en busqueda.bloques[B2].variantes las variantes de '"freeze dr*"' que Scopus debe buscar en su lugar
 - advertencia [B2, liofilización]: Scopus no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
 - advertencia: idiomas no reconocidos ('español'): el filtro de idioma de Scopus se da como instrucción de la interfaz. Use códigos ISO 639-1 (p. ej. es, en) para que se traduzca
