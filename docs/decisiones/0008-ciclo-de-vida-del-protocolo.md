@@ -502,3 +502,14 @@ consideradas".
   aprobación o en la enmienda que la introdujo. Si una versión nueva del
   paquete agrega una regla, sus advertencias cuentan como nuevas en la
   siguiente enmienda, aunque el protocolo no haya cambiado en ese punto.
+
+## Nota posterior (2026-09-27)
+
+Desde la versión 0.1.0rc1, en POSIX, `escribir_atomico` sincroniza el
+directorio (`os.open` del directorio y `os.fsync`) después de cada
+`os.replace`, y `RegistroEncadenado.agregar()` lo hace al crear el archivo
+del registro, para que los nombres nuevos también sobrevivan a un corte de
+energía. En Windows, que no admite abrir un directorio para sincronizarlo,
+se sigue omitiendo, como dice el punto 14. Commits `46e7a5e` (cambio) y
+`911f261` (pruebas); lo pidió una nota de cierre del hito 1 de la hoja de
+ruta.
