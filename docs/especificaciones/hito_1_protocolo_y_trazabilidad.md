@@ -245,13 +245,13 @@ Ajustes aprobados al implementar 1c (2026-09-26); el detalle está en el [ADR-00
 - **Límites de longitud.** Se advierte cuando una ecuación supera el máximo conocido de la fuente.
 - **Pruebas:** archivos de referencia (*golden files*) por fuente, a partir de bloques sintéticos.
 
-Ajustes aprobados al implementar 1d (2026-09-26); el detalle está en el [ADR-0009](../decisiones/0009-ecuaciones-de-busqueda-por-fuente.md), en propuesta hasta completar la verificación de OpenAlex:
+Ajustes aprobados al implementar 1d (2026-09-26); el detalle está en el [ADR-0009](../decisiones/0009-ecuaciones-de-busqueda-por-fuente.md), en propuesta hasta la revisión del asesor:
 
 - **Términos.** Un término es una palabra (con guiones, apóstrofos o tildes), una palabra truncada o una frase entre comillas. Lo que no se traduce igual en todas las fuentes es el error nuevo **P-E11**: por ejemplo, varias palabras sin comillas, operadores, sintaxis de campo o comodines distintos de `*` final.
 - **Variantes.** Cada bloque admite `variantes: {término truncado: [variantes]}`, un campo opcional que no cambia la versión del esquema. Un traductor las usa donde la fuente no admite el truncamiento; sin ellas, esa fuente queda bloqueada con un aviso. El paquete nunca las inventa.
 - **Fuentes.** Se traducen las fuentes declaradas con ID `openalex`, `pubmed`, `scopus` o `wos`, más la genérica.
 - **Lo no documentado se trata como no admitido.** Por ejemplo, el truncamiento dentro de frases en Web of Science.
-- **OpenAlex.** Conserva la búsqueda lematizada si todos los truncados tienen variantes; si no, usa `search.exact` y avisa. Está pendiente verificar `title_and_abstract.search` con una consulta real a la API.
+- **OpenAlex.** Busca en título y resumen con `title_and_abstract.search`, verificado con consultas reales a la API (2026-09-27). Los términos con guion van entre comillas. Conserva la búsqueda lematizada si todos los truncados tienen variantes y ninguna frase ni término con guion contiene palabras vacías; si no, usa `search.exact` y avisa.
 - **Límites.** Scopus y Web of Science, que se usan por exportación manual, traducen los límites verificados y dan instrucciones de interfaz para el resto. OpenAlex y PubMed los dejan para los conectores del hito 3.
 - **Comando.** `agentresearch protocolo ecuaciones [ruta] [--escribir] [--json]`. No registra un evento. Con `--escribir` se niega también con P-E09. Si hay fuentes bloqueadas, escribe igual y sale con 1.
 - **`ecuaciones.md`.** Es determinista. Para Scopus y Web of Science incluye los pasos del investigador: dónde pegar la ecuación, los filtros, el formato de exportación y qué anotar.

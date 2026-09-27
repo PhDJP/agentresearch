@@ -88,7 +88,10 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
     usa las variantes que escribe el investigador (`variantes`, un campo
     opcional por bloque) o bloquea esa fuente con un aviso;
   - error P-E11 (término de búsqueda no traducible) y nota de estado de
-    ecuaciones desactualizadas en `validar` e `historial`.
+    ecuaciones desactualizadas en `validar` e `historial`;
+  - OpenAlex busca en título y resumen, verificado con consultas reales a
+    la API: los términos con guion van entre comillas, y las palabras
+    vacías en frases o guiones llevan a la búsqueda exacta.
 
 ### Cambiado
 

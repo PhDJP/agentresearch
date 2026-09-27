@@ -90,7 +90,7 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
 
    | Fuente | Campo | Qué cubre | Fuente de la verificación |
    |---|---|---|---|
-   | OpenAlex | `title_and_abstract.search` o `search` (punto 9) | título y resumen; `search` suma el texto completo | [Búsqueda](https://help.openalex.org/api/searching/), [guía](https://help.openalex.org/guides/searching) (act. 2026-09-19) |
+   | OpenAlex | `title_and_abstract.search` o `.search.exact` (punto 9) | título y resumen | [Búsqueda](https://help.openalex.org/api/searching/), [guía](https://help.openalex.org/guides/searching) (act. 2026-09-19); consultas a la API (2026-09-27) |
    | PubMed | `[tiab]` | título y resumen | [Guía de usuario](https://pubmed.ncbi.nlm.nih.gov/help/) (act. 2026-09-24) |
    | Scopus | `TITLE-ABS-KEY(…)` | título, resumen y palabras clave; `KEY` reúne palabras clave de autor, términos indexados, nombres comerciales y nombres químicos | [Consejos de búsqueda de la API](https://dev.elsevier.com/sc_search_tips.html), [búsqueda avanzada](https://www.elsevier.support/scopus/answer/how-can-i-best-use-the-advanced-search) (act. 2026-08-24) |
    | Web of Science | `TS=(…)` | título, resumen, palabras clave de autor y Keywords Plus | [Campos de búsqueda](https://webofscience.zendesk.com/hc/en-us/articles/26916258216209-Web-of-Science-Core-Collection-Search-Fields), [reglas](https://webofscience.zendesk.com/hc/en-us/articles/25350084904721-Search-Rules), [operadores](https://webofscience.zendesk.com/hc/en-us/articles/20016122409105-Search-Operators) (act. 2025-10-17) |
@@ -103,7 +103,7 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
 
    | Fuente | Frase | Truncamiento | Guion |
    |---|---|---|---|
-   | OpenAlex | `"…"` | solo con `search.exact` (sin lematización), al menos 3 letras antes; no al inicio | no documentado; pendiente de la verificación del punto 9 |
+   | OpenAlex | `"…"` (la lematizada lematiza y quita palabras vacías también dentro de la frase) | solo con `search.exact` (sin lematización), al menos 3 letras antes; no al inicio; admitido en frases | sin comillas, AND de las partes; entre comillas, frase: el traductor lo pone entre comillas |
    | PubMed | `"…"[tiab]` | al menos 4 letras antes del primer `*`; admitido en frases y tras guion (`breast-feed*`) | busca la frase; si no está en el índice de frases, no devuelve nada |
    | Scopus | `"…"` (aproximada: ignora la puntuación e incluye plurales) | al menos 3 letras; admitido en frases aproximadas; se descarta si va justo después de un guion | se busca como frase aproximada |
    | Web of Science | `"…"` (exacta: desactiva la lematización) | al menos 3 letras antes; en frases, **no documentado** | `TS=hydro-power` recupera `hydro-power` y `hydro power` |
@@ -119,25 +119,56 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
      comillas desactivan la lematización (`"mouse"` no recupera `mice`).
 8. **Tildes.** Ninguna de las cuatro fuentes documenta cómo trata las
    letras con tilde en los campos de tema. Web of Science documenta que no
-   se buscan en los nombres de autor. El término se traduce tal como está
-   escrito, con un aviso no bloqueante que sugiere agregar la forma sin
-   tilde como término aparte si el investigador quiere recuperarla. El
-   paquete no la agrega por su cuenta.
+   se buscan en los nombres de autor. En OpenAlex, las consultas del punto
+   9 muestran que las formas con y sin tilde recuperan conjuntos distintos.
+   El término se traduce tal como está escrito, con un aviso no bloqueante
+   que sugiere agregar la forma sin tilde como término aparte si el
+   investigador quiere recuperarla. El paquete no la agrega por su cuenta.
 9. **OpenAlex.**
-   - **Alcance.** Se usa `title_and_abstract.search` si una consulta real
-     a la API confirma que existe y que admite booleanos, frases y comodines
-     (y su variante `.search.exact`). Si no, se usa `search`, que incluye el
-     texto completo, y la diferencia se declara como amenaza a la validez.
-     La ecuación es el valor del filtro
-     (`title_and_abstract.search:(…)` o `title_and_abstract.search.exact:(…)`).
-     *Pendiente:* la consulta se hace con la clave de `.env`, que el
-     investigador está creando; tampoco está verificado cómo trata OpenAlex
-     los guiones. Este punto se completa con el resultado antes de aceptar
-     el ADR, y el traductor se ajusta si hace falta.
-   - **Truncamiento.** `search` lematiza pero no admite comodines;
-     `search.exact` admite comodines pero no lematiza, y solo se usa uno por
-     solicitud. Se elige así:
-     - sin términos truncados: búsqueda lematizada;
+   - **Verificación con la API (2026-09-27).** Consultas a
+     `https://api.openalex.org/works` con `per-page=1` y `select=id`,
+     autenticadas con la clave del investigador, que no se registra aquí.
+     Se anotó el estado HTTP y `meta.count`. Los conteos cambian con el
+     tiempo; lo que se verifica es la relación entre ellos.
+
+     | Consulta (valor de `filter`, o parámetro) | HTTP | `meta.count` | Qué muestra |
+     |---|---|---|---|
+     | `title_and_abstract.search:dehydration` | 200 | 205 598 | el filtro existe |
+     | `title_and_abstract.search.exact:dehydration` | 200 | 161 465 | la variante exacta existe y no lematiza |
+     | parámetro `search=dehydration` | 200 | 1 120 839 | `search` cubre además el texto completo |
+     | `title_and_abstract.search:(dehydration OR lyophilization)` | 200 | 240 582 | `OR` y paréntesis funcionan (sola, lyophilization: 35 632) |
+     | `title_and_abstract.search:((dehydration OR lyophilization) AND (mango))` | 200 | 516 | `AND` entre bloques funciona (solo mango: 46 309) |
+     | `title_and_abstract.search:(dehydration or lyophilization)` | 200 | 648 | `or` en minúsculas no es un operador |
+     | `title_and_abstract.search:"freeze drying"` | 200 | 66 864 | frase (sin comillas: 75 459) |
+     | `title_and_abstract.search:dehydrat*` | 400 | — | la lematizada rechaza comodines |
+     | `title_and_abstract.search.exact:dehydrat*` | 200 | 217 197 | la exacta los admite |
+     | `title_and_abstract.search.exact:dr*` | 400 | — | exige al menos 3 caracteres antes del `*` |
+     | `title_and_abstract.search.exact:"freeze dry*"` | 200 | 40 341 | comodín dentro de una frase (`"freeze drying"`: 38 508) |
+     | `title_and_abstract.search.exact:(dehydrat* OR lyophiliz*)` | 200 | 252 668 | `OR` con comodines |
+     | `title_and_abstract.search:byproduct` y `:byproducts` | 200 | 112 361 y 112 361 | la lematizada busca plurales (exacta `byproduct`: 64 277) |
+     | `title_and_abstract.search:"mangoes"` | 200 | 46 309 | las comillas no desactivan la lematización (igual que `mango`) |
+     | `title_and_abstract.search:post-extraction` | 200 | 63 993 | sin comillas, el guion es AND (`post AND extraction`: 63 993) |
+     | `title_and_abstract.search:"post-extraction"` | 200 | 4 341 | entre comillas, frase (`"post extraction"`: 4 341) |
+     | `title_and_abstract.search:"by-product"` | 200 | 6 769 981 | la lematizada quita "by": igual que `product` |
+     | `title_and_abstract.search.exact:"by-product"` | 200 | 118 195 | la exacta conserva "by" (igual que `"by product"`) |
+     | `title_and_abstract.search.exact:"by-product*"` | 200 | 242 068 | guion y comodín en frase (igual que `"by product*"`) |
+     | `title_and_abstract.search:"X product"`, con X = by, for, with, in, of, the, and | 200 | 6 769 981 | palabras vacías: se quitan |
+     | `title_and_abstract.search:"X product"`, con X = via, per, co, non, post, pre | 200 | 603 a 9 782 | no son palabras vacías |
+     | `title_and_abstract.search:liofilización` y `:liofilizacion` | 200 | 595 y 277 | las tildes cuentan (igual en la exacta) |
+
+   - **Alcance.** Se usa `title_and_abstract.search`, confirmado por la
+     verificación: busca en título y resumen, como las demás fuentes, y
+     admite booleanos, frases y (en su variante `.exact`) comodines. La
+     ecuación es el valor del filtro (`title_and_abstract.search:(…)` o
+     `title_and_abstract.search.exact:(…)`).
+   - **Guiones.** Un término con guion va siempre entre comillas, porque sin
+     ellas OpenAlex busca sus partes con AND.
+   - **Modo de búsqueda.** La lematizada busca plurales y otras formas,
+     pero no admite comodines y quita las palabras vacías también dentro de
+     frases. La exacta admite comodines y conserva las palabras vacías, pero
+     no lematiza. Solo se usa una por solicitud. Se elige así:
+     - sin términos truncados ni palabras vacías en frases o guiones:
+       búsqueda lematizada;
      - con términos truncados y **todos** con variantes: búsqueda
        lematizada con las variantes en lugar de los truncamientos. **Pro:**
        conserva la lematización (plurales y otras formas) en todos los
@@ -147,7 +178,15 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
      - con términos truncados y alguno sin variantes: `search.exact` con los
        comodines y un aviso de que se pierde la lematización en toda la
        ecuación. Si alguna raíz tiene menos de 3 letras y no tiene
-       variantes, OpenAlex queda bloqueada.
+       variantes, OpenAlex queda bloqueada;
+     - con una palabra vacía dentro de una frase o de un término con guion
+       (en los términos que irían en la búsqueda lematizada, incluidas las
+       variantes): `search.exact`, con un aviso que nombra los términos. En
+       la lematizada, `"by-product"` se buscaría como `product` y
+       recuperaría 57 veces más registros. La lista de palabras vacías es la
+       de inglés de Lucene: se verificaron siete, y el resto se infiere. Una
+       palabra tratada de más como vacía solo cuesta la lematización; una
+       tratada de menos ampliaría la búsqueda sin aviso.
    - **Longitud.** La URL completa admite unos 4 KB. Se avisa cuando la
      ecuación codificada para URL supera ese límite.
 
@@ -269,8 +308,10 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
     - que los campos cubiertos difieren entre fuentes (punto 6);
     - que las frases de Web of Science son exactas y no lematizadas,
       mientras que las de Scopus son aproximadas e incluyen plurales;
-    - si OpenAlex buscó en el texto completo o sin lematización (punto 9);
-    - los términos con tilde cuyo tratamiento no está documentado (punto 8).
+    - si OpenAlex buscó sin lematización, y por qué (punto 9);
+    - los términos con tilde, cuyo tratamiento no está documentado en las
+      fuentes manuales y que en OpenAlex recuperan conjuntos distintos
+      (punto 8).
 
 ## Alternativas consideradas
 
@@ -290,6 +331,16 @@ Las opciones de cada decisión se presentaron al investigador, que eligió
 - **OpenAlex con truncamiento:** usar siempre `search.exact`: es más simple,
   pero pierde la lematización aunque el investigador ya haya escrito todas
   las variantes.
+- **OpenAlex con palabras vacías en frases o guiones:**
+  - mantener la búsqueda lematizada con un aviso: la ecuación recuperaría,
+    por ejemplo, todo lo que contiene "product" en lugar de "by-product";
+  - bloquear OpenAlex hasta que el investigador reformule el término: es
+    más estricto de lo necesario, porque la búsqueda exacta sí lo expresa;
+  - usar solo las siete palabras vacías verificadas: un término con otra
+    palabra de la lista de Lucene ampliaría la búsqueda sin aviso.
+- **OpenAlex con el parámetro `search` (texto completo):** recupera unas
+  cinco veces más registros que el filtro de título y resumen, con otro
+  alcance que las demás fuentes.
 - **Tipos de documento con sinónimos internos** (p. ej. "ponencia" como
   `conferencia`): el paquete decidiría por su cuenta qué significa un valor
   que el investigador escribió; el vocabulario controlado lo hace explícito.
