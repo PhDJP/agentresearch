@@ -121,6 +121,10 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
   `os.fsync`.
 - El evento `estudio_creado` se valida con su esquema y solo puede ser el
   primero del registro (P-E10).
+- En POSIX, la escritura atómica sincroniza el directorio después de
+  `os.replace`, y el registro encadenado lo hace al crear su archivo, para
+  que los nombres nuevos sobrevivan a un corte de energía. En Windows, que
+  no lo admite, se sigue omitiendo.
 
 ### Corregido
 

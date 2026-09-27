@@ -10,6 +10,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
+from agentresearch.trazabilidad.escritura import sincronizar_directorio
 from agentresearch.trazabilidad.hashes import hash_texto
 
 HASH_GENESIS = "sha256:genesis"
@@ -155,11 +156,15 @@ class RegistroEncadenado:
         hash_evento = hash_texto(json_canonico(evento_sin_hash))
         evento_completo = {**evento_sin_hash, "hash": hash_evento}
 
+        es_nuevo = not self._ruta.exists()
         with self._ruta.open("a", encoding="utf-8", newline="\n") as archivo:
             archivo.write(json_canonico(evento_completo) + "\n")
             # El evento queda en disco antes de que el llamador siga (ADR-0008, punto 14).
             archivo.flush()
             os.fsync(archivo.fileno())
+        if es_nuevo:
+            # En POSIX, el nombre del archivo recién creado también queda en disco.
+            sincronizar_directorio(self._ruta.parent)
 
         return EventoRegistro(**evento_completo)
 
