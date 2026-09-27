@@ -18,21 +18,20 @@ Generado por agentresearch a partir del protocolo; no lo edite a mano. Regenére
 
 - Campos: título y resumen (title_and_abstract.search)
 - Límites: se aplicarán con el conector de OpenAlex (hito 3)
-- Longitud: 351 caracteres de URL codificada, de un máximo de 4096
-- Sintaxis verificada en: [Search – Querying (OpenAlex Help Center)](https://help.openalex.org/api/searching/) (2026-09-26); [Searching guide (OpenAlex)](https://help.openalex.org/guides/searching) (2026-09-26)
+- Longitud: 314 caracteres de URL codificada, de un máximo de 4096
+- Sintaxis verificada en: [Search – Querying (OpenAlex Help Center)](https://help.openalex.org/api/searching/) (2026-09-26); [Searching guide (OpenAlex)](https://help.openalex.org/guides/searching) (2026-09-26); [Consultas de verificación a la API de OpenAlex (ADR-0009, punto 9)](https://api.openalex.org/works) (2026-09-27)
 
 ```text
-title_and_abstract.search:((zarambo OR "Zarambus fictus" OR by-product OR by-products OR post-extraction OR fruit OR fruits OR "zarambina") AND (secado OR dehydration OR dehydrated OR "freeze drying" OR "freeze dried" OR "fruto seco" OR "frutos secos" OR liofilización))
+title_and_abstract.search.exact:((zarambo OR "Zarambus fictus" OR "by-product*" OR "post-extraction" OR fru* OR "zarambina") AND (secado OR dehydrat* OR "freeze drying" OR "freeze dried" OR "fruto sec*" OR liofilización))
 ```
 
 Avisos:
 
-- nota [B1, by-product*]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: by-product, by-products
-- nota [B1, fru*]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: fruit, fruits
-- nota [B2, dehydrat*]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: dehydration, dehydrated
-- nota [B2, "freeze dr*"]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: "freeze drying", "freeze dried"
-- nota [B2, "fruto sec*"]: la búsqueda lematizada de OpenAlex no admite comodines, y todos los términos truncados tienen variantes; se usan sus variantes: "fruto seco", "frutos secos"
-- advertencia [B2, liofilización]: OpenAlex no documenta cómo trata las letras con tilde o fuera de ASCII; si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
+- advertencia: se usa la búsqueda sin lematizar (search.exact) porque la lematizada de OpenAlex quita las palabras vacías también dentro de frases y términos con guion (por ejemplo, "by-product" se buscaría como "product"). Términos afectados: by-product, by-products. OpenAlex no buscará plurales ni otras formas de los demás términos; para conservar la lematización, reformule esos términos sin palabras vacías (p. ej. byproduct)
+- advertencia [B1, by-product*]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- advertencia [B1, post-extraction]: se escribe entre comillas: sin ellas, OpenAlex busca las partes del término con guion unidas por AND, no como frase
+- nota [B2, "freeze dr*"]: OpenAlex exige al menos 3 letras antes del *, y '"freeze dr*"' tiene una raíz más corta; se usan sus variantes: "freeze drying", "freeze dried"
+- advertencia [B2, liofilización]: OpenAlex distingue las letras con tilde de las sin tilde (verificado el 2026-09-27); si quiere recuperar también la forma sin tilde, agréguela como término aparte (ADR-0009, punto 8)
 
 ## PubMed
 

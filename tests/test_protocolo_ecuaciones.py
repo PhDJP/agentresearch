@@ -26,8 +26,13 @@ from agentresearch.protocolo.ecuaciones.documento import (
     hash_de_ecuaciones,
     texto_ecuaciones,
 )
-from agentresearch.protocolo.ecuaciones.openalex import MAXIMO_URL, TraductorOpenalex
+from agentresearch.protocolo.ecuaciones.openalex import (
+    MAXIMO_URL,
+    TraductorOpenalex,
+    palabras_vacias_en,
+)
 from agentresearch.protocolo.modelo import Protocolo
+from agentresearch.protocolo.terminos import analizar_termino
 
 DATOS = Path(__file__).parent / "datos" / "ecuaciones"
 ACTUALIZAR = os.environ.get("AGENTRESEARCH_ACTUALIZAR_REFERENCIAS") == "1"
@@ -175,27 +180,38 @@ def test_sin_variantes_se_bloquean_las_fuentes_que_no_admiten_el_truncamiento(
     assert bloqueantes == ["fru*", '"freeze dr*"', '"fruto sec*"']
 
 
+def _sin_by_product(datos_sinteticos: dict[str, Any]) -> dict[str, Any]:
+    """Escenario con variantes, sin el término con una palabra vacía (by-product*)."""
+    datos = _protocolo(datos_sinteticos, "con_variantes").model_dump()
+    bloque = datos["busqueda"]["bloques"][0]
+    bloque["terminos"].remove("by-product*")
+    del bloque["variantes"]["by-product*"]
+    return datos
+
+
+def _openalex(datos: dict[str, Any]) -> Ecuacion:
+    return TraductorOpenalex().traducir(Protocolo.model_validate(datos).busqueda)
+
+
 def test_openalex_conserva_la_lematizacion_si_todos_los_truncados_tienen_variantes(
     datos_sinteticos: dict[str, Any],
 ) -> None:
-    [openalex] = [
-        e for e in _conjunto(datos_sinteticos, "con_variantes").ecuaciones if e.fuente == "openalex"
-    ]
+    ecuacion = _openalex(_sin_by_product(datos_sinteticos))
 
-    assert openalex.texto is not None
-    assert openalex.texto.startswith("title_and_abstract.search:(")
-    assert "*" not in openalex.texto
-    assert not any("search.exact" in a.mensaje for a in openalex.avisos)
+    assert ecuacion.texto is not None
+    assert ecuacion.texto.startswith("title_and_abstract.search:(")
+    assert "*" not in ecuacion.texto
+    assert '"post-extraction"' in ecuacion.texto  # con guion: entre comillas
+    assert not any("search.exact" in a.mensaje for a in ecuacion.avisos)
 
 
 def test_openalex_usa_search_exact_si_falta_alguna_variante(
     datos_sinteticos: dict[str, Any],
 ) -> None:
-    datos = _protocolo(datos_sinteticos, "con_variantes").model_dump()
+    datos = _sin_by_product(datos_sinteticos)
     del datos["busqueda"]["bloques"][1]["variantes"]["dehydrat*"]
-    protocolo = Protocolo.model_validate(datos)
 
-    ecuacion = TraductorOpenalex().traducir(protocolo.busqueda)
+    ecuacion = _openalex(datos)
 
     assert ecuacion.texto is not None
     assert ecuacion.texto.startswith("title_and_abstract.search.exact:(")
@@ -203,6 +219,40 @@ def test_openalex_usa_search_exact_si_falta_alguna_variante(
     assert '"freeze drying"' in ecuacion.texto  # raíz corta: usa sus variantes
     [aviso] = [a for a in ecuacion.avisos if "search.exact" in a.mensaje]
     assert "(dehydrat*)" in aviso.mensaje
+
+
+def test_openalex_usa_search_exact_con_palabras_vacias_en_una_frase_o_un_guion(
+    datos_sinteticos: dict[str, Any],
+) -> None:
+    ecuacion = _openalex(_protocolo(datos_sinteticos, "con_variantes").model_dump())
+
+    assert ecuacion.texto is not None
+    assert ecuacion.texto.startswith("title_and_abstract.search.exact:(")
+    assert '"by-product*"' in ecuacion.texto  # en modo exacto se conserva el truncamiento
+    [aviso] = [a for a in ecuacion.avisos if "palabras vacías" in a.mensaje]
+    assert "Términos afectados: by-product, by-products." in aviso.mensaje
+
+
+@pytest.mark.parametrize(
+    ("termino", "vacias"),
+    [
+        ("by-product", ["by"]),
+        ('"state of the art"', ["of", "the"]),
+        ('"post extraction"', []),
+        ("co-product", []),
+        ('"the"', []),  # una sola palabra: no pierde nada que no se haya pedido
+        ("farmer's", []),
+    ],
+)
+def test_palabras_vacias_en(termino: str, vacias: list[str]) -> None:
+    assert palabras_vacias_en(analizar_termino(termino)) == vacias
+
+
+def test_openalex_avisa_que_distingue_las_tildes(datos_sinteticos: dict[str, Any]) -> None:
+    ecuacion = _openalex(_sin_by_product(datos_sinteticos))
+
+    [aviso] = [a for a in ecuacion.avisos if a.termino == "liofilización"]
+    assert "OpenAlex distingue las letras con tilde" in aviso.mensaje
 
 
 def test_openalex_avisa_si_la_url_supera_el_maximo(datos_sinteticos: dict[str, Any]) -> None:
