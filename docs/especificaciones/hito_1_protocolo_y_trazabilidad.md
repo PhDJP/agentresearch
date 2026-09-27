@@ -301,8 +301,9 @@ Ajustes aprobados al implementar 1e (2026-09-27); el detalle está en el [ADR-00
 - **Evento inicial `estudio_creado`,** con el hash de cada archivo creado, de las instrucciones del agente (`CLAUDE.md`, `.claude/settings.json` y la *skill*) y de los insumos. `validar` e `historial` muestran la nota «instrucciones del agente modificadas» si esos archivos cambian.
 - **`protocolo escribir <sección> --archivo fragmento.yaml`** es la vía para escribir el protocolo: valida contra el esquema antes de escribir y conserva comentarios y estilo. Funciona también con el protocolo vigente, para preparar una enmienda.
 - **Comentarios de sección:** la escritura restaura los del propio archivo, que en un estudio nace de la plantilla.
-- **Permisos del estudio:** se niegan `aprobar` y `decision confirmar`, `enmendar` pregunta cada vez (para permitir `--simular`), y se niega editar `protocolo/`, `estudio.yaml`, `CLAUDE.md` y `.claude/`. No son una frontera de seguridad: la barrera sigue siendo la terminal.
-- **Versión del agente:** antes de `v0.1.0`, el estudio de demostración se fija a la etiqueta candidata `v0.1.0rc1`.
+- **Permisos del estudio:** se niegan `aprobar`, `decision confirmar` y `estudio actualizar`; `enmendar` pregunta cada vez (para permitir `--simular`); se niega editar `protocolo/`, `estudio.yaml`, `CLAUDE.md`, `.claude/`, `pyproject.toml` y `uv.lock`, y leer `.env`. No son una frontera de seguridad: la barrera sigue siendo la terminal.
+- **`estudio actualizar`:** pasa un estudio a la versión instalada del agente, regenera desde las plantillas las instrucciones del agente, `.gitignore` y `.gitattributes`, y registra `estudio_actualizado`, con diff, terminal interactiva y revisor humano. La nota de instrucciones modificadas compara con el último registro.
+- **Versión del agente:** antes de `v0.1.0`, el estudio de demostración se fija a una etiqueta candidata. `v0.1.0rc1` salió sin dos ajustes del asesor y sin `estudio actualizar`; la reemplaza `v0.1.0rc2`, y el estudio pasa a ella con `estudio actualizar` como paso de la aceptación.
 
 ### Aceptación con el estudio de demostración
 

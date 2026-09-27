@@ -81,7 +81,7 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
    ├── .claude/
    │   ├── settings.json             # modelo fijado y permisos (puntos 14 a 16)
    │   └── skills/protocolo/         # SKILL.md, secciones.md y formatos.md (punto 11)
-   ├── .gitignore                    # .env, .venv/, .borradores/, PDF, material con derechos
+   ├── .gitignore                    # .env (salvo .env.ejemplo), .venv/, .borradores/, PDF, material con derechos
    ├── .gitattributes                # * text=auto eol=lf
    └── protocolo/
        ├── protocolo.yaml            # desde la plantilla, con el título
@@ -127,12 +127,22 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
      título, la fecha de creación, el modelo fijado y la licencia de los
      datos (CC BY 4.0).
 8. **Antes de `v0.1.0`,** el estudio de demostración se fija a una
-   **etiqueta candidata, `v0.1.0rc1`**, con la versión `0.1.0rc1` en el
+   **etiqueta candidata** (`v0.1.0rcN`), con esa misma versión en el
    paquete. Así los eventos registran una versión verdadera y distinguible
    de la final. Cuando se publique `v0.1.0`, el estudio pasa a esa etiqueta
-   con un commit visible. Las versiones anteriores a `0.1.0rc1` decían
-   `0.0.1` aunque el código fuera posterior; desde aquí, cada etiqueta
-   corresponde a la versión del paquete.
+   con `estudio actualizar` (punto 20). Las versiones anteriores a
+   `0.1.0rc1` decían `0.0.1` aunque el código fuera posterior; desde aquí,
+   cada etiqueta corresponde a la versión del paquete.
+
+   **Historia de las candidatas.** `v0.1.0rc1` se publicó el 2026-09-27
+   sobre el commit `9b46aef`, y con ella se creó el estudio de demostración,
+   antes de revisar dos ajustes del asesor: negar en el estudio leer `.env`
+   y editar `pyproject.toml` y `uv.lock`, y versionar `.env.ejemplo` en su
+   `.gitignore`. Tampoco tenía `estudio actualizar`. La reemplaza
+   `v0.1.0rc2`. La etiqueta `v0.1.0rc1` **no se borra**: está publicada, y
+   el primer evento del estudio de demostración y su `uv.lock` la
+   referencian. El estudio pasa a `rc2` con `estudio actualizar`, que deja
+   ese paso registrado.
 
 ### Evento inicial e instrucciones del agente
 
@@ -154,17 +164,18 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
    sin registro que dispare P-E10; la copia huérfana se ignora como en
    cualquier otra operación.
 10. **Nota «instrucciones del agente modificadas».**
-    - `validar` e `historial` comparan las instrucciones registradas con los
-      archivos actuales. Si alguno cambió, falta o se agregó, muestran esta
+    - `validar` e `historial` comparan con los archivos actuales las
+      instrucciones del último registro: el evento `estudio_actualizado` más
+      reciente (punto 20) o, si no hay ninguno, `estudio_creado`. Si alguno cambió, falta o se agregó, muestran esta
       nota de estado, y en `--json` `instrucciones_modificadas: true`.
     - Es una nota y no una advertencia P-A: no impide aprobar ni exige
       justificación, igual que la de ecuaciones desactualizadas del
       ADR-0009 (punto 14). El protocolo sigue siendo válido, pero el reporte
       debe poder decir con qué instrucciones trabajó el agente.
     - `.claude/settings.local.json` no cuenta: es local y no se versiona.
-    - Registrar una actualización deliberada de las instrucciones con sus
-      nuevos hashes queda para un hito posterior (hoja de ruta). Hasta
-      entonces, el cambio se deshace con Git o se declara en el reporte.
+    - Un cambio de las instrucciones se registra con `estudio actualizar`,
+      que las regenera desde las plantillas del paquete (punto 20). Un
+      cambio a mano que no se quiera conservar se deshace con Git.
 
 ### `/protocolo` como *skill* de Claude Code
 
@@ -246,9 +257,11 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
 
     | Regla | Tipo | Efecto |
     |---|---|---|
-    | `Bash(*agentresearch protocolo aprobar*)`, `Bash(*agentresearch protocolo decision confirmar*)` y sus equivalentes `PowerShell(…)` | `deny` | Claude no los ejecuta |
+    | `Bash(*agentresearch protocolo aprobar*)`, `Bash(*agentresearch protocolo decision confirmar*)`, `Bash(*agentresearch estudio actualizar*)` y sus equivalentes `PowerShell(…)` | `deny` | Claude no los ejecuta |
     | `Bash(*agentresearch protocolo enmendar*)` y `PowerShell(…)` | `ask` | pide permiso cada vez, también para `--simular` |
     | `Edit(/protocolo/**)`, `Edit(/estudio.yaml)`, `Edit(/CLAUDE.md)`, `Edit(/.claude/**)` | `deny` | Claude no edita el protocolo, el registro ni sus instrucciones |
+    | `Edit(/pyproject.toml)`, `Edit(/uv.lock)` | `deny` | la versión del agente la fija el investigador |
+    | `Read(/.env)`, `Read(/.env.*)` | `deny` | Claude no lee las claves de API |
     | `uv run agentresearch protocolo validar\|historial\|escribir\|ecuaciones\|decision registrar *`, `registro verificar *` (Bash y PowerShell); `Edit(/.borradores/**)` | `allow` | sin preguntar |
 
     `enmendar` va en `ask` y no en `deny` porque una regla `deny` gana
@@ -299,6 +312,56 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
     protocolo** (p. ej. en OSF), y los pasos siguientes de `nuevo-estudio`
     lo crean así. El estudio de demostración es la excepción (punto 3).
 
+### Actualización del agente en un estudio
+
+20. **`agentresearch estudio actualizar --actualizado-por ID (--justificacion T | --archivo A) [--estudio RUTA] [--json]`.**
+    Un estudio vive varios hitos (el de demostración, del hito 2 al 10), y
+    cada versión del agente puede traer instrucciones nuevas. El comando:
+    - toma la versión instalada del agente, la que fija `uv.lock` después
+      de `uv sync`, y exige que `pyproject.toml` la fije
+      (`agentresearch @ …@v<versión>`);
+    - se niega si esa versión coincide con la de `estudio.yaml` y los
+      archivos que administra el paquete no cambiarían; con la misma
+      versión, sirve para restaurar instrucciones editadas a mano;
+    - regenera desde las plantillas del paquete los archivos que administra
+      (`CLAUDE.md`, `.claude/settings.json`, `.claude/skills/**`,
+      `.gitignore` y `.gitattributes`), conservando el modelo fijado, y
+      actualiza el bloque `agente` de `estudio.yaml`. `README.md` y
+      `pyproject.toml` son del investigador después de crearlos, y no se
+      tocan;
+    - muestra el diff de cada archivo y exige, como `aprobar`, una terminal
+      interactiva, la frase `actualizar <versión>` y un revisor humano
+      declarado en `seleccion.revisores`. Los permisos del estudio lo niegan
+      a Claude Code;
+    - registra el evento `estudio_actualizado` (versión y fuente anteriores
+      y nuevas, hash anterior y nuevo de cada archivo, hashes de las
+      instrucciones resultantes, justificación y quién actualizó) y el
+      anclaje, y después escribe los archivos de forma atómica, con
+      `estudio.yaml` al final.
+21. **Coherencia y recuperación.**
+    - P-E10 exige que `estudio_actualizado` siga a `estudio_creado` y
+      encadene versiones: su versión anterior es la de la creación o la de
+      la actualización previa.
+    - El evento es el punto de confirmación. Si la escritura se interrumpe
+      después de registrarlo, `estudio.yaml` conserva la versión anterior;
+      volver a ejecutar el comando lo reconoce y completa la escritura, sin
+      otro evento ni otra confirmación, solo si los archivos que genera
+      tienen los hashes registrados.
+    - `historial` muestra cada actualización.
+22. **Procedimiento para actualizar el agente en un estudio:**
+    1. el investigador cambia la versión en `pyproject.toml`
+       (`…@v<versión nueva>`) y ejecuta `uv sync`;
+    2. ejecuta en su terminal (PowerShell o la terminal de VS Code)
+       `uv run agentresearch estudio actualizar --actualizado-por <id> --justificacion "…"`,
+       revisa el diff y escribe `actualizar <versión nueva>`;
+    3. comprueba con `protocolo validar` que no queda la nota de
+       instrucciones modificadas, y hace el commit con el anclaje en el
+       mensaje.
+
+    La primera vez se usa para pasar el estudio de demostración de
+    `v0.1.0rc1` a `v0.1.0rc2` (punto 8), como paso verificado de la
+    aceptación.
+
 ## Aceptación
 
 Pendiente: se completa con el resultado de la prueba del estudio de
@@ -348,6 +411,12 @@ demostración, en la terminal del investigador.
 - **Nota de instrucciones como advertencia P-A:** exigiría justificarla en
   cada aprobación o enmienda aunque el cambio fuera deliberado y ya
   conocido.
+- **Actualizar el agente de un estudio a mano** (editar las instrucciones y
+  `estudio.yaml`): el registro no sabría cuándo ni por qué cambiaron, y la
+  nota de instrucciones modificadas quedaría activa para siempre.
+- **Borrar la etiqueta `v0.1.0rc1`:** dejaría sin fuente el `uv.lock` y el
+  primer evento del estudio de demostración; una etiqueta publicada se
+  reemplaza con otra, no se borra.
 
 ## Consecuencias
 
@@ -359,10 +428,12 @@ demostración, en la terminal del investigador.
   con dos barreras de procedimiento: los permisos y la consola.
 - Cada versión publicada del agente necesita su etiqueta `v<versión>`,
   porque `nuevo-estudio` la escribe en el estudio.
-- Los estudios de demostración de los hitos siguientes se actualizan de
-  versión con un commit visible en su repositorio.
-- Queda pendiente, para un hito posterior, registrar una actualización
-  deliberada de las instrucciones del agente.
+- Los estudios de los hitos siguientes se actualizan de versión con
+  `estudio actualizar`, que deja la actualización en el registro, y con un
+  commit visible en su repositorio.
+- Toda nueva *skill* o archivo que el paquete administre en un estudio se
+  agrega a las plantillas y llega a los estudios existentes con
+  `estudio actualizar`.
 - Si una versión futura de Claude Code cambia la sintaxis de permisos o de
   *skills*, hay que revisar las plantillas. Las pruebas de este repositorio
   fijan su contenido esperado.
