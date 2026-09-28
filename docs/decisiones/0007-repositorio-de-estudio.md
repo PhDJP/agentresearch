@@ -378,8 +378,55 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
 
 ## Aceptación
 
-Pendiente: se completa con el resultado de la prueba del estudio de
-demostración, en la terminal del investigador.
+Prueba con el estudio de demostración `demo-mucilago-cafe`
+(https://github.com/PhDJP/demo-mucilago-cafe), en la terminal del
+investigador, según la guía del paso 4 revisada con el asesor.
+
+### Parte A: actualización del estudio de `v0.1.0rc1` a `v0.1.0rc2`
+
+El investigador cambió la versión en `pyproject.toml`, ejecutó `uv sync` y
+después `estudio actualizar` en su terminal, con la frase
+`actualizar 0.1.0rc2`, y dejó el commit `08d6f74` en el repositorio del
+estudio, con el anclaje en el mensaje. Claude Code lo verificó en solo
+lectura con el ejecutable del entorno del estudio, sin `uv run`, para no
+sincronizarlo:
+
+- `agentresearch --version`: `0.1.0rc2`.
+- `protocolo historial`:
+  - registro íntegro con 2 eventos;
+  - el anclaje guardado coincide;
+  - la línea `agente actualizado: 0.1.0rc1 → 0.1.0rc2, el 2026-09-28T02:44:53.887Z por investigador-1 (evt-000002), con el protocolo en borrador: …`.
+- `registro verificar protocolo/eventos.jsonl --anclaje` con el anclaje de
+  `protocolo/anclaje.json`: íntegro y cumple
+  `evt-000002@sha256:2778b66ce024e6c3e276c4a6271398a4cd879606a991dd80cd1d7f60019b7f65`.
+- `protocolo validar`:
+  - 2 eventos, **sin** la nota «instrucciones del agente modificadas»;
+  - 4 errores P-E04 y 5 advertencias, los del borrador vacío de la
+    plantilla, esperados antes de construir el protocolo.
+- Evento `evt-000002` (`estudio_actualizado`, `version_agente` `0.1.0rc2`):
+  - `estado_protocolo: borrador` y `version_protocolo` vacía;
+  - versión y fuente anteriores y nuevas correctas;
+  - `actualizado_por` es `humano/investigador-1`;
+  - 5 instrucciones registradas;
+  - cambian `CLAUDE.md`, `.gitignore`, `.claude/settings.json` y
+    `estudio.yaml`; no cambian `.gitattributes` ni los tres archivos de
+    la *skill*.
+- Commit `08d6f74`:
+  - toca exactamente esos cuatro archivos, más `pyproject.toml`,
+    `uv.lock`, `protocolo/eventos.jsonl` y `protocolo/anclaje.json`;
+  - el árbol quedó limpio.
+
+Resultado: **conforme**. El registro del estudio deja la actualización
+trazable (versión, archivos, instrucciones, estado del protocolo,
+justificación y quién la hizo), sin nota de instrucciones pendiente.
+
+### Parte B: construcción, permisos y confirmaciones en la terminal
+
+Pendiente. Incluye, además de la guía, un intento de mostrar `.env` desde
+la terminal (`Get-Content .env` o `cat .env`), junto al de leerlo con la
+herramienta de lectura. Se registra el resultado de ambos tal como
+ocurra; si el de la terminal funciona, es un hallazgo para corregir en
+`v0.1.0`.
 
 ## Alternativas consideradas
 
