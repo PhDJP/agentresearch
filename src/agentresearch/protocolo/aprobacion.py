@@ -564,7 +564,8 @@ def _preparar_enmienda(rutas: RutasProtocolo, nivel: NivelElegido | None) -> _En
             f"la versión de {protocolo_rel} ({protocolo.metadatos.version_protocolo}) no es la "
             f"registrada ({ultima.version}); la versión la asigna el paquete, no se edita a mano"
         )
-    if lectura.hash == ultima.hash_protocolo:
+    sin_cambios = lectura.hash == ultima.hash_protocolo
+    if sin_cambios:
         problemas.append(
             f"no hay cambios que enmendar: {protocolo_rel} coincide con la versión "
             f"{ultima.version} registrada en {ultima.evento.id}"
@@ -579,7 +580,8 @@ def _preparar_enmienda(rutas: RutasProtocolo, nivel: NivelElegido | None) -> _En
     nivel_efectivo: Nivel | None = nivel
     if not cambios:
         nivel_efectivo = "parche"
-        if nivel is not None:
+        # Sin ningún cambio basta «no hay cambios»: el nivel parche no aplica.
+        if nivel is not None and not sin_cambios:
             problemas.append(
                 "el cambio es solo de formato o comentarios: el nivel es parche y lo asigna el "
                 "paquete, así que no se da --nivel"

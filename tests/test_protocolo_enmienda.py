@@ -401,6 +401,18 @@ def test_enmendar_sin_cambios_falla(protocolo_vigente: Path) -> None:
     )
 
 
+def test_enmendar_sin_cambios_con_nivel_no_dice_que_es_solo_formato(
+    protocolo_vigente: Path,
+) -> None:
+    with pytest.raises(ErrorCicloDeVida) as error:
+        _enmendar(protocolo_vigente, "menor")
+
+    assert error.value.errores == [
+        "no hay cambios que enmendar: protocolo/protocolo.yaml coincide con la versión 1.0.0 "
+        "registrada en evt-000001"
+    ]
+
+
 def test_enmendar_un_borrador_falla(protocolo_de_estudio: Path) -> None:
     with pytest.raises(ErrorCicloDeVida) as error:
         simular_enmienda(protocolo_de_estudio, "menor")
