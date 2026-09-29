@@ -1,6 +1,6 @@
 # ADR-0007: Repositorio de estudio, comando `/protocolo` y estrategia de validación
 
-- Estado: Propuesta
+- Estado: Aceptada (2026-09-28, tras la aceptación con el estudio de demostración)
 - Fecha: 2026-09-27
 - Participantes: investigador doctoral, asesor (Claude en Cowork) y Claude Code
 
@@ -259,6 +259,7 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
     |---|---|---|
     | `Bash(*agentresearch protocolo aprobar*)`, `Bash(*agentresearch protocolo decision confirmar*)`, `Bash(*agentresearch estudio actualizar*)` y sus equivalentes `PowerShell(…)` | `deny` | Claude no los ejecuta |
     | `Bash(*agentresearch protocolo enmendar*)` y `PowerShell(…)` | `ask` | pide permiso cada vez, también para `--simular` |
+    | `Bash(git push*)`, `Bash(git tag*)`, `Bash(gh repo create*)`, `Bash(gh repo delete*)`, `Bash(gh pr merge*)`, `Bash(gh release*)` y sus equivalentes `PowerShell(…)` | `ask` | publicar pide permiso cada vez (punto 23) |
     | `Edit(/protocolo/**)`, `Edit(/estudio.yaml)`, `Edit(/CLAUDE.md)`, `Edit(/.claude/**)` | `deny` | Claude no edita el protocolo, el registro ni sus instrucciones |
     | `Edit(/pyproject.toml)`, `Edit(/uv.lock)` | `deny` | la versión del agente la fija el investigador |
     | `Read(/.env)`, `Read(/.env.*)` | `deny` | Claude no lee las claves de API |
@@ -376,6 +377,45 @@ presentaron con pros y contras, y el asesor y el investigador eligieron
     `v0.1.0rc1` a `v0.1.0rc2` (punto 8), como paso verificado de la
     aceptación.
 
+### Hallazgos de la aceptación incorporados en `v0.1.0`
+
+23. **Correcciones del 2026-09-28**, tras la aceptación con el estudio de
+    demostración (ver «Aceptación»):
+    - **Publicar requiere confirmación.** El `settings.json` del estudio
+      agrega reglas `ask` para `git push`, `git tag`, `gh repo create`,
+      `gh repo delete`, `gh pr merge` y `gh release`, en Bash y PowerShell,
+      como el repositorio del agente. El `CLAUDE.md` del estudio pide la
+      confirmación explícita del investigador antes de publicar.
+    - **Solo fases disponibles.** El `CLAUDE.md` del estudio pide proponer
+      solo pasos que tengan un comando en su tabla o una *skill*. Una
+      prueba comprueba que esa tabla coincide con la CLI, así que la regla
+      no queda desactualizada cuando un hito agregue comandos. El
+      protocolo sigue pudiendo planificar fases futuras: la opción que usa
+      un método que el agente aún no automatiza lo dice en sus contras
+      (el test-retest de las decisiones D12 y D14; su soporte, en el
+      hito 5).
+    - **El investigador no es programador.** El `CLAUDE.md` del estudio y
+      `arquitectura.md` piden pasos sencillos (qué escribir, dónde y qué
+      debe ver) y, ante un error, el mensaje exacto y otra ruta, sin
+      eludir las confirmaciones de la terminal.
+    - **Etiquetas del protocolo.** Si el protocolo publica sus versiones
+      con etiquetas de git, `/protocolo` da, después de aprobar o
+      enmendar, el comando de una etiqueta anotada con el anclaje
+      (`git tag -a protocolo-vX.Y.Z -m "Protocolo X.Y.Z (anclaje …)"`) y
+      pide confirmación antes del push.
+    - **Justificaciones al enmendar.** `/protocolo` pasa `--justificaciones`
+      solo si `enmendar --simular` lista advertencias nuevas, y en un
+      archivo propio (`.borradores/justificaciones-enmienda.json`) con solo
+      esas.
+    - **Mensaje de `enmendar` sin cambios.** Si el protocolo coincide con
+      la versión registrada, el comando dice solo «no hay cambios que
+      enmendar», sin el mensaje contradictorio sobre el nivel parche.
+
+    El estudio de demostración recibe estas instrucciones con
+    `estudio actualizar` a `v0.1.0`. Con su protocolo vigente, la
+    actualización es una desviación que el comando advierte y registra
+    (punto 20).
+
 ## Aceptación
 
 Prueba con el estudio de demostración `demo-mucilago-cafe`
@@ -422,11 +462,112 @@ justificación y quién la hizo), sin nota de instrucciones pendiente.
 
 ### Parte B: construcción, permisos y confirmaciones en la terminal
 
-Pendiente. Incluye, además de la guía, un intento de mostrar `.env` desde
-la terminal (`Get-Content .env` o `cat .env`), junto al de leerlo con la
-herramienta de lectura. Se registra el resultado de ambos tal como
-ocurra; si el de la terminal funciona, es un hallazgo para corregir en
-`v0.1.0`.
+Claude Code verificó en solo lectura el estado final del estudio
+(repositorio sincronizado con `origin/main`):
+
+- **Construcción con `/protocolo` (B1):**
+  - 17 decisiones (D1 a D17), cada una propuesta por
+    `claude-opus-5-5`, decidida por `investigador-1` y registrada en
+    `evt-000003` a `evt-000019`;
+  - todas confirmadas por el investigador (`evt-000020` a `evt-000036`).
+- **Aprobación (B5):**
+  - `1.0.0` en `evt-000037` (commit `c9e2780`), con 2 advertencias
+    justificadas: P-A04, un conjunto de validación de 4 artículos, y
+    P-A08, un solo revisor humano, mitigado con test-retest (D12 y D14);
+  - `protocolo/versiones/1.0.0.yaml` y `protocolo/ecuaciones.md`
+    (B6) quedaron en el mismo commit.
+- **Enmienda (B7):**
+  - menor, a `1.1.0`, en `evt-000038` (commit `4bc8b25`);
+  - un cambio: un ejemplo aclaratorio en `criterios.exclusion[CE1].ejemplos_no`,
+    con justificación y efecto esperado;
+  - `ecuaciones.md` se regeneró con la versión nueva.
+- **Estado final:**
+  - `protocolo validar`: vigente `1.1.0`, 38 eventos, 0 errores, las 2
+    advertencias justificadas y sin nota de instrucciones modificadas;
+  - `registro verificar` con el anclaje
+    `evt-000038@sha256:d61639d272c9698bead03bcc9268e5ac17ba7bacffa2fbeedf4697fa96902cf9`:
+    íntegro y cumplido;
+  - 38 eventos = 1 creación + 1 actualización + 17 propuestas + 17
+    confirmaciones + 1 aprobación + 1 enmienda.
+
+Informe del investigador (2026-09-28):
+
+- **B2, permisos**, en un chat nuevo de Claude Code en el estudio. Los
+  siete intentos quedaron bloqueados, y `git status` quedó sin cambios:
+  1. `protocolo aprobar`: «Permission to use PowerShell with command uv
+     run agentresearch protocolo aprobar --aprobado-por investigador-1
+     has been denied.»
+  2. `protocolo decision confirmar`: denegado, con el mismo tipo de
+     mensaje.
+  3. `estudio actualizar`: denegado, con el mismo tipo de mensaje.
+  4. Editar `protocolo/protocolo.yaml`: «File is in a directory that is
+     denied by your permission settings.» La lectura previa sí se
+     permitió.
+  5. Editar `pyproject.toml`: el mismo mensaje; la lectura previa sí se
+     permitió.
+  6. Leer `.env`:
+     - con la herramienta de lectura: «File is in a directory that is
+       denied by your permission settings.»;
+     - desde la terminal, con `Get-Content .env`: bloqueado con
+       «get-content targeting '…\demo-mucilago-cafe\.env' was blocked.
+       For security, Claude Code may only access files in the allowed
+       working directories for this session». El mensaje es genérico,
+       aunque `.env` está dentro de la carpeta.
+- **B3, Git Bash independiente (mintty):**
+  - `enmendar` se negó con el mensaje del ADR-0008, punto 11 («este
+    comando exige una terminal interactiva… En Windows, Git Bash abierto
+    como aplicación independiente (mintty) no ofrece una consola: use
+    PowerShell o la terminal de VS Code…») y no escribió nada;
+  - las tildes se ven mal en mintty, solo en la visualización;
+  - un primer intento, antes de preparar la enmienda, se negó por «no hay
+    cambios que enmendar» y porque no existía el archivo de la enmienda,
+    sin escribir nada.
+- **B4 y B5:**
+  - `decision confirmar` y `aprobar` se ejecutaron en la terminal
+    integrada de VS Code (PowerShell);
+  - la PowerShell independiente, abierta desde el Explorador de Windows,
+    quedó verificada en la Parte A con `estudio actualizar`.
+- **B7:**
+  - `enmendar --simular` pidió permiso en pantalla (regla `ask`);
+  - `enmendar` se registró en la terminal integrada de VS Code,
+    escribiendo `enmendar 1.1.0`.
+
+Resultado: **conforme**. Las confirmaciones solo se completaron en una
+terminal interactiva (PowerShell independiente y la terminal de VS
+Code), Git Bash independiente se rechazó sin escribir, y Claude Code no
+pudo ejecutar las operaciones del investigador ni editar lo que el
+estudio le niega. Los hallazgos se incorporaron en `v0.1.0` (punto 23).
+
+### Observaciones
+
+- **Etiquetas de versión del protocolo (decisión D17).** El estudio
+  publica `protocolo-v1.0.0` como etiqueta anotada, con el anclaje en el
+  mensaje, y `protocolo-v1.1.0` como etiqueta ligera. La etiqueta ligera
+  se creó por una instrucción del asesor. No se borra ni se vuelve a
+  publicar, con el mismo criterio que `v0.1.0rc1`: lo publicado no se
+  reescribe. La integridad no depende de la etiqueta, porque el anclaje
+  está en el mensaje del commit `4bc8b25` y en `protocolo/anclaje.json`.
+- **Hallazgos**, incorporados en `v0.1.0` (punto 23):
+  - faltaban en el estudio las reglas `ask` de publicación;
+  - el agente propuso fases que aún no existen (búsquedas, importación,
+    cribado);
+  - las decisiones D12 y D14 comprometieron un test-retest que el agente
+    no preveía; su soporte queda para el hito 5 (hoja de ruta);
+  - la *skill* no daba el comando de la etiqueta anotada después de
+    aprobar o enmendar;
+  - al enmendar, la *skill* reutilizó con `--justificaciones` el archivo
+    de la aprobación, y el comando lo rechazó con razón: al enmendar solo
+    se justifican las advertencias nuevas;
+  - sin cambios y con `--nivel`, `enmendar` decía «no hay cambios que
+    enmendar» y, a la vez, «el cambio es solo de formato… el nivel es
+    parche».
+- **Leer `.env` desde la terminal no requirió corrección:** Claude Code lo
+  bloqueó. Su mensaje genérico («only access files in the allowed working
+  directories») no nombra la regla, pero el efecto es el esperado. Sigue
+  valiendo el punto 17: los permisos no son una frontera de seguridad.
+- **Las tildes en mintty** se ven mal, pero solo al mostrarlas. El
+  comando se rechaza igual, y en PowerShell y la terminal de VS Code se
+  ven bien.
 
 ## Alternativas consideradas
 
