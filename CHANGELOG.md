@@ -5,6 +5,15 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
 
 ## [Sin publicar]
 
+## [0.1.0] - 2026-09-28
+
+Hito 1: protocolo y trazabilidad. Aceptado con el estudio de
+demostración `demo-mucilago-cafe` (ADR-0007, «Aceptación»). Lo
+precedieron dos versiones candidatas: `v0.1.0rc1` (sobre `9b46aef`), que
+salió sin dos ajustes del asesor y sin `estudio actualizar`, y
+`v0.1.0rc2` (sobre `e7ca809`), que la reemplazó. Ninguna se borra
+(ADR-0007, punto 8).
+
 ### Agregado
 
 - Módulo `agentresearch.trazabilidad`: registro encadenado de eventos
@@ -122,7 +131,19 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
     (PRISMA-ScR, ítem 20). Si la escritura se interrumpe, volver a
     ejecutarlo la completa;
   - el estudio niega a Claude Code leer `.env` y editar `pyproject.toml` y
-    `uv.lock`, y su `.gitignore` versiona `.env.ejemplo`.
+    `uv.lock`, y su `.gitignore` versiona `.env.ejemplo`;
+  - hallazgos de la aceptación (ADR-0007, punto 23): el estudio pregunta
+    antes de publicar (`git push`, `git tag`, `gh repo create/delete`,
+    `gh pr merge` y `gh release`); su `CLAUDE.md` agrega las reglas «Solo
+    fases disponibles», «El investigador no es programador» y «Publicar
+    requiere confirmación», con una prueba de que su tabla de comandos
+    coincide con la CLI; `/protocolo` da el comando de una etiqueta
+    anotada con el anclaje cuando el protocolo publica sus versiones con
+    etiquetas, y al enmendar justifica solo las advertencias nuevas, en
+    un archivo propio.
+- Repositorio del agente: Claude Code pide confirmación antes de
+  `git push`, etiquetas, creación o borrado de repositorios, fusiones y
+  *releases*.
 
 ### Cambiado
 
@@ -139,6 +160,10 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
 - Integración continua: los sistemas quedan fijados en `ubuntu-24.04` y
   `windows-2025`, en vez de `ubuntu-latest` y `windows-latest`, para que el
   entorno de pruebas no cambie sin una decisión explícita.
+- Autor en `LICENSE`, `CITATION.cff` y `pyproject.toml`: Juan Pablo Gomez
+  (ORCID 0009-0004-5255-0802).
+- Las pruebas por subproceso fijan UTF-8 en el entorno del subproceso y
+  decodifican en UTF-8 estricto, sin heredar la codificación del sistema.
 
 ### Corregido
 
@@ -148,6 +173,8 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
   lugar al agregarle un elemento al final (límite del ADR-0006).
 - `RegistroEncadenado.verificar()` informa una línea JSON que no es un
   objeto, en vez de fallar con una excepción.
+- `protocolo enmendar` sin cambios y con `--nivel` ya no dice además que
+  el cambio es solo de formato y que el nivel es parche.
 - Integración continua: `actions/checkout` y `astral-sh/setup-uv`
   actualizados a versiones con soporte nativo de Node.js 24 (sin el aviso de
   Node 20 deprecado), y la versión de uv en CI queda fijada a la misma del

@@ -1,12 +1,12 @@
 [project]
 name = "agentresearch"
-version = "0.1.0rc2"
+version = "0.1.0"
 description = "Agente investigador para estudios de mapeo sistemático de la literatura, con Kitchenham, Petersen y PRISMA-ScR."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
-    { name = "Juan Pablo Gomez Ballesteros", email = "juangomezb@unicauca.edu.co" }
+    { name = "Juan Pablo Gomez", email = "juangomezb@unicauca.edu.co" }
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
