@@ -45,3 +45,52 @@ El cribado se hace por título y resumen. En la fase de texto completo, el agent
 
 - Los conectores comparten una interfaz común, una caché de respuestas crudas y un control de tasa, de modo que agregar una fuente nueva no altera el resto.
 - Como las fuentes cambian con el tiempo, la búsqueda es reproducible a partir de las respuestas crudas guardadas, no volviendo a consultar la API.
+
+## Nota posterior (2026-09-29): ACS Publications y alcance del acceso institucional
+
+Decidido por el investigador con el asesor al planificar el hito 2. El
+ADR-0010 lo formaliza.
+
+1. **ACS Publications se agrega a las fuentes por exportación manual,**
+   junto a Scopus y Web of Science. El investigador entra con el acceso
+   institucional de la Universidad del Cauca. Es la plataforma de una sola
+   editorial, la American Chemical Society: según la descripción de la
+   biblioteca, más de 90 revistas y unos 2,2 millones de artículos desde
+   1879, en química y áreas afines (alimentos, agricultura, materiales,
+   energía). Se solapa con Scopus y Web of Science, así que el protocolo
+   que la declare debe justificarla (PRISMA-ScR, ítem 7).
+2. **Interfaz observada (capturas del investigador, 2026-09-29).** La
+   búsqueda avanzada es un constructor de consultas por filas: en cada fila
+   se elige un campo («Filter by», con «All» por defecto), se escribe el
+   término y se marca o no «Exact Match». Las filas se combinan con
+   «Match» (AND por defecto). Hay filtros adicionales y búsqueda por cita.
+   No hay un cuadro para pegar una ecuación completa con etiquetas de
+   campo, como en Scopus o Web of Science.
+3. **Por verificar en la ayuda oficial de ACS antes de implementar.** La
+   página de ayuda rechazó la consulta automática, y las guías de
+   bibliotecas no son fuente oficial. Hay que confirmar:
+   - los campos de «Filter by», y si «All» incluye el texto completo. Si lo
+     incluye, el alcance difiere del título y resumen de las demás fuentes,
+     y es una amenaza a la validez (ADR-0009, punto 16);
+   - los operadores, los paréntesis dentro de una fila, las frases, el
+     truncamiento y la lematización;
+   - cómo se combinan las filas, y si se puede expresar
+     `(bloque 1) AND (bloque 2)` sobre título y resumen;
+   - los formatos de «Download Citations» (las guías citan RIS con la
+     opción «Citation and abstract») y el máximo de registros por descarga.
+4. **Ecuación.** Mientras no haya un traductor para ACS, `ecuaciones.md` la
+   lista como fuente sin traductor, con la ecuación genérica (ADR-0009,
+   punto 4). El ADR-0010 decide, según lo que se verifique, si se agrega un
+   traductor o instrucciones para el constructor por filas.
+5. **El alcance depende del contrato de la institución.** En Scopus, Web of
+   Science y ACS, lo que el investigador puede buscar y exportar depende
+   del contrato de su universidad; por ejemplo, las ediciones y los años de
+   Web of Science Core Collection que muestra «Editions». Por eso cada
+   búsqueda manual registra la plataforma, la institución de acceso y la
+   cobertura disponible, además de la ecuación, la fecha y hora y el número
+   de resultados (hoja de ruta, nota del hito 2). El acceso al texto
+   completo también depende del contrato (hoja de ruta, nota del hito 7).
+6. **Términos de uso.** El agente nunca automatiza estas interfaces con las
+   credenciales institucionales: el investigador busca y exporta a mano.
+   Las exportaciones se tratan según la política de datos de terceros del
+   ADR-0010.
