@@ -160,8 +160,6 @@ salió sin dos ajustes del asesor y sin `estudio actualizar`, y
 - Integración continua: los sistemas quedan fijados en `ubuntu-24.04` y
   `windows-2025`, en vez de `ubuntu-latest` y `windows-latest`, para que el
   entorno de pruebas no cambie sin una decisión explícita.
-- Autor en `LICENSE`, `CITATION.cff` y `pyproject.toml`: Juan Pablo Gomez
-  (ORCID 0009-0004-5255-0802).
 - Las pruebas por subproceso fijan UTF-8 en el entorno del subproceso y
   decodifican en UTF-8 estricto, sin heredar la codificación del sistema.
 

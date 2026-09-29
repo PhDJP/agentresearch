@@ -22,7 +22,7 @@ Riesgo aceptado: los problemas que solo aparecen con datos reales se descubren a
 
 ## Pendientes del investigador
 
-- [x] Nombre completo y ORCID (para `LICENSE` y `CITATION.cff`): Juan Pablo Gomez, ORCID 0009-0004-5255-0802 (recibidos el 2026-09-28).
+- [x] Nombre completo y ORCID (para `LICENSE` y `CITATION.cff`): Juan Pablo Gomez Ballesteros, ORCID 0009-0004-5255-0802 (el ORCID se confirmó el 2026-09-28).
 - [ ] Nombre del repositorio privado del caso piloto (antes del hito 11; propuesta: `mapeo-subproductos-cbd`).
 - [x] Tema, pregunta general, PCC y preguntas específicas del caso piloto (recibidos el 2026-09-25; ver `caso_piloto_local/contexto_caso_piloto.md`).
 - [ ] Decisiones O1–O10 del caso piloto: se toman con el comando `/protocolo` en el hito 11.
