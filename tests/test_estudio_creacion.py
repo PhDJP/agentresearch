@@ -1,5 +1,6 @@
 """Pruebas de `agentresearch nuevo-estudio` (ADR-0007), con datos sintéticos."""
 
+import argparse
 import json
 import sys
 from datetime import UTC, datetime
@@ -10,7 +11,7 @@ from typing import Any
 import pytest
 from ruamel.yaml import YAML
 
-from agentresearch.cli import ejecutar_nuevo_estudio, main
+from agentresearch.cli import construir_analizador, ejecutar_nuevo_estudio, main
 from agentresearch.estudio import creacion
 from agentresearch.estudio.creacion import (
     PLANTILLAS,
@@ -215,6 +216,104 @@ def test_la_configuracion_niega_editar_el_protocolo_y_las_instrucciones(tmp_path
     ):
         assert regla in permisos["deny"]
     assert "Edit(/.borradores/**)" in permisos["allow"]
+
+
+@pytest.mark.parametrize("herramienta", ["Bash", "PowerShell"])
+def test_la_configuracion_pregunta_antes_de_publicar(tmp_path: Path, herramienta: str) -> None:
+    destino = tmp_path / "mapeo-zarambo"
+    _crear(destino)
+
+    permisos = _configuracion(destino)["permissions"]
+
+    for comando in (
+        "git push",
+        "git tag",
+        "gh repo create",
+        "gh repo delete",
+        "gh pr merge",
+        "gh release",
+    ):
+        assert f"{herramienta}({comando}*)" in permisos["ask"]
+        assert not any(comando in regla for regla in permisos["allow"])
+
+
+def test_claude_md_tiene_las_reglas_de_la_aceptacion(tmp_path: Path) -> None:
+    destino = tmp_path / "mapeo-zarambo"
+    _crear(destino)
+
+    texto = _texto(destino, "CLAUDE.md")
+
+    assert "**Solo fases disponibles.**" in texto
+    assert "**El investigador no es programador.**" in texto
+    assert "simplifica la guía, no la barrera" in texto
+    assert "**Publicar requiere confirmación.**" in texto
+    assert "el agente aún no automatiza este paso" in texto
+
+
+def _comandos_de_la_cli() -> set[str]:
+    """Comandos completos de la CLI (p. ej. «protocolo decision registrar»)."""
+
+    def hojas(analizador: argparse.ArgumentParser, prefijo: str) -> set[str]:
+        subparsers = [
+            accion
+            for accion in analizador._actions
+            if isinstance(accion, argparse._SubParsersAction)
+        ]
+        if not subparsers:
+            return {prefijo}
+        return {
+            comando
+            for nombre, sub in subparsers[0].choices.items()
+            for comando in hojas(sub, f"{prefijo} {nombre}".strip())
+        }
+
+    return hojas(construir_analizador(), "")
+
+
+def _comandos_de_la_tabla(texto: str) -> set[str]:
+    """Comandos de la tabla «Comandos» del CLAUDE.md del estudio, sin sus argumentos."""
+    comandos = set()
+    for linea in texto.splitlines():
+        if not linea.startswith("| `") or linea.startswith("| `/"):
+            continue
+        celda = linea.split("`")[1]
+        palabras = []
+        for palabra in celda.split():
+            if palabra.startswith(("-", "<", "[")) or "/" in palabra or "." in palabra:
+                break  # opciones, marcadores y rutas: argumentos, no el comando
+            palabras.append(palabra)
+        comandos.add(" ".join(palabras))
+    return comandos
+
+
+def test_la_tabla_de_comandos_coincide_con_la_cli(tmp_path: Path) -> None:
+    """La regla «Solo fases disponibles» remite a la tabla: debe listar todo y solo lo que hay."""
+    destino = tmp_path / "mapeo-zarambo"
+    _crear(destino)
+
+    tabla = _comandos_de_la_tabla(_texto(destino, "CLAUDE.md"))
+
+    assert tabla == _comandos_de_la_cli() - {"nuevo-estudio"}
+
+
+def test_la_skill_da_la_etiqueta_anotada_y_justifica_solo_las_advertencias_nuevas(
+    tmp_path: Path,
+) -> None:
+    destino = tmp_path / "mapeo-zarambo"
+    _crear(destino)
+
+    skill = _texto(destino, ".claude/skills/protocolo/SKILL.md")
+    formatos = _texto(destino, ".claude/skills/protocolo/formatos.md")
+
+    assert 'git tag -a protocolo-v1.0.0 -m "Protocolo 1.0.0 (anclaje' in skill
+    assert "pide su confirmación explícita antes de cualquier `git push`" in skill
+    assert (
+        "`uv run agentresearch protocolo enmendar --nivel <nivel> --enmendado-por <id> "
+        "--archivo-enmienda .borradores/enmienda.json`\n"
+    ) in skill
+    assert "No reutilices el archivo de la aprobación" in skill
+    assert "`.borradores/justificaciones-enmienda.json`" in formatos
+    assert "el agente aún no automatiza este paso" in skill
 
 
 def test_la_skill_protocolo_solo_la_invoca_el_investigador(tmp_path: Path) -> None:

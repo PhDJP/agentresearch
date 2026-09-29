@@ -28,7 +28,7 @@ Recursos de esta *skill*:
 
 1. Explica en una o dos frases para qué sirve la sección y qué guía la exige (ver [secciones.md](secciones.md)).
 2. Pregunta **una cosa a la vez**. Construye sobre lo que el investigador ya dijo y sobre los insumos. No inventes datos, referencias, DOI ni términos.
-3. **Si el investigador no sabe qué responder**, propón de 2 a 4 opciones, cada una con pros, contras y al menos una referencia metodológica que puedas verificar (las de [secciones.md](secciones.md) lo son). Cuando elija:
+3. **Si el investigador no sabe qué responder**, propón de 2 a 4 opciones, cada una con pros, contras y al menos una referencia metodológica que puedas verificar (las de [secciones.md](secciones.md) lo son). El protocolo planifica fases que el agente todavía no ofrece; si una opción usa un método que el agente aún no automatiza (por ejemplo, un test-retest del cribado), dilo en sus contras: «el agente aún no automatiza este paso; hoy se haría a mano o requiere una versión posterior». Cuando elija:
    - escribe la decisión en `.borradores/decision-<ID>.json` (ver [formatos.md](formatos.md)), con `propuesto_por` = tu identificador exacto de modelo y `decidido_por` = el revisor humano que eligió;
    - regístrala con `uv run agentresearch protocolo decision registrar --archivo .borradores/decision-<ID>.json`;
    - dile que queda **pendiente** hasta que la confirme en su terminal. Puede confirmar varias a la vez más adelante, y debe hacerlo antes de aprobar.
@@ -53,12 +53,17 @@ Solo cuando todas las secciones estén completas:
 5. Cuando confirme que aprobó, ejecuta `protocolo historial` para comprobarlo y regenera las ecuaciones:
    `uv run agentresearch protocolo ecuaciones --escribir`
 6. Sugiere el commit, con el anclaje que muestra `historial` en el mensaje, por ejemplo: `Aprobar el protocolo 1.0.0 (anclaje evt-000009@sha256:…)`.
+7. Si el protocolo publica sus versiones con etiquetas de git (lo dice `metadatos.registro` o una decisión del protocolo), dale el comando exacto de una etiqueta **anotada** con el anclaje, nunca una etiqueta ligera:
+   `git tag -a protocolo-v1.0.0 -m "Protocolo 1.0.0 (anclaje evt-000009@sha256:…)"`
+   Subir la etiqueta o el commit publica evidencia del estudio: pide su confirmación explícita antes de cualquier `git push`.
 
 ## 4. Enmienda (protocolo vigente)
 
 1. Trabaja las secciones que cambian como en el paso 2, con `protocolo escribir`. Tras escribir, P-E09 avisa del cambio sin registrar: es lo esperado hasta registrar la enmienda.
-2. Ejecuta `uv run agentresearch protocolo enmendar --simular` y muestra el diff y la versión siguiente. Este comando pide permiso al investigador cada vez: explícale que solo simula.
-3. Acuerda con el investigador el nivel (`mayor` si puede cambiar qué estudios se incluyen o cómo se clasifican; `menor` si no), la justificación y el efecto esperado. Escríbelos en `.borradores/enmienda.json`, y las justificaciones de las advertencias nuevas en `.borradores/justificaciones.json`.
-4. Dale el comando para su terminal:
-   `uv run agentresearch protocolo enmendar --nivel <nivel> --enmendado-por <id> --archivo-enmienda .borradores/enmienda.json --justificaciones .borradores/justificaciones.json`
-5. Cuando confirme, ejecuta `protocolo historial`, regenera las ecuaciones con `protocolo ecuaciones --escribir` y sugiere el commit con el anclaje en el mensaje.
+2. Ejecuta `uv run agentresearch protocolo enmendar --simular` y muestra el diff, la versión siguiente y las **advertencias nuevas** que lista. Este comando pide permiso al investigador cada vez: explícale que solo simula.
+3. Acuerda con el investigador el nivel (`mayor` si puede cambiar qué estudios se incluyen o cómo se clasifican; `menor` si no), la justificación y el efecto esperado, y escríbelos en `.borradores/enmienda.json`.
+4. Solo si la simulación lista advertencias nuevas, acuerda su justificación y escríbela en un archivo nuevo, `.borradores/justificaciones-enmienda.json`, que contenga **solo esas**. No reutilices el archivo de la aprobación: al enmendar solo se justifican las advertencias nuevas, y el comando rechaza las que ya estaban activas.
+5. Dale el comando para su terminal (PowerShell o la terminal de VS Code):
+   `uv run agentresearch protocolo enmendar --nivel <nivel> --enmendado-por <id> --archivo-enmienda .borradores/enmienda.json`
+   y, solo si hay advertencias nuevas, añade `--justificaciones .borradores/justificaciones-enmienda.json`.
+6. Cuando confirme, ejecuta `protocolo historial`, regenera las ecuaciones con `protocolo ecuaciones --escribir` y sugiere el commit con el anclaje en el mensaje. Si el protocolo publica sus versiones con etiquetas, dale el comando de la etiqueta anotada como en el paso 7 de la aprobación (`protocolo-v<versión>`), y pide confirmación antes de cualquier `git push`.

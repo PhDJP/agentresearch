@@ -66,7 +66,7 @@ Una entrada por advertencia activa (al aprobar) o por advertencia nueva (al enme
 }
 ```
 
-Se pasa con `--justificaciones .borradores/justificaciones.json` a `aprobar` o `enmendar`. Si no hay advertencias, se omite la opción. Las que falten se piden en la terminal.
+Al aprobar se pasa con `--justificaciones .borradores/justificaciones.json`. Al enmendar se usa otro archivo, `.borradores/justificaciones-enmienda.json`, con el mismo formato y **solo** las advertencias nuevas que lista `protocolo enmendar --simular`: el comando rechaza las que ya estaban activas en la versión anterior, así que el archivo de la aprobación no sirve. Si no hay advertencias (al aprobar) o no hay advertencias nuevas (al enmendar), se omite la opción. Las que falten se piden en la terminal.
 
 ## Enmienda: `.borradores/enmienda.json`
 
