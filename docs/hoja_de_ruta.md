@@ -71,7 +71,7 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 - Hash de cada archivo importado y conteos por fuente para el diagrama de flujo.
 - Búsquedas manuales en Scopus, Web of Science y ACS Publications, con el acceso institucional del investigador (ADR-0003, nota posterior), registradas como búsqueda (ver la nota del hito 2).
 
-**Criterio de terminado:** se importan exportaciones reales de una búsqueda de prueba en cada formato y de cada base manual (Scopus, Web of Science y ACS Publications), con pocos registros, sin versionar las que tengan restricciones y con conteos correctos, y el estudio de demostración importa las suyas.
+**Criterio de terminado:** en el repositorio del agente se leen, sin registrarlas, exportaciones reales de una búsqueda de prueba en cada formato y de cada base manual (Scopus, Web of Science y ACS Publications), con pocos registros, sin versionarlas y con conteos correctos; y el estudio de demostración registra las importaciones de sus propias búsquedas.
 
 ## Hito 3: Conectores de APIs (`v0.3.0`)
 
@@ -161,13 +161,13 @@ Hallazgos de las revisiones del asesor y de auditorías, pendientes para el hito
 - ~~**Cierre del hito 1:** evaluar fijar los sistemas de la integración continua (p. ej. `ubuntu-24.04`) en vez de `*-latest`, para que el entorno de pruebas no cambie sin decisión explícita. GitHub anunció la migración de `ubuntu-latest` a Ubuntu 26 desde el 19 de octubre de 2026.~~ Resuelto al cerrar el hito 1: la integración continua usa `ubuntu-24.04` y `windows-2025`, las imágenes a las que apuntaban las etiquetas `-latest` (verificado en la documentación de GitHub el 2026-09-27). Cambiarlas es una decisión explícita.
 - **Hito 2 (acordado con el investigador el 2026-09-29):** la unidad de importación es la **búsqueda manual**, no el archivo, porque una búsqueda puede exportarse en varios archivos (p. ej., por tandas en Web of Science). Cada búsqueda en Scopus, Web of Science, ACS Publications u otra base sin API registra:
   - la fuente, la plataforma y la cobertura del acceso institucional (p. ej., ediciones y años de Web of Science Core Collection; ADR-0003, nota posterior);
-  - la ecuación: el hash del texto de la ecuación de esa fuente en `ecuaciones.md` y la versión del protocolo vigente en la fecha de la búsqueda. Si el investigador la modificó en la interfaz, se registra la ecuación real como desviación (PRISMA-ScR, ítem 8);
+  - la ecuación: su texto completo y su hash, tal como estaba en `ecuaciones.md`, y la versión del protocolo vigente en la fecha de la búsqueda (el texto se guarda en el registro porque `ecuaciones.md` se regenera). En una fuente con traductor (Scopus, Web of Science), si el investigador la modificó en la interfaz, se registra la ecuación real como desviación. Una fuente sin traductor (p. ej., ACS Publications o Lens) parte de la ecuación genérica: se registra la ecuación tal como se ejecutó, marcada como adaptación de la genérica, y no es una desviación (PRISMA-ScR, ítem 8);
   - los filtros aplicados en la interfaz;
   - la fecha y hora de la búsqueda, con zona horaria y también en UTC (PRISMA-ScR, ítem 7);
   - el número de resultados que mostró la interfaz; si no coincide con los registros leídos, una justificación;
   - cada archivo exportado, con su hash.
 
-  Las exportaciones originales no se versionan en un repositorio público (ADR-0010). El investigador guarda una copia local y otra en la nube institucional, y el hash prueba que son idénticas; `/importar` se lo recuerda.
+  Las exportaciones originales no se versionan en ningún repositorio, ni público ni privado, porque el historial publicado no se reescribe y el repositorio del estudio se publica al final (ADR-0010). El investigador guarda una copia local y otra en la nube institucional, y el hash prueba que son idénticas; `/importar` se lo recuerda.
 - **Hito 3:** los conectores de OpenAlex y PubMed aplican como parámetros los límites de la búsqueda (periodo, idiomas y tipos de documento), que `ecuaciones.md` solo lista como texto para esas fuentes (ADR-0009, punto 10).
 - **Hito 3:** los conectores deben quitar `api_key` (y cualquier otra clave o credencial) de la URL, los parámetros y los encabezados que se guardan con la respuesta cruda y su hash, y de los mensajes de error y los registros. Una prueba debe verificar que la clave no aparece en nada de lo que se guarda.
 - **Hito 3:** decidir si Semantic Scholar necesita un traductor propio de ecuaciones. Es fuente de búsqueda en el ADR-0003, pero el 1d solo traduce para OpenAlex, PubMed, Scopus, Web of Science y la versión genérica.
