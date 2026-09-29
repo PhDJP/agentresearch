@@ -50,6 +50,7 @@ Tablas y detalle: `docs/metodologia/reglas_metodologicas.md`.
 ## Forma de trabajo
 
 - Antes de un cambio grande, proponer un plan y esperar aprobación.
+- Cuando el investigador deba ejecutar algo, darle pasos sencillos: qué escribir, dónde (y cómo abrirlo) y qué debe ver. Ante un error, pedir el mensaje exacto y ofrecer otra ruta, sin eludir las confirmaciones que exigen su terminal.
 - Commits pequeños, con mensajes en español (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`).
 - Toda decisión de diseño relevante se registra como ADR en `docs/decisiones/`.
 - Avanzar hito por hito según `docs/hoja_de_ruta.md`, sin adelantar hitos.

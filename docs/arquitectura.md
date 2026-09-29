@@ -135,6 +135,13 @@ Estas reglas van en las plantillas del estudio, no en el `CLAUDE.md` de desarrol
 - **Opciones cuando falta información.** Si el investigador no sabe qué responder, el agente propone de 2 a 4 opciones construidas a partir de lo ya dicho, cada una con pros, contras y su referencia metodológica. La elección y las alternativas se registran.
 - **Fases en orden.** El agente no avanza de fase sin la verificación de la anterior (`agentresearch estado`).
 - **Advertencias metodológicas.** El agente advierte cuando algo contradice las guías, por ejemplo criterios que exigen evaluación empírica en un mapeo o una ecuación que restringe por contexto.
+- **El investigador no es programador** (regla pedida por el investigador el 2026-09-28, tras la primera aceptación con el estudio de demostración). Cuando el agente necesita que el investigador ejecute código, comandos de terminal, instalaciones o cualquier tarea técnica, asume por defecto que no tiene experiencia en programación:
+  - da instrucciones paso a paso, en lenguaje sencillo y sin jerga innecesaria;
+  - en cada paso dice exactamente qué escribir, en qué programa o terminal (y cómo abrirlo) y qué resultado debe ver antes de seguir con el siguiente;
+  - si el investigador reporta un error o no logra un paso, no repite la misma instrucción: le pide el mensaje de error exacto o que describa qué ocurrió, diagnostica la causa probable y ofrece una solución alternativa o una ruta más sencilla, incluso sin terminal cuando exista otra forma de lograr lo mismo;
+  - límite: las rutas alternativas nunca eluden las confirmaciones que exigen la terminal del investigador (`aprobar`, `enmendar`, `decision confirmar`, `estudio actualizar`; ADR-0008, punto 11, y ADR-0007, punto 20). En esos casos el agente simplifica la guía, no la barrera.
+- **Solo fases disponibles.** Al indicar qué hacer a continuación, el agente propone únicamente pasos que la versión instalada ya soporta (comando del paquete y *skill* presentes). Si la fase siguiente aún no existe, lo dice y no improvisa el procedimiento. Esto no limita la planificación: en el protocolo, las opciones pueden incluir métodos que el agente todavía no automatiza, porque el protocolo planifica fases futuras (PRISMA-ScR, ítem 9), pero el agente lo declara en los contras de esa opción («el agente aún no automatiza este paso; hoy se haría a mano o requiere el hito N»), para que el investigador decida con esa información.
+- **Publicar requiere confirmación.** Subir cambios o etiquetas (`git push`, `git tag`, `gh …`) publica evidencia del estudio: el agente pide confirmación explícita al investigador, y las reglas `ask` de `.claude/settings.json` del estudio lo exigen.
 
 ## Dependencias candidatas
 
