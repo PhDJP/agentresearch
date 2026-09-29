@@ -5,6 +5,15 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
 
 ## [Sin publicar]
 
+## [0.1.0] - 2026-09-28
+
+Hito 1: protocolo y trazabilidad. Aceptado con el estudio de
+demostración `demo-mucilago-cafe` (ADR-0007, «Aceptación»). Lo
+precedieron dos versiones candidatas: `v0.1.0rc1` (sobre `9b46aef`), que
+salió sin dos ajustes del asesor y sin `estudio actualizar`, y
+`v0.1.0rc2` (sobre `e7ca809`), que la reemplazó. Ninguna se borra
+(ADR-0007, punto 8).
+
 ### Agregado
 
 - Módulo `agentresearch.trazabilidad`: registro encadenado de eventos
@@ -95,6 +104,46 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
     guiones, o con truncados sin variantes, usa la búsqueda exacta;
   - en Scopus, los términos con guion van entre comillas.
 - ADR-0009 aceptado: ecuaciones de búsqueda por fuente.
+- Repositorio de estudio y comando `/protocolo` (sub-hito 1e, ADR-0007):
+  - `nuevo-estudio <ruta> --titulo T --modelo ID [--contexto archivo]`:
+    crea el repositorio de un estudio desde las plantillas del paquete
+    (`estudio.yaml`, proyecto uv fijado a la etiqueta de la versión del
+    agente, protocolo en borrador, `CLAUDE.md`, `.claude/settings.json`,
+    la *skill* `/protocolo`, `.gitignore`, `.gitattributes` y `README.md`)
+    y registra el evento `estudio_creado` con el hash de cada archivo;
+  - *skill* `/protocolo`: construye o enmienda el protocolo sección por
+    sección, registra las decisiones y pide al investigador aprobar,
+    enmendar y confirmar en su propia terminal;
+  - configuración de Claude Code del estudio: modelo exacto fijado; niega
+    `aprobar` y `decision confirmar`, pregunta antes de `enmendar` y niega
+    editar el protocolo, el registro y las instrucciones del agente;
+  - `protocolo escribir <sección> --archivo fragmento.yaml`: escribe una
+    sección validando antes el esquema, también con el protocolo vigente;
+  - nota de estado «instrucciones del agente modificadas» en `validar` e
+    `historial`, y la creación del estudio en `historial`;
+  - `estudio actualizar --actualizado-por ID (--justificacion T | --archivo A)`:
+    pasa el estudio a la versión instalada del agente, regenera desde las
+    plantillas sus instrucciones, `.gitignore` y `.gitattributes`
+    (conservando el modelo fijado), muestra el diff, exige terminal
+    interactiva y un revisor humano, y registra `estudio_actualizado` con
+    el estado y la versión del protocolo. Con el protocolo vigente advierte,
+    antes de confirmar, que es una desviación que el reporte debe declarar
+    (PRISMA-ScR, ítem 20). Si la escritura se interrumpe, volver a
+    ejecutarlo la completa;
+  - el estudio niega a Claude Code leer `.env` y editar `pyproject.toml` y
+    `uv.lock`, y su `.gitignore` versiona `.env.ejemplo`;
+  - hallazgos de la aceptación (ADR-0007, punto 23): el estudio pregunta
+    antes de publicar (`git push`, `git tag`, `gh repo create/delete`,
+    `gh pr merge` y `gh release`); su `CLAUDE.md` agrega las reglas «Solo
+    fases disponibles», «El investigador no es programador» y «Publicar
+    requiere confirmación», con una prueba de que su tabla de comandos
+    coincide con la CLI; `/protocolo` da el comando de una etiqueta
+    anotada con el anclaje cuando el protocolo publica sus versiones con
+    etiquetas, y al enmendar justifica solo las advertencias nuevas, en
+    un archivo propio.
+- Repositorio del agente: Claude Code pide confirmación antes de
+  `git push`, etiquetas, creación o borrado de repositorios, fusiones y
+  *releases*.
 
 ### Cambiado
 
@@ -102,12 +151,28 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
   salida incluye un resumen del registro de eventos con su anclaje.
 - `RegistroEncadenado.agregar()` sincroniza cada evento a disco con
   `os.fsync`.
+- El evento `estudio_creado` se valida con su esquema y solo puede ser el
+  primero del registro (P-E10).
+- En POSIX, la escritura atómica sincroniza el directorio después de
+  `os.replace`, y el registro encadenado lo hace al crear su archivo, para
+  que los nombres nuevos sobrevivan a un corte de energía. En Windows, que
+  no lo admite, se sigue omitiendo.
+- Integración continua: los sistemas quedan fijados en `ubuntu-24.04` y
+  `windows-2025`, en vez de `ubuntu-latest` y `windows-latest`, para que el
+  entorno de pruebas no cambie sin una decisión explícita.
+- Las pruebas por subproceso fijan UTF-8 en el entorno del subproceso y
+  decodifican en UTF-8 estricto, sin heredar la codificación del sistema.
 
 ### Corregido
 
 - `CITATION.cff`: se agrega `repository-code`.
+- La escritura del protocolo restaura los comentarios de sección de primer
+  nivel, que ruamel.yaml perdía al vaciar una sección o dejaba fuera de
+  lugar al agregarle un elemento al final (límite del ADR-0006).
 - `RegistroEncadenado.verificar()` informa una línea JSON que no es un
   objeto, en vez de fallar con una excepción.
+- `protocolo enmendar` sin cambios y con `--nivel` ya no dice además que
+  el cambio es solo de formato y que el nivel es parche.
 - Integración continua: `actions/checkout` y `astral-sh/setup-uv`
   actualizados a versiones con soporte nativo de Node.js 24 (sin el aviso de
   Node 20 deprecado), y la versión de uv en CI queda fijada a la misma del

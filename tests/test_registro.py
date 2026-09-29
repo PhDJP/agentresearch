@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from agentresearch.trazabilidad import registro as registro_encadenado
 from agentresearch.trazabilidad.registro import (
     HASH_GENESIS,
     Anclaje,
@@ -442,6 +443,8 @@ def test_agregar_sincroniza_el_evento_a_disco(
         fsync_original(descriptor)
 
     monkeypatch.setattr(os, "fsync", _fsync)
+    # La sincronización del directorio (solo en POSIX) se prueba en test_escritura.py.
+    monkeypatch.setattr(registro_encadenado, "sincronizar_directorio", lambda _d: None)
 
     RegistroEncadenado(tmp_path / "eventos.jsonl").agregar("uno", {})
 

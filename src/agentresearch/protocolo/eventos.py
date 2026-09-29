@@ -1,4 +1,4 @@
-"""Esquemas de los eventos del ciclo de vida del protocolo (ADR-0008, punto 7).
+"""Esquemas de los eventos del registro del protocolo (ADR-0008, punto 7; ADR-0007).
 
 Cada evento de `protocolo/eventos.jsonl` guarda en `datos` un objeto con uno de
 estos esquemas. Se validan con pydantic estricto al leer el registro, para
@@ -28,6 +28,8 @@ TIPO_APROBADO = "protocolo_aprobado"
 TIPO_ENMENDADO = "protocolo_enmendado"
 TIPO_DECISION_PROPUESTA = "decision_propuesta"
 TIPO_DECISION_CONFIRMADA = "decision_confirmada"
+TIPO_ESTUDIO_CREADO = "estudio_creado"
+TIPO_ESTUDIO_ACTUALIZADO = "estudio_actualizado"
 
 Nivel = Literal["mayor", "menor", "parche"]
 EstadoProtocolo = Literal["borrador", "vigente"]
@@ -217,6 +219,73 @@ class DatosDecisionConfirmada(ModeloEvento):
     evento_propuesta: IdEvento
     hash_evento_propuesta: HashSha256
     confirmado_por: PersonaHumana
+
+
+# --- Creación del estudio (ADR-0007) ---------------------------------------------
+
+
+class ArchivoRegistrado(ModeloEvento):
+    """Un archivo del estudio y su hash, en el momento de registrarlo."""
+
+    ruta: RutaRelativa
+    hash: HashSha256
+
+
+class DatosEstudioCreado(ModeloEvento):
+    """Datos del evento `estudio_creado`, el primero del registro.
+
+    `instrucciones` son los archivos que gobiernan al agente en el estudio
+    (`CLAUDE.md`, `.claude/settings.json` y las *skills*); `validar` e
+    `historial` avisan si cambian. `insumos` son los archivos que el
+    investigador aportó con `--contexto`.
+    """
+
+    nombre: TextoNoVacio
+    titulo: TextoNoVacio
+    modelo: TextoNoVacio
+    fuente_agente: TextoNoVacio
+    archivos: list[ArchivoRegistrado]
+    instrucciones: list[ArchivoRegistrado]
+    insumos: list[ArchivoRegistrado]
+
+
+class ArchivoActualizado(ModeloEvento):
+    """Un archivo que el paquete administra en el estudio, antes y después de actualizarlo.
+
+    `hash_anterior` es `None` si el archivo no existía (una plantilla nueva).
+    """
+
+    ruta: RutaRelativa
+    hash_anterior: HashSha256 | None
+    hash_nuevo: HashSha256
+
+
+class DatosEstudioActualizado(ModeloEvento):
+    """Datos del evento `estudio_actualizado`: el estudio pasa a otra versión del agente.
+
+    `instrucciones` son los hashes de todas las instrucciones del agente
+    después de actualizar; con ellos compara la nota «instrucciones del
+    agente modificadas». `estado_protocolo` y `version_protocolo` son los del
+    registro en ese momento: con el protocolo vigente, la actualización es
+    una desviación que el reporte declara (PRISMA-ScR, ítem 20).
+    """
+
+    version_anterior: TextoNoVacio
+    version_nueva: TextoNoVacio
+    fuente_anterior: TextoNoVacio
+    fuente_nueva: TextoNoVacio
+    archivos: list[ArchivoActualizado]
+    instrucciones: list[ArchivoRegistrado]
+    estado_protocolo: EstadoProtocolo
+    version_protocolo: VersionProtocolo | None
+    justificacion: TextoNoVacio
+    actualizado_por: PersonaHumana
+
+    @model_validator(mode="after")
+    def _version_si_esta_vigente(self) -> "DatosEstudioActualizado":
+        if (self.estado_protocolo == "vigente") != (self.version_protocolo is not None):
+            raise ValueError("version_protocolo se registra si y solo si el protocolo está vigente")
+        return self
 
 
 # --- Anclaje ----------------------------------------------------------------------

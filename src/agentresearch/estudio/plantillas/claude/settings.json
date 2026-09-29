@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "{{modelo}}",
+  "permissions": {
+    "allow": [
+      "Bash(uv run agentresearch protocolo validar *)",
+      "Bash(uv run agentresearch protocolo historial *)",
+      "Bash(uv run agentresearch protocolo escribir *)",
+      "Bash(uv run agentresearch protocolo ecuaciones *)",
+      "Bash(uv run agentresearch protocolo decision registrar *)",
+      "Bash(uv run agentresearch registro verificar *)",
+      "PowerShell(uv run agentresearch protocolo validar *)",
+      "PowerShell(uv run agentresearch protocolo historial *)",
+      "PowerShell(uv run agentresearch protocolo escribir *)",
+      "PowerShell(uv run agentresearch protocolo ecuaciones *)",
+      "PowerShell(uv run agentresearch protocolo decision registrar *)",
+      "PowerShell(uv run agentresearch registro verificar *)",
+      "Edit(/.borradores/**)"
+    ],
+    "ask": [
+      "Bash(*agentresearch protocolo enmendar*)",
+      "PowerShell(*agentresearch protocolo enmendar*)",
+      "Bash(git push*)",
+      "Bash(git tag*)",
+      "Bash(gh repo create*)",
+      "Bash(gh repo delete*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh release*)",
+      "PowerShell(git push*)",
+      "PowerShell(git tag*)",
+      "PowerShell(gh repo create*)",
+      "PowerShell(gh repo delete*)",
+      "PowerShell(gh pr merge*)",
+      "PowerShell(gh release*)"
+    ],
+    "deny": [
+      "Bash(*agentresearch protocolo aprobar*)",
+      "Bash(*agentresearch protocolo decision confirmar*)",
+      "PowerShell(*agentresearch protocolo aprobar*)",
+      "PowerShell(*agentresearch protocolo decision confirmar*)",
+      "Bash(*agentresearch estudio actualizar*)",
+      "PowerShell(*agentresearch estudio actualizar*)",
+      "Edit(/protocolo/**)",
+      "Edit(/estudio.yaml)",
+      "Edit(/CLAUDE.md)",
+      "Edit(/.claude/**)",
+      "Edit(/pyproject.toml)",
+      "Edit(/uv.lock)",
+      "Read(/.env)",
+      "Read(/.env.*)"
+    ]
+  }
+}

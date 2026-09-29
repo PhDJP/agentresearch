@@ -13,7 +13,7 @@ Al terminar el hito 1, un investigador puede:
 4. aprobarlo;
 5. dejar trazada cada decisión y cada enmienda.
 
-El caso piloto (subproductos del CBD) es la prueba de aceptación.
+La prueba de aceptación es un estudio de demostración: un tema real y neutral, distinto del caso piloto. El caso piloto (subproductos del CBD) se ejecuta en el hito 11, con el agente terminado (decisión del 2026-09-27; ver «Estrategia de validación» en la hoja de ruta).
 
 ## Sub-hitos
 
@@ -25,7 +25,7 @@ Cada sub-hito se trabaja en una sesión de Claude Code, con plan aprobado antes 
 | 1b | Modelo del protocolo, YAML y validación | Alto |
 | 1c | Ciclo de vida: aprobación, enmiendas y decisiones del protocolo | Alto |
 | 1d | Ecuaciones de búsqueda por fuente | Alto |
-| 1e | Repositorio de estudio, plantilla y comando `/protocolo`; aceptación con el caso piloto | Alto |
+| 1e | Repositorio de estudio, plantilla y comando `/protocolo`; aceptación con el estudio de demostración | Alto |
 
 Al cerrar 1e se etiqueta `v0.1.0`.
 
@@ -294,13 +294,29 @@ Se implementa como comando o *skill* de Claude Code, según lo que la versión a
 5. Al cerrar cada sección, escribir en `protocolo.yaml`, ejecutar `protocolo validar` y mostrar las advertencias con una propuesta para resolverlas.
 6. Al final, mostrar un resumen completo y pedir aprobación explícita. Nunca aprobar sin ella.
 
-### Aceptación con el caso piloto
+Ajustes aprobados al implementar 1e (2026-09-27); el detalle está en el [ADR-0007](../decisiones/0007-repositorio-de-estudio.md):
 
-- Se crea el repositorio del estudio (propuesta: `Documentos\mapeo-subproductos-cbd`, privado en GitHub hasta registrar el protocolo).
-- `/protocolo` construye el protocolo partiendo de `caso_piloto_local/contexto_caso_piloto.md`.
-- Las decisiones O1 a O10 quedan registradas.
-- `validar` da cero errores y todas las advertencias quedan revisadas.
-- El protocolo queda aprobado como `1.0.0`, y `historial` muestra todo el recorrido.
+- **`/protocolo` es una *skill*** con `disable-model-invocation: true` y dos archivos de apoyo (guía por sección y formatos), como recomienda la documentación actual de Claude Code.
+- **`nuevo-estudio --modelo ID`** es obligatorio y exige un identificador exacto. Solo crea `protocolo/`; las carpetas de las demás fases las crea cada hito. No ejecuta Git ni uv: muestra los pasos siguientes. El estudio es un proyecto uv que fija el agente a la etiqueta `v<versión>`.
+- **Evento inicial `estudio_creado`,** con el hash de cada archivo creado, de las instrucciones del agente (`CLAUDE.md`, `.claude/settings.json` y la *skill*) y de los insumos. `validar` e `historial` muestran la nota «instrucciones del agente modificadas» si esos archivos cambian.
+- **`protocolo escribir <sección> --archivo fragmento.yaml`** es la vía para escribir el protocolo: valida contra el esquema antes de escribir y conserva comentarios y estilo. Funciona también con el protocolo vigente, para preparar una enmienda.
+- **Comentarios de sección:** la escritura restaura los del propio archivo, que en un estudio nace de la plantilla.
+- **Permisos del estudio:** se niegan `aprobar`, `decision confirmar` y `estudio actualizar`; `enmendar` pregunta cada vez (para permitir `--simular`); se niega editar `protocolo/`, `estudio.yaml`, `CLAUDE.md`, `.claude/`, `pyproject.toml` y `uv.lock`, y leer `.env`. No son una frontera de seguridad: la barrera sigue siendo la terminal.
+- **`estudio actualizar`:** pasa un estudio a la versión instalada del agente, regenera desde las plantillas las instrucciones del agente, `.gitignore` y `.gitattributes`, y registra `estudio_actualizado`, con diff, terminal interactiva y revisor humano. La nota de instrucciones modificadas compara con el último registro. Con el protocolo vigente, el resumen advierte que la actualización es una desviación que el reporte debe declarar (PRISMA-ScR, ítem 20), y el evento registra el estado y la versión del protocolo.
+- **Versión del agente:** antes de `v0.1.0`, el estudio de demostración se fija a una etiqueta candidata. `v0.1.0rc1` salió sin dos ajustes del asesor y sin `estudio actualizar`; la reemplaza `v0.1.0rc2`, y el estudio pasa a ella con `estudio actualizar` como paso de la aceptación.
+- **Hallazgos de la aceptación** (2026-09-28), incorporados en `v0.1.0` (ADR-0007, punto 23): reglas `ask` de publicación en el estudio; reglas «Solo fases disponibles», «El investigador no es programador» y «Publicar requiere confirmación»; etiqueta anotada del protocolo con el anclaje; justificaciones de la enmienda solo para las advertencias nuevas, y el mensaje de `enmendar` sin cambios.
+
+**Resultado (2026-09-28):** aceptación conforme con el estudio de demostración `demo-mucilago-cafe`: protocolo aprobado como `1.0.0` con 17 decisiones confirmadas y enmendado a `1.1.0`, confirmaciones en la terminal del investigador, rechazo en Git Bash independiente y permisos verificados. Detalle en el ADR-0007, «Aceptación».
+
+### Aceptación con el estudio de demostración
+
+- El ADR-0007 fija el tema del estudio de demostración (real y neutral, distinto del caso piloto, de pocos registros) y dónde viven sus datos.
+- Se crea su repositorio con `nuevo-estudio`.
+- `/protocolo` construye el protocolo de punta a punta, incluidas al menos dos decisiones registradas con `decision registrar` y confirmadas por el investigador en su terminal.
+- `validar` da cero errores y todas las advertencias quedan justificadas.
+- El investigador aprueba el protocolo como `1.0.0` en su propia terminal (PowerShell o la terminal de VS Code), se generan las ecuaciones con `ecuaciones --escribir`, y `historial` muestra todo el recorrido con su anclaje.
+
+El protocolo del caso piloto se construye con este mismo flujo en el hito 11.
 
 ## ADR que el hito 1 debe producir
 
@@ -318,4 +334,4 @@ Se implementa como comando o *skill* de Claude Code, según lo que la versión a
 - CI en verde en Windows y Ubuntu.
 - ADR 0006, 0007 y 0008, y `CHANGELOG.md` actualizado.
 - Etiqueta `v0.1.0`.
-- Protocolo del caso piloto aprobado.
+- Protocolo del estudio de demostración aprobado.

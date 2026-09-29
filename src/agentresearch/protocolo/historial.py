@@ -21,6 +21,7 @@ from agentresearch.protocolo.diferencias import Cambio
 from agentresearch.protocolo.ecuaciones.documento import EstadoEcuaciones, estado_ecuaciones
 from agentresearch.protocolo.estudio import RutasProtocolo
 from agentresearch.protocolo.eventos import DatosAprobado, DatosEnmendado
+from agentresearch.protocolo.instrucciones import EstadoInstrucciones, estado_instrucciones
 from agentresearch.protocolo.validacion import (
     Hallazgo,
     hallazgos_de_directorio,
@@ -42,6 +43,8 @@ class Historial:
     """Hallazgos de P-E09 y P-E10."""
     ecuaciones: EstadoEcuaciones
     """Si `ecuaciones.md` corresponde al protocolo actual (ADR-0009, punto 14)."""
+    instrucciones: EstadoInstrucciones | None = None
+    """Si las instrucciones del agente cambiaron desde su registro (ADR-0007)."""
 
     @property
     def integro(self) -> bool:
@@ -51,6 +54,15 @@ class Historial:
     def como_dict(self) -> dict[str, Any]:
         return {
             "ruta_protocolo": self.rutas.relativa(self.rutas.protocolo),
+            "estudio": _creacion_como_dict(self.registro),
+            "actualizaciones_agente": [
+                {
+                    "evento": actualizacion.evento.id,
+                    "fecha_hora_utc": actualizacion.evento.fecha_hora_utc,
+                    "datos": actualizacion.datos.model_dump(mode="json"),
+                }
+                for actualizacion in self.registro.actualizaciones
+            ],
             "estado": self.estado,
             "version_protocolo": self.version_protocolo,
             "hash_archivo": self.hash_archivo,
@@ -61,6 +73,10 @@ class Historial:
             "hallazgos": [hallazgo.como_dict() for hallazgo in self.hallazgos],
             "ecuaciones": self.ecuaciones.como_dict(),
             "ecuaciones_desactualizadas": self.ecuaciones.desactualizadas,
+            "instrucciones": self.instrucciones.como_dict() if self.instrucciones else None,
+            "instrucciones_modificadas": bool(
+                self.instrucciones and self.instrucciones.modificadas
+            ),
         }
 
 
@@ -81,6 +97,7 @@ def construir_historial(ruta: Path | str) -> Historial:
         registro=registro,
         hallazgos=hallazgos_de_directorio(registro, lectura.hash, estado),
         ecuaciones=estado_ecuaciones(rutas, lectura.hash),
+        instrucciones=estado_instrucciones(registro),
     )
 
 
@@ -112,6 +129,26 @@ def texto_historial(historial: Historial) -> list[str]:
             f"protocolo: {protocolo_rel} ({historial.estado}, versión "
             f"{historial.version_protocolo})"
         ]
+    if registro.creacion is not None:
+        evento = registro.creacion.evento
+        creado = registro.creacion.datos
+        lineas.append(
+            f"estudio: {creado.titulo} ({creado.nombre}), creado el {evento.fecha_hora_utc} "
+            f"con agentresearch {evento.version_agente} ({evento.id}); modelo fijado: "
+            f"{creado.modelo}"
+        )
+    for actualizacion in registro.actualizaciones:
+        datos = actualizacion.datos
+        protocolo = (
+            f"con el protocolo vigente {datos.version_protocolo}, desviación que el reporte declara"
+            if datos.version_protocolo is not None
+            else "con el protocolo en borrador"
+        )
+        lineas.append(
+            f"agente actualizado: {datos.version_anterior} → {datos.version_nueva}, el "
+            f"{actualizacion.evento.fecha_hora_utc} por {datos.actualizado_por.id} "
+            f"({actualizacion.evento.id}), {protocolo}: {datos.justificacion}"
+        )
     eventos_rel = rutas.relativa(rutas.eventos)
     if not registro.existe_registro:
         lineas.append(f"registro: no existe {eventos_rel} (sin eventos registrados)")
@@ -130,6 +167,9 @@ def texto_historial(historial: Historial) -> list[str]:
     nota_ecuaciones = historial.ecuaciones.nota()
     if nota_ecuaciones is not None:
         lineas.append(f"nota: {nota_ecuaciones}")
+    nota_instrucciones = historial.instrucciones.nota() if historial.instrucciones else None
+    if nota_instrucciones is not None:
+        lineas.append(f"nota: {nota_instrucciones}")
 
     lineas.append("versiones:" if registro.versiones else "versiones: ninguna registrada")
     for version in registro.versiones:
@@ -195,6 +235,18 @@ def _texto_decision(registrada: DecisionRegistrada) -> str:
         f"  {decision.id_decision}  {registrada.estado}  {decision.tema}: opción "
         f"{decision.elegida} ({detalle})"
     )
+
+
+def _creacion_como_dict(registro: EstadoRegistro) -> dict[str, Any] | None:
+    creacion = registro.creacion
+    if creacion is None:
+        return None
+    return {
+        "evento": creacion.evento.id,
+        "fecha_hora_utc": creacion.evento.fecha_hora_utc,
+        "version_agente": creacion.evento.version_agente,
+        "datos": creacion.datos.model_dump(mode="json"),
+    }
 
 
 def _version_como_dict(version: VersionRegistrada) -> dict[str, Any]:

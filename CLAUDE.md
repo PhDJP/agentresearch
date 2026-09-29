@@ -50,9 +50,11 @@ Tablas y detalle: `docs/metodologia/reglas_metodologicas.md`.
 ## Forma de trabajo
 
 - Antes de un cambio grande, proponer un plan y esperar aprobación.
+- Cuando el investigador deba ejecutar algo, darle pasos sencillos: qué escribir, dónde (y cómo abrirlo) y qué debe ver. Ante un error, pedir el mensaje exacto y ofrecer otra ruta, sin eludir las confirmaciones que exigen su terminal.
 - Commits pequeños, con mensajes en español (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`).
 - Toda decisión de diseño relevante se registra como ADR en `docs/decisiones/`.
 - Avanzar hito por hito según `docs/hoja_de_ruta.md`, sin adelantar hitos.
+- Validación: cada hito se acepta con un estudio de demostración (tema real y neutral, nunca datos del caso piloto). El caso piloto se ejecuta en el hito 11, con el agente terminado, y da la `v1.0.0`; el hito 10 cierra como `v0.10.0`.
 - Este repositorio es la herramienta. Los datos de cada estudio van en un repositorio aparte.
 - `referencias_locales/` tiene PDFs con derechos de autor: se pueden leer para verificar, pero nunca se versionan ni se copian textualmente.
 - `caso_piloto_local/` es privado: no se versiona ni se copia a archivos versionados. Las pruebas usan datos sintéticos, no los del caso piloto.
@@ -60,4 +62,4 @@ Tablas y detalle: `docs/metodologia/reglas_metodologicas.md`.
 
 ## Estado actual
 
-Hito 0 completo (`v0.0.1`, repositorio público https://github.com/PhDJP/agentresearch). Hito 1 en curso: 1a, 1b y 1c completos (ADR-0006 y ADR-0008); 1d completo (ADR-0009). Sigue el sub-hito 1e: ver `docs/especificaciones/hito_1_protocolo_y_trazabilidad.md`.
+Hito 0 completo (`v0.0.1`, repositorio público https://github.com/PhDJP/agentresearch). Hito 1 completo (`v0.1.0`; ADR-0006 a ADR-0009), aceptado con el estudio de demostración `demo-mucilago-cafe`. Pendiente del cierre: actualizar ese estudio a `v0.1.0` con `estudio actualizar` (hoja de ruta). Sigue el hito 2: ver `docs/hoja_de_ruta.md`.

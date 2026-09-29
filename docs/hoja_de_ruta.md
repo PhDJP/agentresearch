@@ -9,14 +9,25 @@ Se avanza un hito a la vez. Un hito está terminado solo cuando:
 
 Cada hito cerrado se etiqueta con una versión (`v0.N.0`).
 
+## Estrategia de validación (decisión del 2026-09-27)
+
+Primero se termina el agente y después se usa en el caso piloto. Por eso:
+
+- **Cada hito se acepta con un estudio de demostración:** un tema real y neutral, distinto del caso piloto, de pocos registros, que recorre el flujo completo hasta ese hito. El tema y la ubicación de sus datos se deciden en el sub-hito 1e (ADR-0007). Los datos del estudio de demostración nunca son los del caso piloto.
+- **Los formatos reales se prueban sin hacer el mapeo:** en el hito 2 se importan exportaciones reales de una búsqueda de prueba (pocos registros), solo para verificar los lectores. No es la búsqueda oficial de ningún estudio.
+- **El caso piloto se ejecuta en el hito 11 (aceptación),** con el agente terminado. Así, el protocolo de la tesis se construye una sola vez con la herramienta completa, y las mejoras del agente durante el desarrollo no generan enmiendas en él.
+- **La versión `v1.0.0` se reserva para el agente validado con el caso piloto real.** El hito 10 cierra como `v0.10.0`.
+
+Riesgo aceptado: los problemas que solo aparecen con datos reales se descubren al final. Se mitiga con un estudio de demostración realista y con las exportaciones reales de prueba del hito 2; lo que aparezca en el hito 11 se corrige con versiones de parche (`v1.0.x`).
+
 ## Pendientes del investigador
 
-- [ ] Nombre completo y ORCID (para `LICENSE` y `CITATION.cff`).
-- [ ] Usuario de GitHub y nombre del repositorio del caso piloto.
+- [x] Nombre completo y ORCID (para `LICENSE` y `CITATION.cff`): Juan Pablo Gomez Ballesteros, ORCID 0009-0004-5255-0802 (el ORCID se confirmó el 2026-09-28).
+- [ ] Nombre del repositorio privado del caso piloto (antes del hito 11; propuesta: `mapeo-subproductos-cbd`).
 - [x] Tema, pregunta general, PCC y preguntas específicas del caso piloto (recibidos el 2026-09-25; ver `caso_piloto_local/contexto_caso_piloto.md`).
-- [ ] Decisiones O1–O10 del caso piloto: se toman con el comando `/protocolo` en el hito 1.
-- [ ] Criterios de inclusión y exclusión, y de 5 a 10 artículos clave conocidos por vías distintas de las APIs, para el conjunto de validación.
-- [ ] Claves gratuitas de API (antes del hito 3): OpenAlex, Semantic Scholar, NCBI (opcional) y Springer Nature.
+- [ ] Decisiones O1–O10 del caso piloto: se toman con el comando `/protocolo` en el hito 11.
+- [ ] Criterios de inclusión y exclusión, y de 5 a 10 artículos clave conocidos por vías distintas de las APIs, para el conjunto de validación (hito 11).
+- [ ] Claves gratuitas de API (antes del hito 3): OpenAlex ✅ (2026-09-27), Semantic Scholar, NCBI (opcional) y Springer Nature.
 
 ## Hito 0: Entorno y esqueleto (`v0.0.1`) · ✅ completo (2026-09-25)
 
@@ -31,7 +42,7 @@ Cada hito cerrado se etiqueta con una versión (`v0.N.0`).
 
 **Criterio de terminado:** CI en verde en ambos sistemas, y `uv run agentresearch --version` funciona en Windows.
 
-## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · en curso: 1a ✅, 1b ✅ y 1c ✅ (2026-09-26) y 1d ✅ (2026-09-27), sigue 1e
+## Hito 1: Protocolo y trazabilidad (`v0.1.0`) · ✅ completo (2026-09-28): 1a, 1b y 1c (2026-09-26), 1d (2026-09-27) y 1e (2026-09-28)
 
 Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/hito_1_protocolo_y_trazabilidad.md](especificaciones/hito_1_protocolo_y_trazabilidad.md).
 
@@ -49,9 +60,9 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 - **Plantilla de estudio:** `CLAUDE.md` y el comando `/protocolo`, que entrevista al investigador y propone opciones.
 - **Comandos:** `agentresearch nuevo-estudio` y `agentresearch protocolo validar`.
 
-- **Insumo del caso piloto:** `/protocolo` parte de `caso_piloto_local/contexto_caso_piloto.md` y conduce las decisiones O1–O10.
+- **Estudio de demostración:** `/protocolo` se prueba de punta a punta con un estudio de demostración (ver «Estrategia de validación»). El caso piloto se construye en el hito 11.
 
-**Criterio de terminado:** el protocolo del caso piloto se construye con el comando guiado, se valida y queda versionado en su repositorio.
+**Criterio de terminado:** el protocolo del estudio de demostración se construye con el comando guiado, se valida, se aprueba en la terminal del investigador y queda versionado en su repositorio con su historial.
 
 ## Hito 2: Registros e importación (`v0.2.0`)
 
@@ -59,7 +70,7 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 - Lectores de RIS, BibTeX, CSV de Scopus, WoS (.txt) y CSV genérico, probados con archivos sintéticos.
 - Hash de cada archivo importado y conteos por fuente para el diagrama de flujo.
 
-**Criterio de terminado:** se importan exportaciones reales del caso piloto (sin versionar las que tengan restricciones) con conteos correctos.
+**Criterio de terminado:** se importan exportaciones reales de una búsqueda de prueba en cada formato (pocos registros; sin versionar las que tengan restricciones) con conteos correctos, y el estudio de demostración importa las suyas.
 
 ## Hito 3: Conectores de APIs (`v0.3.0`)
 
@@ -67,14 +78,14 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 - Conectores de OpenAlex, PubMed, Semantic Scholar, Springer Nature OA, Crossref y AGROVOC.
 - Volver a verificar límites y términos de cada API y registrarlos en ADR-0003.
 
-**Criterio de terminado:** búsqueda del caso piloto en las APIs, con respuestas crudas guardadas y pruebas simuladas.
+**Criterio de terminado:** búsqueda del estudio de demostración en las APIs, con respuestas crudas guardadas (sin credenciales) y pruebas simuladas.
 
 ## Hito 4: Deduplicación (`v0.4.0`)
 
 - Coincidencia por DOI normalizado, y por título difuso más año, con umbral configurable.
 - Grupos de duplicados con la regla aplicada; los casos dudosos pasan a revisión humana.
 
-**Criterio de terminado:** conteos de duplicados listos para el diagrama de flujo, con muestra verificada manualmente.
+**Criterio de terminado:** conteos de duplicados del estudio de demostración listos para el diagrama de flujo, con muestra verificada manualmente.
 
 ## Hito 5: Cribado por título y resumen (`v0.5.0`)
 
@@ -85,7 +96,7 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 - Flujo del piloto: aplicación en voz alta, piloto, ajuste de criterios y umbral; luego conciliación.
 - Medición de estabilidad del LLM sobre una muestra.
 
-**Criterio de terminado:** piloto de cribado del caso real con concordancia reportada.
+**Criterio de terminado:** piloto de cribado del estudio de demostración, de punta a punta (lote del LLM, hoja ciega del investigador, conciliación), con concordancia reportada. La concordancia sobre el tema real se mide en el hito 11.
 
 ## Hito 6: Conjunto de validación y bola de nieve (`v0.6.0`)
 
@@ -93,9 +104,13 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 - Bola de nieve según Wohlin (2014) con OpenAlex y Semantic Scholar: iteraciones, origen de cada candidato e inclusión definitiva antes de continuar.
 - Criterio de parada.
 
+**Criterio de terminado:** el estudio de demostración reporta la sensibilidad frente a su conjunto de validación y completa al menos una iteración de bola de nieve con el origen de cada candidato.
+
 ## Hito 7: Texto completo (`v0.7.0`)
 
 - Vínculo entre PDF y registro por hash, extracción de texto con pypdf, y cribado de texto completo con motivos de exclusión.
+
+**Criterio de terminado:** el estudio de demostración completa el cribado de texto completo con los motivos de exclusión registrados.
 
 ## Hito 8: Extracción y clasificación (`v0.8.0`)
 
@@ -103,16 +118,30 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 - *Keywording* y *card sorting* para el esquema emergente; facetas con definiciones y ejemplos.
 - Segundo revisor con concordancia; evaluación de calidad opcional.
 
+**Criterio de terminado:** el estudio de demostración completa la extracción y la clasificación con concordancia reportada.
+
 ## Hito 9: Análisis y visualización (`v0.9.0`)
 
 - Conteos por faceta, series temporales, mapas de burbujas y de calor, generados desde los datos.
 
-## Hito 10: Reporte (`v1.0.0`)
+**Criterio de terminado:** los gráficos del estudio de demostración se generan desde sus datos.
+
+## Hito 10: Reporte (`v0.10.0`)
 
 - Diagrama de flujo PRISMA-ScR, checklist con la ubicación de cada ítem, tabla completa de estudios con su clasificación, declaración de uso de IA, amenazas a la validez y desviaciones del protocolo.
 - Paquete del estudio listo para Zenodo.
 
-**Criterio de terminado:** el reporte del caso piloto se regenera de forma idéntica desde los datos (prueba de reproducibilidad).
+**Criterio de terminado:** el reporte del estudio de demostración se regenera de forma idéntica desde sus datos (prueba de reproducibilidad).
+
+## Hito 11: Aceptación con el caso piloto (`v1.0.0`)
+
+- Crear el repositorio privado del caso piloto con `nuevo-estudio` y el insumo `caso_piloto_local/contexto_caso_piloto.md`.
+- Construir el protocolo con `/protocolo`: decisiones O1–O10, criterios, conjunto de validación y variantes de los términos truncados; aprobarlo como `1.0.0`.
+- Elegir el modelo del cribado con datos (ver la nota del hito 5) y fijar su identificador completo.
+- Ejecutar el mapeo completo: búsquedas, importación, deduplicación, cribado, bola de nieve, texto completo, extracción, análisis y reporte.
+- Corregir con versiones de parche lo que el caso real revele.
+
+**Criterio de terminado:** el reporte del caso piloto se regenera de forma idéntica desde sus datos, y el agente queda etiquetado como `v1.0.0`.
 
 ## Notas de revisión para hitos futuros
 
@@ -120,18 +149,23 @@ Hallazgos de las revisiones del asesor y de auditorías, pendientes para el hito
 
 - ~~**1c:** implementar el anclaje del registro encadenado (número de eventos y hash del último) en `protocolo historial` y en los reportes, según el punto 10 del ADR-0006. Sin anclaje no se detecta la eliminación de eventos finales.~~ Resuelto en 1c (ADR-0008, puntos 19 a 21).
 - ~~**1c:** agregar la advertencia P-A09, "piloto de cribado sin tamaño definido" (`seleccion.piloto.tamano` igual a 0). El proceso de selección exige un piloto con medición de concordancia antes del cribado completo (Ali y Petersen, 2014; Petersen et al., 2015, figura 17). La plantilla trae 0 por defecto, y hoy eso pasa sin aviso.~~ Resuelto en 1c (ADR-0008, punto 25).
-- **1e:** `nuevo-estudio` debe crear `protocolo/eventos.jsonl` con su evento inicial y el `anclaje.json` correspondiente. `/protocolo` debe pedir al investigador que ejecute `aprobar`, `enmendar` y `decision confirmar` en su propia terminal. Valorar negar esos comandos en los permisos de Claude Code del estudio (ADR-0008, consecuencias).
-- **1e:** verificar en la terminal real del investigador (PowerShell y la terminal de VS Code) que la confirmación interactiva funciona, y que Git Bash abierto como aplicación independiente (mintty) se rechaza con el mensaje que recomienda PowerShell o la terminal de VS Code. Las pruebas simulan la consola; en esta sesión solo se comprobó que las herramientas de Claude Code no la ofrecen.
-- **1e:** mitigar el límite conocido de ruamel.yaml documentado en el ADR-0006: al eliminar el último elemento antes del comentario de una sección, ese comentario se pierde. Como `/protocolo` escribirá sección por sección, la escritura debe restaurar los comentarios de sección de primer nivel tomándolos de la plantilla, que es su fuente canónica, y probarlo vaciando una lista.
-- **1e:** la plantilla del repositorio de estudio debe incluir un `.gitattributes` con `* text=auto eol=lf`. Git para Windows convierte los fines de línea por defecto, y eso alteraría los hashes de archivos como el protocolo.
-- **1e:** decidir O1 (opción A o C) del caso piloto con `/protocolo`.
-- **Cierre del hito 1:** en POSIX, sincronizar el directorio (`os.open` del directorio y `os.fsync`) después de cada `os.replace` de la escritura atómica, para que el cambio de nombre también sobreviva a un corte de energía. El ADR-0008 (punto 14) lo omitió porque Windows no lo admite; en Windows se sigue omitiendo.
-- **Cierre del hito 1:** evaluar fijar los sistemas de la integración continua (p. ej. `ubuntu-24.04`) en vez de `*-latest`, para que el entorno de pruebas no cambie sin decisión explícita. GitHub anunció la migración de `ubuntu-latest` a Ubuntu 26 desde el 19 de octubre de 2026.
+- ~~**1e:** `nuevo-estudio` debe crear `protocolo/eventos.jsonl` con su evento inicial y el `anclaje.json` correspondiente. `/protocolo` debe pedir al investigador que ejecute `aprobar`, `enmendar` y `decision confirmar` en su propia terminal. Valorar negar esos comandos en los permisos de Claude Code del estudio (ADR-0008, consecuencias).~~ Resuelto en 1e (ADR-0007, puntos 9, 12, 15 a 17).
+- ~~**1e:** verificar en la terminal real del investigador (PowerShell y la terminal de VS Code) que la confirmación interactiva funciona, y que Git Bash abierto como aplicación independiente (mintty) se rechaza con el mensaje que recomienda PowerShell o la terminal de VS Code. Las pruebas simulan la consola; en esta sesión solo se comprobó que las herramientas de Claude Code no la ofrecen.~~ Resuelto en la aceptación del 1e (ADR-0007, «Aceptación»): `estudio actualizar` en PowerShell independiente; `decision confirmar`, `aprobar` y `enmendar` en la terminal de VS Code; `enmendar` rechazado en Git Bash independiente sin escribir nada.
+- ~~**1e:** mitigar el límite conocido de ruamel.yaml documentado en el ADR-0006: al eliminar el último elemento antes del comentario de una sección, ese comentario se pierde. Como `/protocolo` escribirá sección por sección, la escritura debe restaurar los comentarios de sección de primer nivel tomándolos de la plantilla, que es su fuente canónica, y probarlo vaciando una lista.~~ Resuelto en 1e (ADR-0007, punto 14): se restauran los comentarios del propio archivo, que en un estudio nace de la plantilla.
+- ~~**1e:** la plantilla del repositorio de estudio debe incluir un `.gitattributes` con `* text=auto eol=lf`. Git para Windows convierte los fines de línea por defecto, y eso alteraría los hashes de archivos como el protocolo.~~ Resuelto en 1e (ADR-0007, punto 4).
+- **Hito 11:** decidir O1 (opción A o C) del caso piloto con `/protocolo`.
+- ~~**Cierre del hito 1 (plantillas del estudio, v0.1.0):** hallazgos de la primera aceptación con el estudio de demostración (2026-09-28): (a) agregar a `.claude/settings.json` del estudio reglas `ask` para `git push`, `git tag`, `gh repo`, `gh pr merge` y `gh release` (Bash y PowerShell), como en el repositorio del agente; (b) llevar al `CLAUDE.md` del estudio y a la skill `/protocolo` las reglas «El investigador no es programador», «Solo fases disponibles» y «Publicar requiere confirmación» de `arquitectura.md` («Comportamiento del agente en un estudio»); (c) cuando el protocolo registre sus versiones con etiquetas de git (como la decisión D17 del estudio de demostración), la skill `/protocolo` debe dar, después de aprobar o enmendar, el comando exacto de una etiqueta anotada con el anclaje, `git tag -a protocolo-vX.Y.Z -m "Protocolo X.Y.Z (anclaje …)"`, y pedir la confirmación del investigador antes del push; en el estudio de demostración, `protocolo-v1.1.0` quedó publicada como etiqueta ligera, y no se reescribe (ADR-0007, «Aceptación»); (d) al enmendar, la skill `/protocolo` reutilizó con `--justificaciones` el archivo de la aprobación, y el comando lo rechaza porque al enmendar solo se justifican las advertencias nuevas: incluirlo solo si hay advertencias nuevas, con un archivo que contenga solo esas; (e) cuando `enmendar` no encuentra cambios, además de «no hay cambios» dice «el cambio es solo de formato… el nivel es parche», que se contradice: mostrar solo el primero.~~ Resuelto al cerrar el hito 1 (ADR-0007, punto 23).
+- **Cierre del hito 1 (después de publicar `v0.1.0`):** aplicar las correcciones al estudio de demostración con `estudio actualizar`, que registrará la desviación porque su protocolo está vigente (ADR-0007, puntos 20 y 23), y registrar el resultado en una nota posterior del ADR-0007.
+- ~~**Cierre del hito 1:** en POSIX, sincronizar el directorio (`os.open` del directorio y `os.fsync`) después de cada `os.replace` de la escritura atómica, para que el cambio de nombre también sobreviva a un corte de energía. El ADR-0008 (punto 14) lo omitió porque Windows no lo admite; en Windows se sigue omitiendo.~~ Resuelto al cerrar el hito 1: `escribir_atomico` sincroniza el directorio después de `os.replace`, y `RegistroEncadenado.agregar()` lo hace al crear el archivo del registro.
+- ~~**Cierre del hito 1:** evaluar fijar los sistemas de la integración continua (p. ej. `ubuntu-24.04`) en vez de `*-latest`, para que el entorno de pruebas no cambie sin decisión explícita. GitHub anunció la migración de `ubuntu-latest` a Ubuntu 26 desde el 19 de octubre de 2026.~~ Resuelto al cerrar el hito 1: la integración continua usa `ubuntu-24.04` y `windows-2025`, las imágenes a las que apuntaban las etiquetas `-latest` (verificado en la documentación de GitHub el 2026-09-27). Cambiarlas es una decisión explícita.
 - **Hito 2:** al importar una exportación de una búsqueda manual (Scopus, Web of Science u otra base sin API), registrar además del hash y los conteos: la ecuación usada (versión y hash del protocolo de `ecuaciones.md`), la fecha y hora en que el investigador ejecutó la búsqueda, y el número de resultados que mostró la interfaz, para compararlo con los registros importados. PRISMA-ScR, ítem 7, exige reportar la fecha de cada búsqueda.
 - **Hito 3:** los conectores de OpenAlex y PubMed aplican como parámetros los límites de la búsqueda (periodo, idiomas y tipos de documento), que `ecuaciones.md` solo lista como texto para esas fuentes (ADR-0009, punto 10).
 - **Hito 3:** los conectores deben quitar `api_key` (y cualquier otra clave o credencial) de la URL, los parámetros y los encabezados que se guardan con la respuesta cruda y su hash, y de los mensajes de error y los registros. Una prueba debe verificar que la clave no aparece en nada de lo que se guarda.
 - **Hito 3:** decidir si Semantic Scholar necesita un traductor propio de ecuaciones. Es fuente de búsqueda en el ADR-0003, pero el 1d solo traduce para OpenAlex, PubMed, Scopus, Web of Science y la versión genérica.
 - **Hito 5:** agregar escritura por lotes al registro encadenado, verificando la cadena una vez por lote. Con miles de decisiones, verificar el archivo completo en cada evento crece de forma cuadrática.
-- **Hito 5:** elegir el modelo del cribado con datos. En el piloto se compara la concordancia con el investigador de al menos dos configuraciones (p. ej. Sonnet 5 en esfuerzo alto y Opus 5.5 en medio), y se fija el identificador completo del modelo para todo el estudio. Cambiarlo después es una enmienda del protocolo.
+- **Hito 5:** incorporar el test-retest intraevaluador para investigadores sin segundo revisor humano (Kitchenham y Charters, 2007, §6.2.3: volver a evaluar una muestra aleatoria para comprobar la consistencia de las propias decisiones). Reutiliza la hoja Excel ciega y el cálculo de kappa: el investigador vuelve a cribar, tras un intervalo mínimo y sin ver sus decisiones anteriores, una muestra aleatoria reproducible (semilla registrada). Agregar al esquema el campo opcional `seleccion.test_retest {tamano, intervalo_minimo_dias}`, sin cambiar la versión del esquema (ADR-0006, punto 16), para que el protocolo lo declare de forma validable y no solo en el texto del plan. Origen: el estudio de demostración lo eligió en las decisiones D12 y D14 (2026-09-28) cuando el agente aún no lo soportaba.
+- **Hito 5 (mecanismo) e hito 11 (elección):** elegir el modelo del cribado con datos. El hito 5 construye la comparación; en el piloto de cribado del caso real (hito 11) se compara la concordancia con el investigador de al menos dos configuraciones (p. ej. Sonnet 5 en esfuerzo alto y Opus 5.5 en medio), y se fija el identificador completo del modelo para todo el estudio. Cambiarlo después es una enmienda del protocolo.
+- **Hito 10:** la declaración de uso de IA del reporte se construye con la línea de tiempo de los eventos `estudio_creado` y `estudio_actualizado`: versión del agente, modelo e instrucciones vigentes en cada fase del estudio. Las actualizaciones registradas con el protocolo vigente (`estado_protocolo: vigente`) se declaran además como desviaciones del protocolo (PRISMA-ScR, ítem 20; ADR-0007, punto 20).
+- **Hito 11:** con un solo revisor humano en el caso piloto, valorar además que el director de tesis actúe como segundo revisor humano en la muestra del piloto de cribado (Kitchenham y Charters, 2007, §6.2.3, sugieren discutir las decisiones con asesores o expertos). Es más fuerte que el test-retest solo, porque mide la concordancia entre personas (advertencia P-A08).
 - **Proceso:** toda afirmación sobre versiones, sintaxis o límites de APIs y herramientas se verifica contra la fuente oficial o la integración continua. Por ejemplo, `astral-sh/setup-uv@v10` no existía, y la integración continua lo detectó.
 - **Proceso:** GitHub Copilot se usa solo como auditor de lectura; únicamente Claude Code edita el código.

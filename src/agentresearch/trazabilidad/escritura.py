@@ -10,8 +10,10 @@ def escribir_atomico(ruta: Path | str, contenido: bytes) -> None:
 
     Escribe en un temporal del mismo directorio, lo sincroniza a disco con
     `flush` y `os.fsync`, y lo pone en su lugar con `os.replace`, que es
-    atómico en Windows y en POSIX. Si algo falla, el archivo original queda
-    intacto y el temporal se elimina. Crea el directorio si no existe.
+    atómico en Windows y en POSIX. En POSIX, además, sincroniza el
+    directorio para que el cambio de nombre sobreviva a un corte de energía.
+    Si algo falla, el archivo original queda intacto y el temporal se
+    elimina. Crea el directorio si no existe.
     """
     ruta = Path(ruta)
     ruta.parent.mkdir(parents=True, exist_ok=True)
@@ -28,3 +30,21 @@ def escribir_atomico(ruta: Path | str, contenido: bytes) -> None:
     except BaseException:
         temporal.unlink(missing_ok=True)
         raise
+    sincronizar_directorio(ruta.parent)
+
+
+def sincronizar_directorio(directorio: Path | str) -> None:
+    """Sincroniza a disco las entradas de `directorio` (nombres de archivo), solo en POSIX.
+
+    Después de `os.replace` o de crear un archivo, el contenido ya está en
+    disco, pero el nombre nuevo puede no estarlo hasta sincronizar el
+    directorio. Windows no admite abrir un directorio para sincronizarlo,
+    así que ahí no hace nada (ADR-0008, punto 14).
+    """
+    if os.name != "posix":
+        return
+    descriptor = os.open(directorio, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)

@@ -9,6 +9,8 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Protocol
 
+from agentresearch.estudio.actualizacion import ResultadoActualizacion, actualizar_estudio
+from agentresearch.estudio.creacion import ErrorCreacion, ResultadoCreacion, crear_estudio
 from agentresearch.protocolo import RutasProtocolo, validar_archivo
 from agentresearch.protocolo.aprobacion import (
     ErrorCicloDeVida,
@@ -30,6 +32,7 @@ from agentresearch.protocolo.decisiones import (
 from agentresearch.protocolo.ecuaciones.servicio import ErrorEcuaciones
 from agentresearch.protocolo.ecuaciones.servicio import generar as generar_ecuaciones_del_protocolo
 from agentresearch.protocolo.historial import construir_historial, texto_historial
+from agentresearch.protocolo.secciones import SECCIONES, ResultadoEscritura, escribir_seccion
 from agentresearch.protocolo.terminal import Terminal, TerminalDelSistema
 from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
 
@@ -45,6 +48,61 @@ def construir_analizador() -> argparse.ArgumentParser:
         version=f"agentresearch {version('agentresearch')}",
     )
     subcomandos = analizador.add_subparsers(dest="comando")
+
+    nuevo_estudio = subcomandos.add_parser(
+        "nuevo-estudio",
+        help="Crea el repositorio de un estudio con su protocolo, registro e instrucciones",
+    )
+    nuevo_estudio.add_argument(
+        "ruta", type=Path, help="carpeta nueva del estudio; su nombre es el nombre del estudio"
+    )
+    nuevo_estudio.add_argument(
+        "--titulo", required=True, metavar="TEXTO", help="título del estudio"
+    )
+    nuevo_estudio.add_argument(
+        "--modelo",
+        required=True,
+        metavar="ID",
+        help="identificador exacto del modelo que se fija en .claude/settings.json "
+        "(p. ej. claude-opus-5-5)",
+    )
+    nuevo_estudio.add_argument(
+        "--contexto",
+        type=Path,
+        metavar="ARCHIVO",
+        help="insumo del investigador que se copia en protocolo/insumos/",
+    )
+    _argumento_json(nuevo_estudio)
+
+    estudio = subcomandos.add_parser("estudio", help="Operaciones sobre el repositorio del estudio")
+    subcomandos_estudio = estudio.add_subparsers(dest="subcomando", required=True)
+    actualizar = subcomandos_estudio.add_parser(
+        "actualizar",
+        help="Pasa el estudio a la versión instalada del agente y regenera sus instrucciones "
+        "(exige una terminal interactiva)",
+    )
+    actualizar.add_argument(
+        "--actualizado-por",
+        required=True,
+        metavar="ID",
+        help="revisor humano declarado en seleccion.revisores que actualiza el estudio",
+    )
+    justificacion = actualizar.add_mutually_exclusive_group(required=True)
+    justificacion.add_argument("--justificacion", metavar="TEXTO", help="por qué se actualiza")
+    justificacion.add_argument(
+        "--archivo",
+        type=Path,
+        metavar="ARCHIVO",
+        help='JSON con {"justificacion": "…"}, en lugar de --justificacion',
+    )
+    actualizar.add_argument(
+        "--estudio",
+        type=Path,
+        default=Path("."),
+        metavar="RUTA",
+        help="raíz del estudio (por defecto, el directorio actual)",
+    )
+    _argumento_json(actualizar)
 
     registro = subcomandos.add_parser("registro", help="Operaciones sobre registros encadenados")
     subcomandos_registro = registro.add_subparsers(dest="subcomando", required=True)
@@ -144,6 +202,21 @@ def construir_analizador() -> argparse.ArgumentParser:
     )
     _argumento_json(ecuaciones)
 
+    escribir = subcomandos_protocolo.add_parser(
+        "escribir",
+        help="Escribe una sección del protocolo desde un fragmento YAML, validando el esquema",
+    )
+    escribir.add_argument("seccion", choices=SECCIONES, help="sección de primer nivel")
+    escribir.add_argument(
+        "--archivo",
+        type=Path,
+        required=True,
+        metavar="ARCHIVO",
+        help="YAML con una sola clave de primer nivel, la sección, y su contenido completo",
+    )
+    _argumento_protocolo(escribir)
+    _argumento_json(escribir)
+
     decision = subcomandos_protocolo.add_parser(
         "decision", help="Decisiones del protocolo: registrar la propuesta y confirmarla"
     )
@@ -212,6 +285,84 @@ def _anclaje_argumento(texto: str) -> Anclaje:
         raise argparse.ArgumentTypeError(str(error)) from None
 
 
+def ejecutar_nuevo_estudio(
+    ruta: Path,
+    titulo: str,
+    modelo: str,
+    contexto: Path | None = None,
+    como_json: bool = False,
+) -> int:
+    """Crea el repositorio de un estudio y muestra los pasos siguientes."""
+    _tolerar_caracteres_no_representables()
+    comando = "nuevo-estudio"
+    try:
+        resultado = crear_estudio(ruta, titulo, modelo, contexto)
+    except ErrorCreacion as error:
+        return _informar_fallo(comando, como_json, "no se pudo crear el estudio", error.errores)
+    if como_json:
+        _imprimir_json(comando, True, [], resultado.como_dict())
+    else:
+        for linea in _describir_creacion(resultado):
+            print(linea)
+    return 0
+
+
+def _describir_creacion(resultado: ResultadoCreacion) -> list[str]:
+    estudio = resultado.estudio
+    return [
+        f"estudio creado: {resultado.ruta}",
+        f"título: {estudio.titulo}",
+        f"agente: agentresearch {estudio.agente.version} ({estudio.agente.fuente})",
+        f"modelo fijado: {estudio.modelo}",
+        f"evento: {resultado.evento.id} ({resultado.evento.tipo})",
+        f"anclaje: {resultado.anclaje}",
+        "archivos:",
+        *[f"  {archivo}" for archivo in resultado.archivos],
+        "pasos siguientes:",
+        *[f"  {numero}. {paso}" for numero, paso in enumerate(resultado.pasos_siguientes(), 1)],
+    ]
+
+
+def ejecutar_estudio_actualizar(
+    actualizado_por: str,
+    justificacion: str | None = None,
+    archivo: Path | None = None,
+    estudio: Path = Path("."),
+    como_json: bool = False,
+    terminal: Terminal | None = None,
+    reloj: Reloj | None = None,
+) -> int:
+    """Actualiza el agente del estudio tras la confirmación interactiva del investigador."""
+    return _ejecutar_operacion(
+        "estudio actualizar",
+        como_json,
+        lambda: actualizar_estudio(
+            estudio, actualizado_por, _terminal(terminal), justificacion, archivo, reloj
+        ),
+        _describir_actualizacion,
+    )
+
+
+def _describir_actualizacion(resultado: ResultadoActualizacion) -> list[str]:
+    if resultado.completada:
+        return [
+            f"se completó la actualización a agentresearch {resultado.version_nueva} "
+            f"registrada en {resultado.evento.id}, que se había interrumpido",
+            f"archivos escritos: {', '.join(resultado.archivos_cambiados) or 'ninguno'}",
+            f"anclaje: {resultado.anclaje}",
+        ]
+    return [
+        f"estudio actualizado: agentresearch {resultado.version_anterior} → "
+        f"{resultado.version_nueva}",
+        f"archivos regenerados: {', '.join(resultado.archivos_cambiados) or 'ninguno'}",
+        f"evento: {resultado.evento.id} ({resultado.evento.tipo})",
+        f"anclaje: {resultado.anclaje}",
+        *_aviso_anclaje(resultado.anclaje_recreado),
+        f'haga el commit con el anclaje en el mensaje, p. ej.: git commit -am "Actualizar el '
+        f'agente a {resultado.version_nueva} (anclaje {resultado.anclaje})"',
+    ]
+
+
 def ejecutar_registro_verificar(archivo: Path, anclaje: Anclaje | None = None) -> int:
     """Verifica un registro encadenado e imprime el resultado. Devuelve el código de salida."""
     registro = RegistroEncadenado(archivo)
@@ -251,9 +402,8 @@ def ejecutar_protocolo_validar(ruta: Path, como_json: bool = False) -> int:
         print(f"registro: {registro['ruta']} ({registro['numero_eventos']} eventos{anclaje})")
         if registro["falta_anclaje"]:
             print(f"nota: {nota_falta_anclaje(RutasProtocolo.desde(ruta))}")
-    nota_ecuaciones = resultado.ecuaciones.nota() if resultado.ecuaciones else None
-    if nota_ecuaciones is not None:
-        print(f"nota: {nota_ecuaciones}")
+    for nota in resultado.notas():
+        print(f"nota: {nota}")
     for hallazgo in resultado.hallazgos:
         print(hallazgo)
     print(f"resultado: {_resumen(len(resultado.errores), len(resultado.advertencias))}")
@@ -411,6 +561,47 @@ def ejecutar_protocolo_ecuaciones(
     if bloqueadas:
         print(f"fuentes bloqueadas, sin ecuación: {', '.join(bloqueadas)}")
     return codigo
+
+
+def ejecutar_protocolo_escribir(
+    seccion: str,
+    archivo: Path,
+    protocolo: Path = RUTA_PROTOCOLO_POR_DEFECTO,
+    como_json: bool = False,
+) -> int:
+    """Escribe una sección del protocolo y muestra la validación del resultado.
+
+    Devuelve 0 si la sección se escribió (aunque el protocolo, incompleto, tenga
+    errores de contenido) y 1 si se rechazó sin escribir nada.
+    """
+    return _ejecutar_operacion(
+        "protocolo escribir",
+        como_json,
+        lambda: escribir_seccion(protocolo, seccion, archivo),
+        _describir_escritura,
+    )
+
+
+def _describir_escritura(resultado: ResultadoEscritura) -> list[str]:
+    if resultado.cambio:
+        lineas = [f"sección «{resultado.seccion}» escrita en {resultado.ruta_protocolo}"]
+    else:
+        lineas = [f"sin cambios: la sección «{resultado.seccion}» ya tenía ese contenido"]
+    lineas.append(
+        f"protocolo: {resultado.estado}, versión {resultado.version_protocolo}, "
+        f"hash {resultado.hash_protocolo}"
+    )
+    validacion = resultado.validacion
+    lineas.extend(f"nota: {nota}" for nota in validacion.notas())
+    lineas.extend(str(hallazgo) for hallazgo in validacion.hallazgos)
+    lineas.append(f"validación: {_resumen(len(validacion.errores), len(validacion.advertencias))}")
+    if resultado.pendiente_de_enmienda:
+        lineas.append(
+            "nota: el protocolo está vigente, así que el cambio queda sin registrar (P-E09) "
+            "hasta que el investigador registre la enmienda en su terminal; "
+            "`agentresearch protocolo enmendar --simular` muestra el diff"
+        )
+    return lineas
 
 
 def ejecutar_decision_registrar(
@@ -574,6 +765,28 @@ def main() -> None:
         analizador.print_help()
         return
 
+    if argumentos.comando == "nuevo-estudio":
+        sys.exit(
+            ejecutar_nuevo_estudio(
+                argumentos.ruta,
+                argumentos.titulo,
+                argumentos.modelo,
+                argumentos.contexto,
+                argumentos.como_json,
+            )
+        )
+
+    if argumentos.comando == "estudio" and argumentos.subcomando == "actualizar":
+        sys.exit(
+            ejecutar_estudio_actualizar(
+                argumentos.actualizado_por,
+                argumentos.justificacion,
+                argumentos.archivo,
+                argumentos.estudio,
+                argumentos.como_json,
+            )
+        )
+
     if argumentos.comando == "registro" and argumentos.subcomando == "verificar":
         sys.exit(ejecutar_registro_verificar(argumentos.archivo, argumentos.anclaje))
 
@@ -612,6 +825,13 @@ def main() -> None:
         sys.exit(
             ejecutar_protocolo_ecuaciones(
                 argumentos.ruta, argumentos.escribir, argumentos.como_json
+            )
+        )
+
+    if argumentos.comando == "protocolo" and argumentos.subcomando == "escribir":
+        sys.exit(
+            ejecutar_protocolo_escribir(
+                argumentos.seccion, argumentos.archivo, argumentos.protocolo, argumentos.como_json
             )
         )
 

@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "Si usa este software, cite este trabajo con los siguientes metadatos."
 title: "Agentresearch"
 type: software
-version: 0.0.1
-date-released: "2026-09-25"
+version: 0.1.0
+date-released: "2026-09-28"
 license: MIT
 repository-code: "https://github.com/PhDJP/agentresearch"
 authors:
