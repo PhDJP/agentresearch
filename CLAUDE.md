@@ -62,4 +62,4 @@ Tablas y detalle: `docs/metodologia/reglas_metodologicas.md`.
 
 ## Estado actual
 
-Hito 0 completo (`v0.0.1`, repositorio público https://github.com/PhDJP/agentresearch). Hito 1 completo (`v0.1.0`; ADR-0006 a ADR-0009), aceptado con el estudio de demostración `demo-mucilago-cafe`. Pendiente del cierre: actualizar ese estudio a `v0.1.0` con `estudio actualizar` (hoja de ruta). Sigue el hito 2: ver `docs/hoja_de_ruta.md`.
+Hito 0 completo (`v0.0.1`, repositorio público https://github.com/PhDJP/agentresearch). Hito 1 completo (`v0.1.0`; ADR-0006 a ADR-0009), aceptado con el estudio de demostración `demo-mucilago-cafe`, que ya usa `v0.1.0`. Sigue el hito 2: ver `docs/hoja_de_ruta.md`.

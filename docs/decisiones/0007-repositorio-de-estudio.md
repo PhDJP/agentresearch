@@ -646,3 +646,35 @@ estudio le niega. Los hallazgos se incorporaron en `v0.1.0` (punto 23).
 - Si una versión futura de Claude Code cambia la sintaxis de permisos o de
   *skills*, hay que revisar las plantillas. Las pruebas de este repositorio
   fijan su contenido esperado.
+
+## Nota posterior (2026-09-29)
+
+Publicada `v0.1.0` (etiqueta anotada sobre la fusión `011ea96`), el
+estudio de demostración pasó a ella con `estudio actualizar`, como piden
+los puntos 22 y 23. Fue la primera actualización con el protocolo vigente:
+
+- el investigador cambió la versión en `pyproject.toml`, ejecutó
+  `uv sync` y, en PowerShell independiente, `estudio actualizar`. Antes de
+  confirmar, el resumen mostró la advertencia de desviación (protocolo
+  vigente `1.1.0`, registrado en `evt-000038`; PRISMA-ScR, ítem 20), y el
+  investigador confirmó con `actualizar 0.1.0`;
+- evento `evt-000039` (`estudio_actualizado`, `version_agente` `0.1.0`):
+  - `0.1.0rc2 → 0.1.0`, con `estado_protocolo: vigente` y
+    `version_protocolo: 1.1.0`;
+  - `actualizado_por` es `humano/investigador-1`;
+  - cambian `CLAUDE.md`, `.claude/settings.json`, `SKILL.md`,
+    `formatos.md` y `estudio.yaml`; no cambian `.gitignore`,
+    `.gitattributes` ni `secciones.md`;
+- `uv.lock` fija `v0.1.0` en el commit `011ea96`;
+- Claude Code lo verificó en solo lectura:
+  - `historial` muestra «con el protocolo vigente 1.1.0, desviación que
+    el reporte declara»;
+  - el registro está íntegro, con 39 eventos, y cumple
+    `evt-000039@sha256:7d4da588f24d09cca3b4f5a1f50495a3a4c6c2b3db22ee71dbf874f116410d2c`;
+  - `validar` da 0 errores, las 2 advertencias ya justificadas y ninguna
+    nota de instrucciones modificadas;
+- commit `81b4923` del estudio, con el anclaje en el mensaje, publicado
+  por el investigador.
+
+El reporte del estudio (hito 10) declara esta actualización como
+desviación del protocolo. No cambia el protocolo ni sus decisiones.
