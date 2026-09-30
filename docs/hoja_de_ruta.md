@@ -66,6 +66,8 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 
 ## Hito 2: Registros e importación (`v0.2.0`)
 
+Especificación detallada, dividida en los sub-hitos 2a a 2e: [especificaciones/hito_2_registros_e_importacion.md](especificaciones/hito_2_registros_e_importacion.md). Decisiones: [ADR-0010](decisiones/0010-registros-importacion-y-datos-de-terceros.md) (propuesta).
+
 - Modelo normalizado de registro con procedencia y distinción entre artículo y estudio.
 - Lectores de RIS, BibTeX, CSV de Scopus, WoS (.txt) y CSV genérico, probados con archivos sintéticos.
 - Hash de cada archivo importado y conteos por fuente para el diagrama de flujo.
