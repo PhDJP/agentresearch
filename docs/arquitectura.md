@@ -22,7 +22,7 @@ flowchart LR
 ## Dos repositorios
 
 1. **`agentresearch` (este repositorio): la herramienta.** Contiene código, pruebas, documentación y las plantillas que se instalan en cada estudio. Es público, con licencia MIT.
-2. **Un repositorio por estudio: los datos y la evidencia.** Se crea con un comando del paquete, fija la versión exacta del agente y se archiva en Zenodo al publicar. Sus datos van con CC BY 4.0.
+2. **Un repositorio por estudio: los datos y la evidencia.** Se crea con un comando del paquete, fija la versión exacta del agente y se archiva en Zenodo al publicar. Sus datos van con CC BY 4.0, salvo los datos de terceros, que no se versionan (ver «Datos de terceros»).
 
 ## Módulos del paquete (`src/agentresearch/`)
 
@@ -31,8 +31,8 @@ flowchart LR
 | `cli` | Interfaz de línea de comandos (`agentresearch …`) | 0 |
 | `trazabilidad` | Registro JSONL de solo adición, hashes SHA-256, versiones, fecha y hora UTC | 1 |
 | `protocolo` | Modelo del protocolo (PCC/PICOC, preguntas, criterios, reglas, facetas), validación, enmiendas, generación de ecuaciones por fuente | 1 |
-| `registros` | Modelo normalizado de registro bibliográfico y de estudio (artículo ≠ estudio), procedencia | 2 |
-| `importacion` | Lectores de RIS, BibTeX, CSV de Scopus, WoS (.txt) y CSV genérico | 2 |
+| `registros` | Modelo normalizado de registro, con artículo y estudio provisionales (artículo ≠ estudio), procedencia y política de campos publicables por fuente (ADR-0010) | 2 |
+| `importacion` | Lectores de RIS, BibTeX, CSV de Scopus, WoS (.txt) y CSV genérico; registro de búsquedas manuales (ADR-0010) | 2 |
 | `fuentes` | Conectores de OpenAlex, PubMed, Semantic Scholar, Springer Nature OA, Crossref y AGROVOC; caché de respuestas crudas y control de tasa | 3 |
 | `deduplicacion` | Coincidencia por DOI y por título difuso más año; grupos de duplicados; regla aplicada en cada fusión | 4 |
 | `cribado` | Prefiltros deterministas, lotes para el LLM, hojas Excel, reglas A–F, concordancia, conciliación | 5 |
@@ -51,34 +51,53 @@ flowchart LR
 ```text
 mi-estudio/
 ├── CLAUDE.md                     # comportamiento del agente en este estudio (desde plantilla)
-├── .claude/                      # settings.json (modelo fijado y permisos) y skills/protocolo/
+├── .claude/                      # settings.json (modelo fijado y permisos) y skills/ (/protocolo, /importar)
 ├── estudio.yaml                  # metadatos, versión exacta del agente y modelo fijado
 ├── pyproject.toml, uv.lock       # proyecto uv que fija el agente a la etiqueta de su versión
 ├── README.md, .gitignore, .gitattributes
 ├── .borradores/                  # archivos intermedios de Claude Code (no se versiona)
 ├── protocolo/
 │   ├── protocolo.yaml            # versión actual
-│   ├── eventos.jsonl             # creación, aprobación, enmiendas y decisiones (ADR-0007 y ADR-0008)
+│   ├── eventos.jsonl             # eventos del estudio: creación, actualizaciones, ciclo de vida del protocolo y búsquedas registradas (ADR-0007, 0008 y 0010)
 │   ├── anclaje.json              # número de eventos y hash del último
 │   ├── versiones/                # copia exacta de cada versión registrada (X.Y.Z.yaml)
 │   ├── ecuaciones.md             # ecuaciones de búsqueda por fuente (ADR-0009)
 │   └── insumos/                  # insumos del investigador (--contexto)
 ├── busquedas/
-│   └── <fuente>/<fecha-hora>/    # consulta.json, respuesta cruda, conteo
-├── importaciones/                # archivos exportados originales + hash
+│   └── <fuente>/<fecha-hora>/    # consulta.json, conteo y hash de la respuesta cruda; los campos restringidos no se versionan (hito 3, ADR-0010)
+├── importaciones/
+│   └── imp-NNNN/                 # una búsqueda manual (ADR-0010)
+│       ├── importacion.json      # fuente, cobertura, filtros, ecuación, fecha y hora, archivos y sus hashes
+│       ├── registros.jsonl       # registros normalizados, solo con los campos publicables
+│       └── registros.csv         # vista derivada y determinista de registros.jsonl
+├── exportaciones_originales/     # copias de las exportaciones originales (no se versiona; ADR-0010)
 ├── registros/
-│   ├── registros.csv             # registros normalizados con procedencia
-│   └── duplicados.csv            # grupos y regla aplicada
+│   └── duplicados.csv            # grupos y regla aplicada (hito 4)
 ├── cribado/
-│   ├── lotes/                    # lote-NNNN.entrada.json / lote-NNNN.respuesta.json
-│   ├── revision_humana/          # hojas Excel exportadas e importadas
-│   ├── decisiones.jsonl          # registro de decisiones (solo adición)
+│   ├── lotes/                    # lote-NNNN.entrada.json (no se versiona: contiene resúmenes; se versionan su hash y sus IDs) / lote-NNNN.respuesta.json
+│   ├── revision_humana/          # hojas Excel exportadas e importadas (no se versionan: contienen resúmenes; se versionan su hash y sus IDs)
+│   ├── decisiones.jsonl          # registro de decisiones (solo adición), anclado a protocolo/eventos.jsonl
 │   └── concordancia.json
 ├── bola_de_nieve/                # iteraciones y origen de cada candidato
 ├── texto_completo/               # hashes y DOI (los PDF no se versionan)
 ├── extraccion/                   # formulario, esquema de clasificación y datos extraídos
 └── reportes/                     # diagrama de flujo, checklist, tablas, mapas, declaración de IA
 ```
+
+## Datos de terceros
+
+Las exportaciones de las bases de suscripción y las respuestas de algunas APIs contienen datos con licencia, como los resúmenes. El [ADR-0010](decisiones/0010-registros-importacion-y-datos-de-terceros.md) (propuesta) fija el principio **local completo, nube mínima y configurable** y dos niveles:
+
+- **Se versionan** los datos de cada búsqueda, el hash y el número de registros de cada original, y los registros normalizados con solo los campos que el estudio habilita en `publicacion_datos.yaml`, cada uno con su base registrada (institución, revista o licencia). Nunca se publican el resumen, las palabras clave, las referencias, los conteos de citas, las afiliaciones ni la financiación (`agentresearch/registros/politica_datos.yaml`).
+- **No se versionan** las exportaciones originales, que el paquete copia a `exportaciones_originales/` (ignorada por Git y comprobada con `git check-ignore`), ni los registros completos, que se regeneran en el equipo del investigador desde los originales verificados por su hash. Tampoco se versionan los archivos derivados que contienen resúmenes, como los lotes del LLM y las hojas Excel del cribado: se versionan su hash y sus IDs.
+
+Por eso lo reproducible es lo versionado más los originales verificados por su hash (el ADR-0010 precisa el alcance del ADR-0004).
+
+## Importación de búsquedas manuales
+
+1. **Leer.** `agentresearch importar leer` lee los archivos exportados de una búsqueda y muestra conteos, errores con su línea y cobertura de campos, sin escribir nada.
+2. **Registrar.** `agentresearch importar registrar --busqueda archivo.json --registrado-por <id>` lo ejecuta el investigador en su terminal: confirma la fecha y la hora, revisa el resumen (ecuación esperada y ejecutada, resultados de la interfaz frente a registros leídos) y escribe la frase de confirmación. Registra el evento `busqueda_registrada`.
+3. **Consultar.** `agentresearch importar historial` da los conteos por fuente para el diagrama de flujo.
 
 ## Interacción con el LLM (cribado y clasificación)
 
@@ -87,7 +106,7 @@ mi-estudio/
    - los criterios vigentes;
    - el hash del prompt.
 
-   Nunca incluye decisiones de otros revisores. El tamaño por defecto es de unos 25 registros y se configura en el protocolo.
+   Nunca incluye decisiones de otros revisores. El tamaño por defecto es de unos 25 registros y se configura en el protocolo. Como contiene resúmenes, el lote no se versiona: se versionan su hash y los IDs de sus registros (ADR-0010).
 2. **Responder.** Claude Code lee el prompt versionado y el lote, y escribe `lote-NNNN.respuesta.json` siguiendo el esquema.
 3. **Registrar.** `agentresearch cribado registrar --lote NNNN --modelo <identificador exacto>` valida:
    - el esquema;
@@ -101,7 +120,7 @@ mi-estudio/
 
 ## Revisión humana con Excel
 
-1. `agentresearch cribado exportar-excel --revisor <id>` genera una hoja con los registros y columnas de decisión y criterio, con listas desplegables. No incluye decisiones del LLM.
+1. `agentresearch cribado exportar-excel --revisor <id>` genera una hoja con los registros y columnas de decisión y criterio, con listas desplegables. No incluye decisiones del LLM. Como contiene resúmenes, la hoja no se versiona: se versionan su hash y los IDs de sus registros (ADR-0010).
 2. El investigador la diligencia fuera de línea.
 3. `agentresearch cribado importar-excel` la valida con las mismas reglas del LLM (salvo la evidencia literal, que es opcional para humanos), guarda su hash y añade las decisiones al registro.
 
@@ -153,8 +172,8 @@ Hay que verificar la licencia y la versión de cada una al incorporarla.
 | Modelos y validación | pydantic | MIT |
 | YAML que conserva comentarios | ruamel.yaml | MIT |
 | HTTP | httpx | BSD-3 |
-| RIS | rispy | MIT |
-| BibTeX | bibtexparser | MIT |
+| RIS | lector propio con la biblioteca estándar (ADR-0010) | — |
+| BibTeX | bibtexparser 2.0.1 y pylatexenc 2.11, versiones exactas (ADR-0010) | MIT, MIT |
 | Coincidencia difusa | rapidfuzz | MIT |
 | Tablas | pandas | BSD-3 |
 | Excel | openpyxl | MIT |
