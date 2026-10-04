@@ -113,3 +113,75 @@ de las fuentes; precisa una consecuencia.
   tercero sin ella reproduce solo lo que depende de campos versionados.
 - Lo mismo vale para las exportaciones manuales. El detalle está en el
   ADR-0010 (puntos 1 a 4); esta nota no lo repite.
+
+## Nota posterior (2026-10-04): condiciones de acceso verificadas y prueba en vivo
+
+Resultado de volver a verificar las APIs antes del hito 3, con tres orígenes
+que se distinguen en cada dato: **O**, leído en la página oficial por Claude
+Code el 2026-10-04; **A**, verificado por el asesor en la documentación
+oficial; **I**, prueba en vivo del investigador en su equipo el 2026-10-04.
+Las cifras son las que dicen esas fuentes: no se agregó ninguna otra.
+
+### Corrección de la fila de OpenAlex
+
+La fila de OpenAlex de la tabla de arriba **ya no es correcta**: la clave no es
+obligatoria. Según la ayuda oficial
+([help.openalex.org/api/authentication](https://help.openalex.org/api/authentication),
+actualizada el 2026-08-19 según el asesor):
+
+- la clave es **opcional pero recomendada** y gratuita: sin ella se hacen
+  consultas básicas, y con ella el presupuesto diario se multiplica por 10
+  (O, A);
+- el máximo es de 100 solicitudes por segundo, y exceder ese ritmo o el
+  presupuesto diario devuelve 429 (O, A);
+- `per_page` admite como máximo 100, y el paginado básico llega a 10 000
+  resultados; más allá se usa el paginado por cursor (O, A);
+- la página **no expresa el presupuesto en dólares ni en solicitudes**. La
+  afirmación «1 USD de uso diario» y sus equivalencias de la tabla original no
+  tienen respaldo en la página actual;
+- los encabezados de la respuesta son `X-RateLimit-Limit`,
+  `X-RateLimit-Remaining`, `X-RateLimit-Credits-Used` y `X-RateLimit-Reset`
+  (segundos hasta la medianoche UTC) (O).
+
+### Verificado, por fuente
+
+| Fuente | Qué dice la documentación oficial | Origen |
+|---|---|---|
+| NCBI E-utilities | 3 solicitudes por segundo sin clave y 10 con clave; trabajos grandes en fin de semana o entre las 21:00 y las 05:00, hora del Este; enviar `tool` y `email`. Guía [NBK25497](https://www.ncbi.nlm.nih.gov/books/NBK25497/) | A. Claude Code no pudo reconsultarla: la página devolvió un reCAPTCHA |
+| Semantic Scholar | La clave es opcional y gratuita. Sin clave se comparte un grupo común («1000 requests per second shared among all unauthenticated users», con posible limitación adicional en uso intenso); con clave, el límite introductorio es 1 solicitud por segundo. Exige aceptar su licencia de la API ([semanticscholar.org/product/api](https://www.semanticscholar.org/product/api)) | O, A |
+| Crossref | Sin clave. Grupo público y grupo *polite*, que exige el parámetro `mailto`; al exceder se devuelve 429 ([documentación de acceso](https://www.crossref.org/documentation/retrieve-metadata/rest-api/access-and-authentication/)). **No se registran cifras de límites**: la lectura no dio el intervalo. La documentación consultada no dice nada sobre los derechos de los resúmenes | O |
+| Springer Nature OA | Plan Basic: 500 consultas al día, con control de tasa de 100 por minuto y una sola clave por cuenta; el Premium sube a 10 000 y 300 ([página del producto](https://datasolutions.springernature.com/products/open-access/)) (O). Tamaño máximo de página `p` = 20, el inicio se pasa con `s`, una clave por usuario, la clave viaja en la URL, y la licencia Creative Commons de cada artículo rige el uso de su contenido (A) | O y A, como se indica |
+| AGROVOC | Contenido en inglés, ruso, francés, español, árabe y chino bajo CC-BY 4.0; el de otros idiomas pertenece a las instituciones que lo crearon; una versión nueva cada mes ([fao.org/agrovoc/maintenance](https://www.fao.org/agrovoc/maintenance)) (O). API de Skosmos documentada en api.finto.fi/doc (A); ver el ADR-0011 | O y A, como se indica |
+
+### No verificado
+
+- **Springer:** el acuerdo de uso de la API lo leyó el investigador; Claude Code
+  **no lo verificó** y no lo cita. Tampoco verificó el tamaño de página ni la
+  licencia por artículo, que son del asesor. El límite diario de 500 sale del
+  texto de la página del producto: la respuesta de la API no trae encabezados
+  de límite (I).
+- **Licencia de AGROVOC:** la fuente oficial vigente dice CC-BY 4.0, pero la
+  [FAQ de AIMS](https://aims.fao.org/standards/agrovoc/faq) todavía dice
+  «CC-BY IGO 3.0», y la página de versiones es de 2020 y cita la versión
+  2022-04. Se toma la primera como vigente y se deja la discrepancia a
+  confirmar por el investigador **antes del sub-hito 3a** (hoja de ruta).
+- **Crossref:** los intervalos de sus límites y los derechos de sus
+  resúmenes.
+- **OpenAlex:** la unidad del presupuesto. El diagnóstico de fuentes (hito 3,
+  sub-hito 3a) debe medirla.
+- **NCBI:** Claude Code no reverificó las cifras (arriba).
+
+### Prueba en vivo del investigador (I, 2026-10-04, su equipo)
+
+| Fuente | Sin clave | Con clave |
+|---|---|---|
+| OpenAlex | 200 | 200; `X-RateLimit-Remaining: 9990` tras una consulta de búsqueda (unidad no confirmada) |
+| Crossref | 200 | no aplica |
+| PubMed (NCBI) | 200 | 200; 9123 resultados en una consulta de prueba |
+| Semantic Scholar | tiempo de espera agotado y luego 429, en dos intentos: el grupo compartido sin clave estaba saturado | sin clave aún |
+| Springer Nature OA | no probado | 200; total 301 en una consulta de prueba; sin encabezados de límite en la respuesta |
+| AGROVOC | REST con error 500 en tres intentos; SPARQL con 503; el sitio web con 200 (los servicios de datos de la FAO estaban caídos) | no aplica |
+
+Los números de resultados (9123 y 301) vienen de consultas de prueba del
+investigador, con fecha, y no de una fuente oficial. Estas observaciones son
+las que motivan el ADR-0011 (degradación ante fuentes inestables).
