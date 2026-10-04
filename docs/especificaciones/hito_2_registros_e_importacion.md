@@ -1,6 +1,7 @@
 # Especificación del hito 2: registros e importación
 
 - **Estado:** propuesta de Claude Code (2026-09-29), con las decisiones del investigador y del asesor. Se revisa con el asesor antes de programar, y cada sub-hito se revisa antes de implementarlo.
+- **Revisión del 2026-10-04:** incorpora los ajustes del asesor al ADR-0010 (principio «local completo, nube mínima y configurable»; los campos pendientes ya no bloquean `importar registrar`; regla de la evidencia literal; respaldo separado de la publicación; `adaptacion_generica` solo con datos sintéticos; máximos y términos «por verificar»).
 - **Relación con otros documentos:** desarrolla el hito 2 de la [hoja de ruta](../hoja_de_ruta.md) y su nota, y se apoya en el [ADR-0010](../decisiones/0010-registros-importacion-y-datos-de-terceros.md) (propuesta). Si algo aquí contradice un ADR aceptado, prevalece el ADR y se corrige este documento.
 
 ## Objetivo
@@ -45,22 +46,22 @@ Al cerrar 2e se etiqueta `v0.2.0`.
 
 Un registro es lo que devuelve una fuente para un documento. Esquema pydantic estricto (`extra="forbid"`):
 
-| Campo | Contenido | Publicable |
+| Campo | Contenido | Versionable |
 |---|---|---|
 | `id` | `imp-NNNN-NNNNN`: importación y posición en la búsqueda (orden de los archivos declarado y, dentro de cada archivo, orden de lectura) | siempre |
 | `id_importacion` | `imp-NNNN` | siempre |
 | `fuente` | ID de la fuente en el protocolo (`scopus`, `wos`, `acs`, …) | siempre |
 | `formato` | `ris`, `bibtex`, `scopus_csv`, `wos_txt` o `csv` | siempre |
 | `archivo` y `posicion` | nombre del archivo original y línea (RIS, WoS, BibTeX) o fila (CSV) donde empieza el registro | siempre |
-| `tipo_id_fuente` y `id_fuente` | `eid`, `ut`, `doi`, `pmid`, `lens_id` o `ninguno`, y su valor | según la política |
-| `titulo` | texto | según la política |
-| `autores` | lista, en el orden de la fuente | según la política |
-| `anio` | entero o nulo | según la política |
-| `fuente_publicacion` | revista, libro, congreso u oficina de patentes | según la política |
-| `volumen`, `numero`, `paginas` | texto o nulo | según la política |
-| `doi` | normalizado o nulo | según la política |
-| `pmid` | texto o nulo | según la política |
-| `tipo_documento`, `idioma` | el texto de la fuente, sin traducir | según la política |
+| `tipo_id_fuente` y `id_fuente` | `eid`, `ut`, `doi`, `pmid`, `lens_id` o `ninguno`, y su valor | según la configuración del estudio |
+| `titulo` | texto | según la configuración del estudio |
+| `autores` | lista, en el orden de la fuente | según la configuración del estudio |
+| `anio` | entero o nulo | según la configuración del estudio |
+| `fuente_publicacion` | revista, libro, congreso u oficina de patentes | según la configuración del estudio |
+| `volumen`, `numero`, `paginas` | texto o nulo | según la configuración del estudio |
+| `doi` | normalizado o nulo | según la configuración del estudio |
+| `pmid` | texto o nulo | según la configuración del estudio |
+| `tipo_documento`, `idioma` | el texto de la fuente, sin traducir | según la configuración del estudio |
 | `resumen`, `palabras_clave_autor`, `palabras_clave_indexadas` | texto o lista | nunca |
 | `otros` | `{etiqueta o columna: valor}` para los campos leídos sin campo propio, sin los volátiles | nunca |
 | `hash_completo` | SHA-256 del registro completo normalizado (abajo) | siempre |
@@ -74,42 +75,47 @@ Un registro es lo que devuelve una fuente para un documento. Esquema pydantic es
 - `Articulo` y `Estudio`, con la relación de muchos a muchos `VinculoArticuloEstudio`. Se definen con los campos mínimos (ID y vínculos) y quedan marcados en su docstring como **provisionales**: el hito 4 asocia registros a artículos y el hito 8, artículos a estudios.
 - El registro no se fusiona ni se modifica al asociarlo: la deduplicación del hito 4 crea artículos que lo referencian.
 
-### Política de datos
+### Política de datos y configuración de publicación
 
-- **`agentresearch/registros/politica_datos.yaml`,** validada con pydantic al cargarla:
+Principio del ADR-0010: **local completo, nube mínima y configurable**. Todo se importa y se conserva completo en local; lo que se versiona lo decide cada estudio, con la base registrada. Hay dos archivos, ambos validados con pydantic al cargarlos.
+
+- **`agentresearch/registros/politica_datos.yaml` (paquete).** Lista fija `nunca_publicables` (resumen, palabras clave de autor e indexadas, referencias, conteos de citas, afiliaciones y financiación) y, por fuente, los campos que esa fuente puede aportar y que el estudio puede habilitar. **Es neutral:** no atribuye ninguna confirmación a una institución ni trae una base por omisión, porque eso es de cada estudio. Que un campo esté «confirmado» o «pendiente» lo decide la base que el estudio registra en `publicacion_datos.yaml`:
 
   ```yaml
-  version: 1
+  version: 2
+  nunca_publicables: [resumen, palabras_clave_autor, palabras_clave_indexadas, referencias, conteos_citas, afiliaciones, financiacion]
   fuentes:
-    por_omision:
-      campos:
-        titulo: confirmado
-        autores: confirmado
-        doi: confirmado
-        fuente_publicacion: confirmado
     scopus:
-      campos:
-        titulo: confirmado
-        autores: confirmado
-        doi: confirmado
-        fuente_publicacion: confirmado
-        anio: pendiente
-        volumen: pendiente
-        numero: pendiente
-        paginas: pendiente
-        tipo_documento: pendiente
-        idioma: pendiente
-        id_fuente: pendiente     # EID
-    # wos (UT), acs (el ID de la fuente es el DOI) y lens con la misma forma
+      campos_habilitables: [titulo, autores, doi, fuente_publicacion, anio, volumen, numero, paginas, tipo_documento, idioma, id_fuente]   # id_fuente: EID
+    # wos (id_fuente: UT), acs (el ID de la fuente es el DOI) y lens con la misma forma
   ```
 
-- `campos_publicables(fuente)` y `tiene_pendientes(fuente)`. Una fuente sin entrada usa `por_omision`. Un campo ausente no se publica.
-- `hash_politica()`: el SHA-256 del archivo, que registra cada importación.
-- `registro_publicable(registro, politica)`: el registro con solo los campos publicables y los que se publican siempre.
+- **`publicacion_datos.yaml` (estudio, en la raíz, versionado).** Por fuente, los campos que el estudio habilita, cada uno con su `base`:
+
+  ```yaml
+  fuentes:
+    scopus:
+      campos:
+        titulo:
+          base: {tipo: institucion, detalle: null, medio: null, fecha: null}   # incompleta: el estudio la registra
+    # ...
+  evidencia_literal:
+    resumen: no_permitido      # o permitido, con su base (ADR-0010, punto 5)
+  respaldo_nube:
+    scopus: {estado: sin_verificar}
+  ```
+
+  - `base.tipo` es `institucion`, `revista` o `licencia`; `detalle`, `medio` y `fecha` completan la base. Una base sin `tipo`, `detalle` o `fecha` es **incompleta**.
+  - Cargarla rechaza cualquier campo de `nunca_publicables`.
+  - La plantilla del estudio la crea **neutra**: con los campos de metadatos bibliográficos habituales (`titulo`, `autores`, `doi`, `fuente_publicacion`) y su base incompleta (`detalle`, `medio` y `fecha` vacíos), hasta que el investigador registre la suya. Ninguna institución concreta aparece en el paquete ni en la plantilla; el caso de la Universidad del Cauca es un ejemplo documentado en el ADR-0010 (punto 4).
+- **Regla de versionado.** `campos_versionables(fuente, politica, config)` devuelve los campos que no son `nunca_publicables`, que el estudio habilita para esa fuente y cuya base está completa. Una fuente sin entrada no tiene campos habilitados. Un campo ausente no se versiona.
+- **Los campos que no se versionan sí se importan.** El registro completo normalizado se conserva en local (el original y su regeneración verificada por `hash_completo`). Un campo `pendiente` o con base incompleta no se versiona, pero tampoco bloquea el registro de la búsqueda (ADR-0010, punto 4).
+- `hash_politica()` y `hash_configuracion()`: los SHA-256 de ambos archivos, que registra cada importación.
+- `registro_versionable(registro, campos)`: el registro con solo los campos versionables y los que se versionan siempre.
 
 ### Archivos
 
-- `escribir_registros_jsonl(registros)`: una línea de JSON canónico por registro publicable, en UTF-8 con LF.
+- `escribir_registros_jsonl(registros)`: una línea de JSON canónico por registro, solo con los campos versionables, en UTF-8 con LF.
 - `escribir_vista_csv(registros)`: `registros.csv` derivado de `registros.jsonl`, con columnas fijas en el orden del esquema, `autores` unidos por `; `, UTF-8 sin BOM y LF. Es determinista: el mismo JSONL da los mismos bytes.
 
 ### Pruebas
@@ -117,7 +123,11 @@ Un registro es lo que devuelve una fuente para un documento. Esquema pydantic es
 - Esquema: campos desconocidos rechazados; registro sin DOI ni revista (patente, tesis) aceptado.
 - DOI: extracción desde URL, `doi:` y el proxy; minúsculas solo en ASCII; texto sin DOI → nulo.
 - `hash_completo`: igual con otro `id`, `archivo` o `posicion`; distinto si cambia un campo bibliográfico.
-- Política: un campo `pendiente` se detecta; un campo ausente no se publica; el resumen y las palabras clave nunca se publican aunque la tabla los liste por error (se rechaza al cargar).
+- Política y configuración:
+  - un campo `pendiente` o con base incompleta no es versionable, pero el registro completo conserva su valor;
+  - un campo ausente de la configuración no se versiona, y una fuente sin entrada no habilita nada;
+  - el resumen, las palabras clave y los demás `nunca_publicables` se rechazan al cargar la configuración, aunque el estudio los liste;
+  - `hash_politica()` y `hash_configuracion()` cambian si cambia el archivo.
 - JSONL y CSV: bytes idénticos en ejecuciones repetidas y en Windows y Ubuntu; caracteres no ASCII sin escapar.
 
 ## 2b. Lectores y `importar leer`
@@ -222,7 +232,7 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
 
 1. **Valida todo sin escribir** y reporta todos los problemas a la vez:
    - el protocolo y la fuente (I-E01, I-E02);
-   - la política de la fuente (I-E03);
+   - la configuración de publicación: un campo sin base completa no impide registrar; se informa como advertencia I-A01 (abajo);
    - la lectura de cada archivo, que debe estar sin errores (I-E07);
    - los archivos ya registrados (I-E05) y los identificadores repetidos (I-E06);
    - el revisor (I-E11);
@@ -233,7 +243,7 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
    - Si ese desfase difiere del actual, avisa que la fecha cae en otro periodo de horario de verano.
    - Rechaza una fecha futura o anterior a la aprobación del protocolo (I-E04).
 4. **Determina la versión del protocolo vigente en esa fecha** y la ecuación esperada (ADR-0010, punto 12), la compara con la ejecutada y clasifica la relación: `identica`, `desviacion` o `adaptacion_generica`. Una desviación sin justificación es I-E09. Una diferencia entre los resultados de la interfaz y los registros leídos sin justificación es I-E08.
-5. **Muestra el resumen completo:** fuente, plataforma, institución, cobertura, filtros, lematización, fecha y hora local y UTC, versión del protocolo, las dos ecuaciones con su diferencia y su relación, cada archivo con su hash y su número de registros, los totales frente a la interfaz, las justificaciones y los campos que se versionarán según la política.
+5. **Muestra el resumen completo:** fuente, plataforma, institución, cobertura, filtros, lematización, fecha y hora local y UTC, versión del protocolo, las dos ecuaciones con su diferencia y su relación, cada archivo con su hash y su número de registros, los totales frente a la interfaz, las justificaciones, y los campos que se versionarán y los que quedarán solo en local (con el motivo: sin habilitar, base incompleta o nunca publicable).
 6. **Pide la frase** `registrar imp-NNNN`. Una respuesta distinta cancela sin escribir.
 7. **Escribe**, con el evento como punto de confirmación (ADR-0010, punto 18):
    1. copia los originales a `exportaciones_originales/imp-NNNN/`;
@@ -250,7 +260,7 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
 |---|---|
 | I-E01 | El protocolo no está vigente según el registro, o hay P-E09 o P-E10 |
 | I-E02 | La fuente no está declarada en `fuentes` con `tipo: exportacion` |
-| I-E03 | La política de la fuente tiene campos pendientes de confirmar (ADR-0010, punto 4) |
+| I-E03 | Retirada (2026-10-04): los campos pendientes ya no bloquean el registro; ver I-A01. El número no se reutiliza |
 | I-E04 | La fecha de la búsqueda es futura o anterior a la aprobación del protocolo |
 | I-E05 | Un archivo ya está registrado en el estudio (mismo hash) o aparece dos veces en la búsqueda |
 | I-E06 | Un identificador de la fuente se repite dentro de un archivo o entre archivos de la búsqueda |
@@ -260,6 +270,12 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
 | I-E10 | Un original quedaría versionado, o no se pudo comprobar con Git |
 | I-E11 | `--registrado-por` no es un revisor humano declarado en `seleccion.revisores` |
 | I-E12 | No hay terminal interactiva |
+
+Advertencia (no impide registrar):
+
+| ID | Regla |
+|---|---|
+| I-A01 | Hay campos que no se versionarán: porque el estudio no los habilita o porque su base está incompleta. Se listan; se importan y se conservan en local |
 
 ### Evento `busqueda_registrada`
 
@@ -273,7 +289,8 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
 - `archivos`: `{nombre_original, formato, hash, registros, copia}`, con `copia` como ruta relativa en `exportaciones_originales/imp-NNNN/`;
 - `mapeo`: su hash, si hay;
 - `carpeta` (`importaciones/imp-NNNN`), `hash_importacion_json`, `hash_registros_jsonl` y `hash_registros_csv`;
-- `politica` `{version, hash}`;
+- `politica` `{version, hash}` y `configuracion_publicacion` `{hash}`;
+- `campos_versionados` y `campos_solo_locales` (con el motivo de cada uno);
 - `registrado_por` (`{tipo: humano, id}`).
 
 **P-E10 se amplía:** el esquema de `busqueda_registrada`, los números de importación consecutivos desde `imp-0001`, y que los tres archivos de cada `importaciones/imp-NNNN/` existan con los hashes registrados. Que falten los originales **no** es P-E10, porque no se versionan: lo informa `importar historial`.
@@ -294,7 +311,8 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
 
 ### Pruebas
 
-- Cada regla I-E01 a I-E12 con un caso que la dispare, sin escribir nada.
+- Cada regla I-E01 a I-E12 (salvo la I-E03, retirada) con un caso que la dispare, sin escribir nada.
+- Campos pendientes: una búsqueda con campos `pendiente` o con base incompleta **se registra**, informa I-A01, versiona solo los campos con base completa y conserva los demás en local; los campos `nunca_publicables` no aparecen en ningún archivo versionado ni aunque la configuración los liste (se rechaza al cargarla).
 - Registro completo con una terminal simulada:
   - archivos escritos, evento y anclaje;
   - bytes de `registros.jsonl` y `registros.csv` iguales en repeticiones;
@@ -304,7 +322,7 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
   - aviso de otro periodo de horario de verano, con el desfase del sistema inyectado;
   - fecha futura y anterior a la aprobación;
   - versión del protocolo vigente en una fecha entre dos enmiendas.
-- Ecuación: idéntica; desviación con y sin justificación; adaptación de la genérica; esperada tomada de `ecuaciones.md` y regenerada desde `versiones/`.
+- Ecuación: idéntica; desviación con y sin justificación; adaptación de la genérica; esperada tomada de `ecuaciones.md` y regenerada desde `versiones/`. **La ruta `adaptacion_generica` solo se prueba con datos sintéticos hasta tener datos reales** (ADR-0010, punto 12): el estudio de demostración no usa ACS y su exportación de prueba solo se lee.
 - Varias tandas: suma, identificador repetido entre archivos y archivo ya importado.
 - `git check-ignore`: destino ignorado; no ignorado; archivo ya agregado al índice; fuera de un repositorio.
 - Atomicidad: un fallo antes del evento deja la carpeta huérfana y el reintento la sobrescribe; un fallo después del evento se reconoce.
@@ -317,6 +335,7 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
 Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
 
 - **`.gitignore`:** agrega `exportaciones_originales/`, con un comentario que remite al ADR-0010.
+- **`publicacion_datos.yaml`:** se crea en la raíz del estudio, neutra: con los campos de metadatos habituales y su base incompleta, sin nombrar ninguna institución. Es un archivo del estudio: `estudio actualizar` lo crea si no existe y **nunca lo sobrescribe**.
 - **`.claude/settings.json`:**
   - `allow`: `importar leer` e `importar historial` (Bash y PowerShell);
   - `deny`: `*agentresearch importar registrar*` (Bash y PowerShell), `Edit(/importaciones/**)` y `Edit(/exportaciones_originales/**)`.
@@ -324,22 +343,22 @@ Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
   `importar leer` no coincide con la regla `deny` porque el subcomando es distinto.
 - **Skill `/importar`** (`.claude/skills/importar/`, con `disable-model-invocation: true`):
   1. comprueba con `validar` e `historial` que el protocolo esté vigente, sin P-E09 ni P-E10, y que el `.gitignore` ignore `exportaciones_originales/`; si no, explica `estudio actualizar`;
-  2. muestra la ecuación de la fuente desde `ecuaciones.md` y los pasos manuales: dónde pegarla, qué filtros aplicar, en qué formato exportar y el máximo por exportación de la base (ADR-0010, punto 25);
+  2. muestra la ecuación de la fuente desde `ecuaciones.md` y los pasos manuales: dónde pegarla, qué filtros aplicar, en qué formato exportar y el máximo por exportación de la base, presentado como «según la documentación consultada, por verificar» (ADR-0010, punto 25);
   3. pide al investigador, una cosa a la vez: plataforma, institución, cobertura, filtros, lematización, la ecuación tal como la ejecutó, los resultados de la interfaz y dónde guardó los archivos;
   4. ejecuta `importar leer` y explica el resultado; si la suma no coincide con la interfaz, pregunta el motivo para la justificación;
   5. prepara `.borradores/busqueda.json` y da el comando exacto de `importar registrar` para la terminal del investigador (PowerShell o la terminal de VS Code), con lo que verá y la frase que debe escribir;
-  6. después, verifica con `importar historial`, sugiere el commit con el anclaje en el mensaje y **recuerda guardar los originales** en el equipo y, si la base está cubierta por la confirmación de la Biblioteca, en la nube institucional; si no, en un respaldo fuera de la nube (ADR-0010, punto 9);
+  6. después, verifica con `importar historial`, sugiere el commit con el anclaje en el mensaje y **recuerda guardar los originales** en el equipo y en un respaldo fuera de los servicios de nube compartidos; recomienda la nube institucional solo si `publicacion_datos.yaml` registra `respaldo_nube: permitido` para esa fuente, con su base. El respaldo no depende de qué campos se publican (ADR-0010, punto 9);
   7. para ACS, explica su rol (ADR-0010, punto 27): búsquedas complementarias puntuales, descarga por selección o por página como tandas, y nunca herramientas que automaticen la interfaz.
 - **`CLAUDE.md` del estudio:** la tabla de comandos incluye `importar leer`, `importar registrar` (solo el investigador) e `importar historial`, y la prueba que compara la tabla con la CLI sigue pasando. Se agrega la regla: los originales y los registros completos no se versionan ni se copian a archivos versionados.
 - **`README.md` del estudio:** anuncia `importaciones/` y `exportaciones_originales/`.
-- **Pruebas:** contenido esperado de las plantillas; reglas de permisos; que `importar registrar` coincide con la regla `deny` y `importar leer` no; `estudio actualizar` lleva el `.gitignore` y la *skill* nuevos a un estudio de `v0.1.0`.
+- **Pruebas:** contenido esperado de las plantillas; reglas de permisos; que `importar registrar` coincide con la regla `deny` y `importar leer` no; `estudio actualizar` lleva el `.gitignore`, la *skill* y `publicacion_datos.yaml` nuevos a un estudio de `v0.1.0`, y no sobrescribe un `publicacion_datos.yaml` que el estudio ya modificó.
 
 ## 2e. Aceptación y cierre de `v0.2.0`
 
 ### Antes de empezar
 
-- El investigador completa en el ADR-0010 la confirmación de la Biblioteca (medio, fecha y bases cubiertas) y la comprobación adicional de ACS.
-- Se resuelven los campos pendientes de la política (ADR-0010, punto 4). Si alguno no se confirma, sale de la tabla en un commit de este repositorio.
+- El investigador completa la comprobación adicional de ACS (ADR-0010, punto 28).
+- La confirmación de la Biblioteca (medio, fecha y bases cubiertas) y los campos pendientes de la política **no bloquean** el 2e (ADR-0010, punto 4). Mientras la base de un campo esté incompleta, ese campo se importa en local y no se versiona. Cuando el investigador reciba la confirmación, completa la base en `publicacion_datos.yaml` del estudio.
 
 ### Parte A: exportaciones reales de prueba (repositorio del agente)
 
@@ -351,7 +370,8 @@ Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
 
   Las guarda en `exportaciones_prueba_local/`, que Git ignora.
 - Claude Code las lee **solo con `importar leer`**: no se registran ni se versionan. Se comprueba que los conteos coinciden con la interfaz y que las correspondencias de campos son correctas, y se corrigen las tablas de los lectores con lo que revelen (columnas, etiquetas y campos volátiles).
-- Queda constancia en el ADR-0010, «Aceptación»: formatos, número de registros por archivo, hallazgos y correcciones, sin copiar datos de los registros.
+- El investigador anota el máximo por exportación que ofrece cada interfaz, para verificar los de Scopus y Web of Science, que el ADR-0010 (punto 25) deja «por verificar».
+- Queda constancia en el ADR-0010, «Aceptación»: formatos, número de registros por archivo, máximos observados, hallazgos y correcciones, sin copiar datos de los registros.
 
 ### Parte B: estudio de demostración
 
@@ -368,7 +388,7 @@ Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
 ## ADR que el hito 2 debe producir
 
 - **ADR-0010:** registros, importación de búsquedas manuales y datos de terceros. Propuesta en el 2a; se acepta al cerrar el 2e, con su sección «Aceptación».
-- **Nota posterior del ADR-0004**, al aceptar el ADR-0010: el alcance de «reproducible» (ADR-0010, punto 3).
+- **Notas posteriores del ADR-0003 y del ADR-0004** (hechas el 2026-10-04): «reproducible desde respuestas crudas guardadas» ya no aplica a campos restringidos; la reproducción se apoya en la copia local y en los hashes registrados (ADR-0010, punto 3). Si al aceptar el ADR-0010 cambia ese punto, se agrega otra nota posterior.
 - Un ADR nuevo solo si una decisión de implementación lo exige (p. ej. cambiar bibtexparser por un lector propio).
 
 ## Criterio de terminado del hito 2
