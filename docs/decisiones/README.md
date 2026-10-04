@@ -16,6 +16,7 @@ Cada decisión de diseño relevante queda en un archivo numerado. Una decisión 
 | [0008](0008-ciclo-de-vida-del-protocolo.md) | Ciclo de vida del protocolo | Aceptada | 2026-09-26 |
 | [0009](0009-ecuaciones-de-busqueda-por-fuente.md) | Ecuaciones de búsqueda por fuente | Aceptada | 2026-09-27 |
 | [0010](0010-registros-importacion-y-datos-de-terceros.md) | Registros, importación de búsquedas manuales y datos de terceros | Propuesta | 2026-09-29 |
+| [0011](0011-degradacion-de-apis-y-copia-local-de-agrovoc.md) | Degradación ante fuentes de API inestables y copia local de AGROVOC | Propuesta | 2026-10-04 |
 
 ## Plantilla
 
