@@ -86,9 +86,9 @@ mi-estudio/
 
 ## Datos de terceros
 
-Las exportaciones de las bases de suscripción y las respuestas de algunas APIs contienen datos con licencia, como los resúmenes. El [ADR-0010](decisiones/0010-registros-importacion-y-datos-de-terceros.md) (propuesta) fija dos niveles:
+Las exportaciones de las bases de suscripción y las respuestas de algunas APIs contienen datos con licencia, como los resúmenes. El [ADR-0010](decisiones/0010-registros-importacion-y-datos-de-terceros.md) (propuesta) fija el principio **local completo, nube mínima y configurable** y dos niveles:
 
-- **Se versionan** los datos de cada búsqueda, el hash y el número de registros de cada original, y los registros normalizados con solo los campos que permite la política de su fuente (`agentresearch/registros/politica_datos.yaml`).
+- **Se versionan** los datos de cada búsqueda, el hash y el número de registros de cada original, y los registros normalizados con solo los campos que el estudio habilita en `publicacion_datos.yaml`, cada uno con su base registrada (institución, revista o licencia). Nunca se publican el resumen, las palabras clave, las referencias, los conteos de citas, las afiliaciones ni la financiación (`agentresearch/registros/politica_datos.yaml`).
 - **No se versionan** las exportaciones originales, que el paquete copia a `exportaciones_originales/` (ignorada por Git y comprobada con `git check-ignore`), ni los registros completos, que se regeneran en el equipo del investigador desde los originales verificados por su hash. Tampoco se versionan los archivos derivados que contienen resúmenes, como los lotes del LLM y las hojas Excel del cribado: se versionan su hash y sus IDs.
 
 Por eso lo reproducible es lo versionado más los originales verificados por su hash (el ADR-0010 precisa el alcance del ADR-0004).
