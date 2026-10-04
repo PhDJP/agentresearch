@@ -42,3 +42,26 @@ Para lograrlo:
 
 - Cada comando que registra decisiones debe validar el esquema antes de escribir. Las pruebas cubren los casos de rechazo.
 - El artículo podrá declarar con precisión qué hizo el LLM, con qué modelo, con qué prompts y con qué concordancia frente al investigador.
+
+## Nota posterior (2026-10-04): alcance de «reproducible» con datos de terceros
+
+Pedida por el asesor al revisar el ADR-0010 (propuesta). Los datos de terceros
+con licencia (resúmenes, palabras clave y otros campos de las bases y de las
+APIs) no pueden publicarse en el repositorio de un estudio, y esto precisa lo
+que la decisión original daba por supuesto.
+
+- **Reproducible,** punto 15 de la decisión original: la garantía se apoya en
+  **lo versionado más la copia local de los originales (exportaciones y
+  respuestas crudas) verificada por los hashes registrados.** Un tercero
+  reproduce sin los originales lo que depende solo de campos versionados, y
+  el reporte declara lo que exige los originales.
+- **Evidencia literal,** puntos 1 y 2: la verificación de que la evidencia
+  aparece en el registro se hace en el equipo del investigador, contra el
+  original. Cada decisión versionada guarda siempre el campo de origen, las
+  posiciones del fragmento y su SHA-256; el texto del fragmento se versiona
+  solo si la configuración del estudio lo permite (ADR-0010, punto 5).
+- **Evidencia pública,** punto 8: «todo lo anterior» se versiona **con
+  estas restricciones**. Lo que no se versiona queda en local y, si el
+  investigador lo decide, en un respaldo que no dependa de servicios de nube
+  que los términos de la fuente prohíban.
+- El detalle está en el ADR-0010 (puntos 1 a 5).

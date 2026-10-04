@@ -94,3 +94,22 @@ ADR-0010 lo formaliza.
    credenciales institucionales: el investigador busca y exporta a mano.
    Las exportaciones se tratan según la política de datos de terceros del
    ADR-0010.
+
+## Nota posterior (2026-10-04): reproducibilidad y respuestas crudas
+
+Pedida por el asesor al revisar el ADR-0010 (propuesta). No cambia la decisión
+de las fuentes; precisa una consecuencia.
+
+- La consecuencia «la búsqueda es reproducible a partir de las respuestas
+  crudas guardadas, no volviendo a consultar la API» **ya no aplica a los
+  campos restringidos.** Las respuestas crudas completas de una API contienen
+  datos de terceros (por ejemplo, los resúmenes) que no se publican, y el
+  repositorio de un estudio se publica.
+- Las respuestas crudas completas se guardan **solo en el equipo del
+  investigador**, en una carpeta ignorada por Git. En el repositorio van su
+  hash y los campos que el estudio habilite, con la base de esa habilitación.
+- **La reproducción se apoya en la copia local y en los hashes registrados:**
+  quien tenga la copia local verifica que es la misma comprobando su hash, y un
+  tercero sin ella reproduce solo lo que depende de campos versionados.
+- Lo mismo vale para las exportaciones manuales. El detalle está en el
+  ADR-0010 (puntos 1 a 4); esta nota no lo repite.
