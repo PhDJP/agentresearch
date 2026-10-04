@@ -27,7 +27,10 @@ Riesgo aceptado: los problemas que solo aparecen con datos reales se descubren a
 - [x] Tema, pregunta general, PCC y preguntas específicas del caso piloto (recibidos el 2026-09-25; ver `caso_piloto_local/contexto_caso_piloto.md`).
 - [ ] Decisiones O1–O10 del caso piloto: se toman con el comando `/protocolo` en el hito 11.
 - [ ] Criterios de inclusión y exclusión, y de 5 a 10 artículos clave conocidos por vías distintas de las APIs, para el conjunto de validación (hito 11).
-- [ ] Claves gratuitas de API (antes del hito 3): OpenAlex ✅ (2026-09-27), Semantic Scholar, NCBI (opcional) y Springer Nature.
+- [ ] Claves gratuitas de API (antes del hito 3): OpenAlex ✅ (2026-09-27; probada con clave el 2026-10-04, 200), NCBI ✅ (opcional; probada con clave el 2026-10-04, 200), Springer Nature ✅ (probada con clave el 2026-10-04, 200), y **Semantic Scholar pendiente** (con la aceptación de su licencia de la API).
+- [ ] Reintentar AGROVOC más adelante: el 2026-10-04 el REST respondió 500 (tres intentos) y SPARQL 503, con el sitio web en 200 (ADR-0003, nota posterior del 2026-10-04).
+- [ ] **Antes del sub-hito 3a:** verificar contra la fuente oficial los límites y términos de Springer Nature (el acuerdo de uso de la API lo leyó el investigador; Claude Code no lo verificó) y la **licencia de AGROVOC**, que tiene una discrepancia entre CC-BY 4.0 y CC-BY IGO 3.0 (ADR-0011, punto 13).
+- [ ] Tener el `.env` del estudio con las claves y el correo que Crossref y NCBI piden (nunca en el código ni en lo versionado).
 
 ## Hito 0: Entorno y esqueleto (`v0.0.1`) · ✅ completo (2026-09-25)
 
@@ -77,11 +80,19 @@ Especificación detallada, dividida en los sub-hitos 2a a 2e: [especificaciones/
 
 ## Hito 3: Conectores de APIs (`v0.3.0`)
 
-- Interfaz común, caché de respuestas crudas, control de tasa y claves en `.env` (con `.env.ejemplo` versionado).
-- Conectores de OpenAlex, PubMed, Semantic Scholar, Springer Nature OA, Crossref y AGROVOC.
-- Volver a verificar límites y términos de cada API y registrarlos en ADR-0003.
+Especificación detallada, dividida en los sub-hitos 3a a 3e: [especificaciones/hito_3_conectores_de_apis.md](especificaciones/hito_3_conectores_de_apis.md) (propuesta). Decisiones: [ADR-0011](decisiones/0011-degradacion-de-apis-y-copia-local-de-agrovoc.md) (propuesta) y la nota posterior del 2026-10-04 del [ADR-0003](decisiones/0003-fuentes-y-formatos.md).
 
-**Criterio de terminado:** búsqueda del estudio de demostración en las APIs, con respuestas crudas guardadas (sin credenciales) y pruebas simuladas.
+**Prerrequisito: diagnóstico de fuentes.** Antes de escribir los conectores, el sub-hito 3a incluye `agentresearch fuentes diagnosticar`: una consulta mínima a cada fuente configurada, con el código HTTP, los encabezados de límite y si la clave existe (sin mostrarla), guardado solo en el equipo del investigador, en una carpeta ignorada. Cuesta unas 7 solicitudes por ejecución y reproduce lo que el investigador observó el 2026-10-04.
+
+- Sub-hitos, ordenados por utilidad y riesgo:
+  - **3a:** interfaz común, caché local de respuestas crudas, control de tasa y de presupuesto diario, claves en `.env` con saneo (`.env.ejemplo` versionado), degradación (ADR-0011) y diagnóstico de fuentes;
+  - **3b:** OpenAlex y Crossref;
+  - **3c:** PubMed;
+  - **3d:** Semantic Scholar (requiere clave);
+  - **3e:** Springer Nature OA y AGROVOC, cada uno con su criterio de omisión si su verificación falla.
+- Volver a verificar límites y términos de cada API al implementar su conector y registrarlos en una nota posterior del ADR-0003.
+
+**Criterio de terminado:** búsqueda del estudio de demostración en las APIs que declara, con respuestas crudas guardadas en local (sin credenciales) y pruebas simuladas; el diagnóstico de fuentes reproduce lo observado.
 
 ## Hito 4: Deduplicación (`v0.4.0`)
 
@@ -171,7 +182,10 @@ Hallazgos de las revisiones del asesor y de auditorías, pendientes para el hito
 
   Las exportaciones originales no se versionan en ningún repositorio, ni público ni privado, porque el historial publicado no se reescribe y el repositorio del estudio se publica al final (ADR-0010). El investigador guarda una copia local y otra en la nube institucional, y el hash prueba que son idénticas; `/importar` se lo recuerda.
 - **Hito 3:** los conectores de OpenAlex y PubMed aplican como parámetros los límites de la búsqueda (periodo, idiomas y tipos de documento), que `ecuaciones.md` solo lista como texto para esas fuentes (ADR-0009, punto 10).
-- **Hito 3:** los conectores deben quitar `api_key` (y cualquier otra clave o credencial) de la URL, los parámetros y los encabezados que se guardan con la respuesta cruda y su hash, y de los mensajes de error y los registros. Una prueba debe verificar que la clave no aparece en nada de lo que se guarda.
+- **Hito 3:** los conectores deben quitar `api_key` (y cualquier otra clave o credencial) de la URL, los parámetros y los encabezados que se guardan con la respuesta cruda y su hash, y de los mensajes de error y los registros. Una prueba debe verificar que la clave no aparece en nada de lo que se guarda. El saneo cubre también el **correo del investigador** (`mailto` de Crossref y `email` de NCBI), incluido el encabezado `User-Agent`, y los eventos de la cadena. La clave de Springer viaja en la URL, así que es el caso más expuesto.
+- **Hito 3:** el control de tasa de Springer cuenta el **presupuesto diario** (500 consultas, plan Basic) y no solo el ritmo por minuto (100). Propuesta: la caché de respuestas crudas es obligatoria para Springer.
+- **Hito 3:** la degradación ante una API caída sigue el ADR-0011 (propuesta): reintentos con espera, fallo registrado en la cadena y paso a importación manual por decisión del investigador. Nunca se sustituye una fuente en silencio.
+- **Hito 3:** AGROVOC se usa con una copia local con nota de versión (ADR-0011); antes de implementar se verifican el formato, el tamaño descomprimido y la licencia con el archivo oficial.
 - **Hito 3:** decidir si Semantic Scholar necesita un traductor propio de ecuaciones. Es fuente de búsqueda en el ADR-0003, pero el 1d solo traduce para OpenAlex, PubMed, Scopus, Web of Science y la versión genérica.
 - **Hito 3:** la política del ADR-0010 sobre qué datos de terceros se versionan (p. ej., los resúmenes) se aplica también a las respuestas crudas de las APIs que se guardan en el estudio (PubMed, OpenAlex y las demás).
 - **Hito 5:** agregar escritura por lotes al registro encadenado, verificando la cadena una vez por lote. Con miles de decisiones, verificar el archivo completo en cada evento crece de forma cuadrática.
