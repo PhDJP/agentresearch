@@ -76,7 +76,7 @@ En la tabla, `id` e `id_importacion` son campos de `Registro`; los demás, de `R
 - **Normalización.** Se aplica a todo campo de texto, incluidos `resumen` y los valores de `otros`, en este orden. Las posiciones y el hash de la evidencia literal del hito 5 se calculan sobre el texto ya normalizado.
   1. Unicode NFC.
   2. Cada secuencia de espacios Unicode (incluidos el espacio duro U+00A0 y los saltos de línea) pasa a un solo espacio U+0020, y se recortan los extremos. Los saltos de párrafo del resumen se pierden.
-  3. DOI (DOI Handbook, §2.4): se busca la forma `10.<registrante>/<sufijo>` dentro de cualquier URL o prefijo (`https://doi.org/`, `doi:`, el proxy de la biblioteca). El registrante admite subdivisiones (`10.1000.10/`). De una URL se quitan la consulta (`?…`) y el fragmento (`#…`) y se decodifican los `%XX`. Se descarta la puntuación final `.`, `,`, `;` o `:`. Solo las letras ASCII A–Z pasan a minúsculas, no los demás caracteres. Un texto sin esa forma da nulo.
+  3. DOI (DOI Handbook, §2.4): se busca la forma `10.<registrante>/<sufijo>` dentro de cualquier URL o prefijo (`https://doi.org/`, `doi:`, el proxy de la biblioteca). El registrante admite subdivisiones (`10.1000.10/`). De una URL se quitan la consulta (`?…`) y el fragmento (`#…`) y se decodifican los `%XX`. Se descarta la puntuación final `.`, `,`, `;` o `:`. Cuando el DOI sale de texto libre (hay un prefijo, una URL o texto alrededor, y no solo el DOI), se descarta además un cierre final (`)`, `]`, `>` o comillas) solo si no tiene su apertura dentro del DOI, porque hay DOI reales con paréntesis internos (tipo SICI): un DOI con paréntesis balanceados se conserva. Se compara el número de cierres y de aperturas del propio DOI, y las comillas rectas cuentan por paridad. Se repite hasta que no cambie nada. Solo las letras ASCII A–Z pasan a minúsculas, no los demás caracteres. Un texto sin esa forma da nulo.
   4. Las tildes de LaTeX se decodifican en el lector de BibTeX (2b), antes del paso 1.
 
   Cambiar cualquiera de estas reglas exige incrementar `VERSION_NORMALIZACION` (abajo).
@@ -121,7 +121,7 @@ Principio del ADR-0010: **local completo, nube mínima y configurable**. Todo se
   ```
 
   - `base.tipo` es `institucion`, `revista` o `licencia` (un término de contrato se registra como `licencia`); `detalle`, `medio` y `fecha` completan la base.
-  - **Base completa:** `tipo`, `detalle` y `fecha` siempre (la fecha en `AAAA-MM-DD`, no futura); `medio` solo con `tipo: institucion`, porque documenta cómo se obtuvo la confirmación. Con cualquier obligatorio ausente, la base es **incompleta**.
+  - **Base completa:** `tipo`, `detalle` y `fecha` siempre (la fecha en `AAAA-MM-DD`, no futura; la comparación usa un reloj inyectable, `reloj: Callable[[], datetime]` con zona horaria, como `RegistroEncadenado`, y no `datetime.now()` directo; por las zonas horarias se admite hasta un día posterior a la fecha UTC del reloj); `medio` solo con `tipo: institucion`, porque documenta cómo se obtuvo la confirmación. Con cualquier obligatorio ausente, la base es **incompleta**.
   - **`estado`** (en `evidencia_literal` y en cada fuente de `respaldo_nube`) es `sin_verificar`, `permitido` o `no_permitido`, con su `base`. `permitido` exige una base completa. Lo ausente equivale a `sin_verificar` en `respaldo_nube` y a `no_permitido` en `evidencia_literal` (ADR-0010, punto 5). Las claves de `evidencia_literal` son los campos de los que puede salir una cita: `resumen`, `palabras_clave_autor` y `palabras_clave_indexadas`.
   - **Cargarla rechaza**, informando todos los problemas a la vez (`ErrorConfiguracionPublicacion`; en el registro, la regla I-E13):
     - un campo de `nunca_publicables` dentro de `fuentes[*].campos`; la cita de `evidencia_literal` es la única salida permitida de esos campos, y solo como cita breve;
@@ -146,14 +146,14 @@ Principio del ADR-0010: **local completo, nube mínima y configurable**. Todo se
 
 - Esquema: campos desconocidos rechazados; registro sin DOI ni revista (patente, tesis) aceptado; `RegistroNormalizado` sin `id`; `Registro` con `id`; posición 99 999 aceptada y 100 000 rechazada con error explícito.
 - Normalización de texto: NFC; espacio duro y saltos de línea colapsados; extremos recortados; aplicarla dos veces da el mismo resultado.
-- DOI (con el prefijo de prueba `10.5555`): extracción desde URL, `doi:` y el proxy; `?consulta`, `#fragmento` y `%2F`; puntuación final; subdivisión del registrante (`10.1000.10/`); minúsculas solo en ASCII (un carácter no ASCII queda igual); texto sin DOI → nulo.
+- DOI (con el prefijo de prueba `10.5555`): extracción desde URL, `doi:` y el proxy; `?consulta`, `#fragmento` y `%2F`; puntuación final; subdivisión del registrante (`10.1000.10/`); minúsculas solo en ASCII (un carácter no ASCII queda igual); texto sin DOI → nulo; `(doi:10.5555/abc)` da `10.5555/abc`; un DOI con paréntesis balanceados, como `10.5555/(SICI)1097-4571(199806)49:6<517::AID-ASI4>3.0.CO;2-8`, se conserva solo y dentro de texto libre; un cierre sin su apertura al final de texto libre se descarta.
 - `hash_completo`: igual con otro `id`, `archivo` o `posicion`; distinto si cambia un campo bibliográfico.
 - Política y configuración:
   - un campo `pendiente` o con base incompleta no es versionable, pero el registro completo conserva su valor;
   - un campo ausente de la configuración no se versiona, y una fuente sin entrada no habilita nada;
   - el resumen, las palabras clave y los demás `nunca_publicables` se rechazan al cargar la configuración cuando el estudio los lista en `fuentes[*].campos`;
   - `hash_politica()` y `hash_configuracion()` cambian si cambia el archivo;
-  - base completa: falta `tipo`, `detalle` o `fecha` → incompleta; `medio` ausente solo la hace incompleta con `tipo: institucion`; fecha mal formada o futura → error;
+  - base completa: falta `tipo`, `detalle` o `fecha` → incompleta; `medio` ausente solo la hace incompleta con `tipo: institucion`; fecha mal formada o futura → error, con un reloj inyectado y sin depender de la fecha real (el día siguiente a la fecha UTC se acepta; dos días después se rechaza);
   - techo: un campo fuera de la lista de una fuente conocida se rechaza; una fuente desconocida admite cualquier campo del esquema salvo `nunca_publicables`; un nombre que no es campo del esquema se rechaza;
   - `id_fuente` de tipo `doi` o `pmid` no se versiona si `doi` o `pmid` no está habilitado, aunque `id_fuente` lo esté; con tipo `eid` rige su propia habilitación;
   - `evidencia_literal` y `respaldo_nube`: `permitido` sin base completa se rechaza; `evidencia_literal.resumen` se acepta, pero `resumen` dentro de `fuentes[*].campos` se rechaza; una clave de `evidencia_literal` distinta de las tres admitidas se rechaza; varios problemas se informan a la vez.
@@ -275,7 +275,7 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
 3. **Pide la fecha** (`AAAA-MM-DD`) **y la hora** (`HH:MM`) de la búsqueda, por separado.
    - Propone el desfase del computador para esa fecha, calculado con `astimezone()` sobre la fecha sin zona, y el investigador lo confirma o escribe otro (`±HH:MM`).
    - Si ese desfase difiere del actual, avisa que la fecha cae en otro periodo de horario de verano.
-   - Rechaza una fecha futura o anterior a la aprobación del protocolo (I-E04).
+   - Rechaza una fecha futura o anterior a la aprobación del protocolo (I-E04); la fecha de hoy sale de un reloj inyectable, no de `datetime.now()` directo.
 4. **Determina la versión del protocolo vigente en esa fecha** y la ecuación esperada (ADR-0010, punto 12), la compara con la ejecutada y clasifica la relación: `identica`, `desviacion` o `adaptacion_generica`. Una desviación sin justificación es I-E09. Una diferencia entre los resultados de la interfaz y los registros leídos sin justificación es I-E08.
 5. **Muestra el resumen completo:** fuente, plataforma, institución, cobertura, filtros, lematización, fecha y hora local y UTC, versión del protocolo, las dos ecuaciones con su diferencia y su relación, cada archivo con su hash y su número de registros, los totales frente a la interfaz, las justificaciones, y los campos que se versionarán y los que quedarán solo en local (con el motivo: sin habilitar, base incompleta o nunca publicable).
 6. **Pide la frase** `registrar imp-NNNN`. Una respuesta distinta cancela sin escribir.

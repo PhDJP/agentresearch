@@ -169,8 +169,9 @@ agrega:
      campo no se versiona.
    - **Regla de versionado.** Un campo se versiona solo si no es
      `nunca_publicables`, el estudio lo habilita para esa fuente y su base está
-     completa. Una fuente sin entrada no tiene campos habilitados por omisión:
-     el estudio los habilita registrando la base.
+     completa. Una fuente sin entrada en `publicacion_datos.yaml` no tiene
+     campos habilitados por omisión: el estudio los habilita registrando la
+     base.
    - **`id_fuente` rige por el campo que repite.** Si el tipo del
      identificador es `doi` o `pmid` (en ACS, el ID de la fuente es el DOI,
      punto 19), `id_fuente` se versiona solo si `doi` o `pmid` está
@@ -418,8 +419,11 @@ agrega:
       hito 5 se calcula sobre el texto normalizado;
     - en el DOI, de una URL se quitan la consulta y el fragmento y se
       decodifican los `%XX`; se descarta la puntuación final `.`, `,`, `;` o
-      `:`; se admiten subdivisiones del registrante (`10.1000.10/`); y solo
-      las letras A–Z pasan a minúsculas;
+      `:`; en texto libre se descarta además un cierre final (`)`, `]`, `>`
+      o comillas) solo si no tiene su apertura dentro del DOI, porque hay
+      DOI reales con paréntesis internos (tipo SICI); se admiten
+      subdivisiones del registrante (`10.1000.10/`); y solo las letras A–Z
+      pasan a minúsculas;
     - cambiar cualquiera de estas reglas incrementa `VERSION_NORMALIZACION`
       (punto 20).
 
