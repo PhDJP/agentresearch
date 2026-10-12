@@ -15,7 +15,13 @@ import re
 from collections.abc import Iterable
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from agentresearch.registros.normalizacion import (
+    normalizar_doi,
+    normalizar_texto,
+    normalizar_texto_opcional,
+)
 
 FormatoRegistro = Literal["ris", "bibtex", "scopus_csv", "wos_txt", "csv"]
 """Formatos de exportación que leen los lectores (hito 2b)."""
@@ -25,6 +31,20 @@ TipoIdFuente = Literal["eid", "ut", "doi", "pmid", "lens_id", "ninguno"]
 
 LIMITE_POSICION = 99_999
 """Máxima posición de un registro dentro de una búsqueda (cinco dígitos en el ID)."""
+
+_CAMPOS_DE_TEXTO = (
+    "id_fuente",
+    "titulo",
+    "fuente_publicacion",
+    "volumen",
+    "numero",
+    "paginas",
+    "pmid",
+    "tipo_documento",
+    "idioma",
+    "resumen",
+)
+_CAMPOS_DE_LISTA = ("autores", "palabras_clave_autor", "palabras_clave_indexadas")
 
 _PATRON_ID_IMPORTACION = re.compile(r"imp-[0-9]{4}")
 _PATRON_ID_REGISTRO = re.compile(r"(imp-[0-9]{4})-([0-9]{5})")
@@ -46,6 +66,12 @@ class RegistroNormalizado(ModeloRegistros):
     Los campos bibliográficos son los de la especificación del hito 2 (sección
     2a). `archivo` y `posicion` dicen dónde empieza el registro en el original:
     `posicion` es la línea física, en todos los formatos.
+
+    Al construirse, el modelo aplica la normalización de
+    `agentresearch.registros.normalizacion` a todo campo de texto, de modo que
+    un registro válido siempre está normalizado y su hash es determinista.
+    Un texto que queda vacío pasa a `None`, y en `autores`, las palabras clave
+    y `otros` se descartan las entradas vacías.
     """
 
     fuente: str = Field(min_length=1)
@@ -69,6 +95,32 @@ class RegistroNormalizado(ModeloRegistros):
     palabras_clave_autor: tuple[str, ...] = ()
     palabras_clave_indexadas: tuple[str, ...] = ()
     otros: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator(*_CAMPOS_DE_TEXTO, mode="after")
+    @classmethod
+    def _normalizar_campo_de_texto(cls, valor: str | None) -> str | None:
+        return normalizar_texto_opcional(valor)
+
+    @field_validator("doi", mode="after")
+    @classmethod
+    def _normalizar_doi(cls, valor: str | None) -> str | None:
+        return normalizar_doi(valor)
+
+    @field_validator(*_CAMPOS_DE_LISTA, mode="after")
+    @classmethod
+    def _normalizar_lista(cls, valor: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(texto for texto in map(normalizar_texto, valor) if texto)
+
+    @field_validator("otros", mode="after")
+    @classmethod
+    def _normalizar_otros(cls, valor: dict[str, str]) -> dict[str, str]:
+        normalizados: dict[str, str] = {}
+        for etiqueta, contenido in valor.items():
+            clave = normalizar_texto(etiqueta)
+            texto = normalizar_texto(contenido)
+            if clave and texto:
+                normalizados[clave] = texto
+        return normalizados
 
     @model_validator(mode="after")
     def _identificador_coherente(self) -> "RegistroNormalizado":
