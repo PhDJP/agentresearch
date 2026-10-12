@@ -222,3 +222,50 @@ def test_normalizar_un_registro_ya_normalizado_no_lo_cambia() -> None:
 
 def test_una_url_entre_signos_tambien_pierde_su_consulta() -> None:
     assert normalizar_doi("<https://doi.org/10.5555/abc?casa_token=XYZ>") == "10.5555/abc"
+
+
+# ---------------------------------- id_fuente de tipo doi (se normaliza como DOI)
+
+
+@pytest.mark.parametrize(
+    ("id_fuente", "esperado"),
+    [
+        ("10.1021/ACS.X", "10.1021/acs.x"),
+        ("doi:10.1021/ACS.X", "10.1021/acs.x"),
+        ("https://doi.org/10.1021/ACS.X", "10.1021/acs.x"),
+        ("  10.1021/ACS.X \n", "10.1021/acs.x"),
+        # Sin DOI dentro, queda como texto normalizado.
+        ("  no es un   doi ", "no es un doi"),
+    ],
+)
+def test_el_id_de_la_fuente_de_tipo_doi_se_normaliza_como_doi(
+    id_fuente: str, esperado: str
+) -> None:
+    registro = _registro(tipo_id_fuente="doi", id_fuente=id_fuente)
+
+    assert registro.id_fuente == esperado
+
+
+def test_el_id_de_la_fuente_de_tipo_doi_coincide_con_el_campo_doi() -> None:
+    registro = _registro(
+        tipo_id_fuente="doi", id_fuente="10.1021/ACS.X", doi="https://doi.org/10.1021/acs.x"
+    )
+
+    assert registro.id_fuente == registro.doi == "10.1021/acs.x"
+
+
+@pytest.mark.parametrize(
+    ("tipo", "id_fuente"),
+    [("eid", "2-S2.0-ABC"), ("ut", "WOS:000AB"), ("pmid", "123"), ("lens_id", "000-AAA-111")],
+)
+def test_los_demas_identificadores_solo_se_normalizan_como_texto(tipo: str, id_fuente: str) -> None:
+    registro = _registro(tipo_id_fuente=tipo, id_fuente=f"  {id_fuente}  ")
+
+    assert registro.id_fuente == id_fuente  # sin minúsculas ni extracción de DOI
+
+
+def test_dos_formas_del_mismo_doi_como_id_de_la_fuente_dan_el_mismo_hash() -> None:
+    mayusculas = _registro(tipo_id_fuente="doi", id_fuente="10.1021/ACS.X")
+    minusculas = _registro(tipo_id_fuente="doi", id_fuente="doi:10.1021/acs.x")
+
+    assert mayusculas.hash_completo == minusculas.hash_completo

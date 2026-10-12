@@ -425,6 +425,9 @@ agrega:
       DOI reales con paréntesis internos (tipo SICI); se admiten
       subdivisiones del registrante (`10.1000.10/`); y solo las letras A–Z
       pasan a minúsculas;
+    - si el tipo del identificador de la fuente es `doi`, `id_fuente` se
+      normaliza como DOI (y, sin DOI dentro, como texto), para que no difiera
+      del campo `doi`;
     - cambiar cualquiera de estas reglas incrementa `VERSION_NORMALIZACION`
       (punto 20).
 

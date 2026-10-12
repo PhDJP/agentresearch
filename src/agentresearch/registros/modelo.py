@@ -15,7 +15,14 @@ import re
 from collections.abc import Iterable
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from agentresearch.registros.normalizacion import (
     normalizar_doi,
@@ -34,7 +41,6 @@ LIMITE_POSICION = 99_999
 """Máxima posición de un registro dentro de una búsqueda (cinco dígitos en el ID)."""
 
 _CAMPOS_DE_TEXTO = (
-    "id_fuente",
     "titulo",
     "fuente_publicacion",
     "volumen",
@@ -98,7 +104,9 @@ class RegistroNormalizado(ModeloRegistros):
     `agentresearch.registros.normalizacion` a todo campo de texto, de modo que
     un registro válido siempre está normalizado y su hash es determinista.
     Un texto que queda vacío pasa a `None`, y en `autores`, las palabras clave
-    y `otros` se descartan las entradas vacías.
+    y `otros` se descartan las entradas vacías. Si `tipo_id_fuente` es `doi`,
+    `id_fuente` se normaliza con `normalizar_doi` (y si no contiene un DOI, queda
+    como texto normalizado), de modo que no difiera del campo `doi`.
     """
 
     fuente: str = Field(min_length=1)
@@ -132,6 +140,15 @@ class RegistroNormalizado(ModeloRegistros):
     @classmethod
     def _normalizar_doi(cls, valor: str | None) -> str | None:
         return normalizar_doi(valor)
+
+    @field_validator("id_fuente", mode="after")
+    @classmethod
+    def _normalizar_id_fuente(cls, valor: str | None, info: ValidationInfo) -> str | None:
+        """Con tipo `doi`, el identificador se normaliza como DOI (si contiene uno)."""
+        texto = normalizar_texto_opcional(valor)
+        if texto is not None and info.data.get("tipo_id_fuente") == "doi":
+            return normalizar_doi(texto) or texto
+        return texto
 
     @field_validator(*_CAMPOS_DE_LISTA, mode="after")
     @classmethod
