@@ -417,10 +417,11 @@ agrega:
       saltos de línea, pasa a un espacio, y se recortan los extremos; los
       saltos de párrafo del resumen se pierden, y la evidencia literal del
       hito 5 se calcula sobre el texto normalizado;
-    - en el DOI, de una URL se quitan la consulta y el fragmento y se
-      decodifican los `%XX`; se descarta la puntuación final `.`, `,`, `;` o
-      `:`; en texto libre se descarta además un cierre final (`)`, `]`, `>`
-      o comillas) solo si no tiene su apertura dentro del DOI, porque hay
+    - en el DOI, de una URL se quitan la consulta y el fragmento literales
+      y después se decodifican los `%XX` (un `%23` o un `%3F` es parte del
+      DOI), y se quita la barra final; se descarta la puntuación final `.`,
+      `,`, `;` o `:`; en texto libre se descarta además un cierre final (`)`,
+      `]`, `>` o comillas) solo si no tiene su apertura dentro del DOI, porque hay
       DOI reales con paréntesis internos (tipo SICI); se admiten
       subdivisiones del registrante (`10.1000.10/`); y solo las letras A–Z
       pasan a minúsculas;

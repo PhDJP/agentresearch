@@ -96,6 +96,18 @@ def test_un_texto_vacio_o_de_espacios_pasa_a_none() -> None:
         ("doi:10.5555/abc(def)", "10.5555/abc(def)"),
         # Un DOI solo (sin texto alrededor) conserva sus cierres.
         ("10.5555/abc)", "10.5555/abc)"),
+        # `#` y `?` codificados son parte del DOI; solo los literales abren fragmento y consulta.
+        ("https://doi.org/10.5555/a%23b", "10.5555/a#b"),
+        ("https://doi.org/10.5555/a%3Fb", "10.5555/a?b"),
+        ("https://doi.org/10.5555/a%3fb", "10.5555/a?b"),
+        ("https://doi.org/10.5555/a%23b?x=1", "10.5555/a#b"),
+        ("https://doi.org/10.5555/a%3Fb#seccion", "10.5555/a?b"),
+        ("https://doi.org/10.5555%2Fa%23b%3Fc", "10.5555/a#b?c"),
+        # Una barra final de una URL se quita; la de un DOI suelto se conserva.
+        ("https://doi.org/10.5555/abc/", "10.5555/abc"),
+        ("https://doi.org/10.5555/abc/?utm=1", "10.5555/abc"),
+        ("https://doi.org/10.5555/abc//", "10.5555/abc"),
+        ("10.5555/abc/", "10.5555/abc/"),
     ],
 )
 def test_normalizar_doi(entrada: str, esperado: str) -> None:
@@ -122,7 +134,14 @@ def test_un_texto_sin_doi_da_none(entrada: str | None) -> None:
 
 @pytest.mark.parametrize(
     "entrada",
-    ["10.5555/ABC", "(doi:10.5555/abc).", f"({SICI})", "https://doi.org/10.5555%2Fabc?x=1"],
+    [
+        "10.5555/ABC",
+        "(doi:10.5555/abc).",
+        f"({SICI})",
+        "https://doi.org/10.5555%2Fabc?x=1",
+        "https://doi.org/10.5555/a%23b",
+        "https://doi.org/10.5555/abc/",
+    ],
 )
 def test_normalizar_doi_es_idempotente(entrada: str) -> None:
     una_vez = normalizar_doi(entrada)

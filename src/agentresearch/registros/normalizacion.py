@@ -27,6 +27,8 @@ _PATRON_SERVIDOR = re.compile(
 )
 
 _PUNTUACION_FINAL = ".,;:"
+_NUMERAL_CODIFICADO = "%23"
+_INTERROGACION_CODIFICADA = "%3F"
 _CIERRES = {")": "(", "]": "[", ">": "<", "”": "“", "’": "‘", "»": "«"}
 _COMILLAS_RECTAS = "\"'"
 
@@ -56,8 +58,10 @@ def normalizar_doi(texto: str | None) -> str | None:
     - se busca `10.<registrante>/<sufijo>` dentro de cualquier URL o prefijo
       (`https://doi.org/`, `doi:`, el proxy de la biblioteca); el registrante
       admite subdivisiones (`10.1000.10/`);
-    - de una URL se quitan la consulta (`?…`) y el fragmento (`#…`), y se
-      decodifican los `%XX`;
+    - de una URL se quitan la consulta (`?…`) y el fragmento (`#…`) literales, y
+      después se decodifican los `%XX`: un `%23` o un `%3F` es parte del DOI y no
+      abre un fragmento ni una consulta. De una URL se quita también la barra
+      final;
     - se descarta la puntuación final `.`, `,`, `;` o `:`;
     - cuando el DOI sale de texto libre (hay un prefijo, una URL o texto
       alrededor), se descarta además un cierre final (`)`, `]`, `>` o
@@ -71,27 +75,42 @@ def normalizar_doi(texto: str | None) -> str | None:
     texto = normalizar_texto(texto)
     es_url = "://" in texto or _PATRON_SERVIDOR.match(texto) is not None
     if es_url:
-        texto = unquote(texto)
+        texto = _decodificar_url(texto)
     coincidencia = _PATRON_DOI.search(texto)
     if coincidencia is None:
         return None
     candidato = coincidencia.group(0)
     if es_url:
         candidato = re.split(r"[?#]", candidato, maxsplit=1)[0]
+        candidato = candidato.replace(_NUMERAL_CODIFICADO, "#")
+        candidato = candidato.replace(_INTERROGACION_CODIFICADA, "?")
+        candidato = candidato.replace(_INTERROGACION_CODIFICADA.lower(), "?")
     solo_doi = (
         not es_url and coincidencia.start() == 0 and coincidencia.end() == len(texto)
     )
-    candidato = _recortar_final(candidato, texto_libre=not solo_doi)
+    candidato = _recortar_final(candidato, texto_libre=not solo_doi, es_url=es_url)
     if _PATRON_DOI_COMPLETO.fullmatch(candidato) is None:
         return None
     return candidato.translate(_MINUSCULAS_ASCII)
 
 
-def _recortar_final(candidato: str, *, texto_libre: bool) -> str:
-    """Descarta puntuación final y, en texto libre, cierres sin su apertura."""
+def _decodificar_url(texto: str) -> str:
+    """Decodifica los `%XX` de una URL salvo `%23` (`#`) y `%3F` (`?`).
+
+    Esos dos se dejan codificados para que, al cortar la consulta y el
+    fragmento, solo corten los literales; después se decodifican. Para que
+    `unquote` los respete, su `%` se codifica antes como `%25`.
+    """
+    protegido = texto.replace("%23", "%2523").replace("%3F", "%253F").replace("%3f", "%253f")
+    return unquote(protegido)
+
+
+def _recortar_final(candidato: str, *, texto_libre: bool, es_url: bool) -> str:
+    """Descarta puntuación final, la barra final de una URL y, en texto libre, cierres sueltos."""
+    finales = _PUNTUACION_FINAL + "/" if es_url else _PUNTUACION_FINAL
     while True:
         anterior = candidato
-        candidato = candidato.rstrip(_PUNTUACION_FINAL)
+        candidato = candidato.rstrip(finales)
         if texto_libre and candidato and _sobra_cierre(candidato):
             candidato = candidato[:-1]
         if candidato == anterior:
