@@ -36,5 +36,8 @@ jobs:
       - name: pytest
         run: uv run pytest
 
-      - name: Cobertura mínima de trazabilidad y protocolo
-        run: uv run coverage report --include="src/agentresearch/trazabilidad/*,src/agentresearch/protocolo/*,src/agentresearch/estudio/*" --fail-under=90
+      - name: Cobertura mínima de trazabilidad, protocolo, estudio y registros
+        run: uv run coverage report --include="src/agentresearch/trazabilidad/*,src/agentresearch/protocolo/*,src/agentresearch/estudio/*,src/agentresearch/registros/*" --fail-under=90
+
+      - name: Paquete construido (los datos viajan en el wheel)
+        run: uv run pytest -m construccion --no-cov

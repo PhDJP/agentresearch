@@ -49,4 +49,7 @@ warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=agentresearch --cov-report=term-missing"
+addopts = "--cov=agentresearch --cov-report=term-missing -m 'not construccion'"
+markers = [
+    "construccion: construye el wheel con uv; se ejecuta con `-m construccion --no-cov`",
+]
