@@ -22,6 +22,7 @@ from agentresearch.registros.normalizacion import (
     normalizar_texto,
     normalizar_texto_opcional,
 )
+from agentresearch.trazabilidad import hash_texto, json_canonico
 
 FormatoRegistro = Literal["ris", "bibtex", "scopus_csv", "wos_txt", "csv"]
 """Formatos de exportación que leen los lectores (hito 2b)."""
@@ -45,6 +46,32 @@ _CAMPOS_DE_TEXTO = (
     "resumen",
 )
 _CAMPOS_DE_LISTA = ("autores", "palabras_clave_autor", "palabras_clave_indexadas")
+
+CAMPOS_DEL_HASH = (
+    "tipo_id_fuente",
+    "id_fuente",
+    "titulo",
+    "autores",
+    "anio",
+    "fuente_publicacion",
+    "volumen",
+    "numero",
+    "paginas",
+    "doi",
+    "pmid",
+    "tipo_documento",
+    "idioma",
+    "resumen",
+    "palabras_clave_autor",
+    "palabras_clave_indexadas",
+    "otros",
+)
+"""Campos bibliográficos que entran al `hash_completo`, desde `tipo_id_fuente` hasta `otros`.
+
+No incluye `id`, `id_importacion`, `archivo` ni `posicion`, que cambian entre
+descargas, ni `fuente` ni `formato`, que constan aparte en el registro y en el
+evento (ADR-0010, punto 20).
+"""
 
 _PATRON_ID_IMPORTACION = re.compile(r"imp-[0-9]{4}")
 _PATRON_ID_REGISTRO = re.compile(r"(imp-[0-9]{4})-([0-9]{5})")
@@ -130,6 +157,18 @@ class RegistroNormalizado(ModeloRegistros):
         if self.tipo_id_fuente != "ninguno" and not tiene_id:
             raise ValueError("un `tipo_id_fuente` distinto de «ninguno» exige `id_fuente`")
         return self
+
+    @property
+    def hash_completo(self) -> str:
+        """SHA-256 del registro completo normalizado (ADR-0010, punto 20).
+
+        Se calcula sobre el JSON canónico (ADR-0006, punto 2) de
+        `CAMPOS_DEL_HASH`. El mismo registro descargado dos veces tiene el mismo
+        hash. Sirve para comprobar que regenerar el registro desde el original
+        da exactamente el mismo registro.
+        """
+        contenido = {campo: getattr(self, campo) for campo in CAMPOS_DEL_HASH}
+        return hash_texto(json_canonico(contenido))
 
 
 class Registro(RegistroNormalizado):

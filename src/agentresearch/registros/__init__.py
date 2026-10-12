@@ -1,6 +1,7 @@
 """Registros normalizados, artículos y estudios, y política de datos de terceros (ADR-0010)."""
 
 from agentresearch.registros.modelo import (
+    CAMPOS_DEL_HASH,
     LIMITE_POSICION,
     FormatoRegistro,
     LimiteDePosicionExcedido,
@@ -18,6 +19,7 @@ from agentresearch.registros.normalizacion import (
 )
 
 __all__ = [
+    "CAMPOS_DEL_HASH",
     "LIMITE_POSICION",
     "FormatoRegistro",
     "LimiteDePosicionExcedido",
