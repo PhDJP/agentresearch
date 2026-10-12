@@ -3,6 +3,7 @@
 - Estado: Propuesta
 - Fecha: 2026-09-29
 - Revisado: 2026-10-04, con los ajustes del asesor (principio «local completo, nube mínima y configurable»; ver «Revisión del 2026-10-04»)
+- Revisado: 2026-10-12, con la revisión de diseño del 2a (ver «Revisión del 2026-10-12»)
 - Participantes: investigador doctoral, asesor (Claude en Cowork) y Claude Code
 
 ## Contexto
@@ -52,6 +53,24 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
 - los máximos de exportación y las cláusulas de términos de uso quedan
   marcados «por verificar» (puntos 25 y 26).
 
+### Revisión del 2026-10-12
+
+La revisión de diseño del 2a (antes de programar el módulo `registros`)
+agrega:
+
+- la definición de **base completa** y la forma de `evidencia_literal` y
+  `respaldo_nube` (puntos 4, 5 y 9);
+- la lista de campos habilitables del paquete como **techo** para las fuentes
+  que conoce, y el error ante nombres de campo desconocidos (punto 4);
+- la regla de que `id_fuente` de tipo `doi` o `pmid` se rige por `doi` o `pmid`
+  (punto 4);
+- que una configuración de publicación inválida sí impide registrar, a
+  diferencia de una base incompleta (puntos 4 y 11);
+- la **versión de la normalización**, que se registra con cada importación
+  (puntos 2, 16 y 20);
+- las reglas precisas de normalización de espacios y DOI, y el tope de la
+  posición (puntos 19 y 22).
+
 ## Decisión
 
 ### Principio de diseño: local completo, nube mínima y configurable
@@ -93,6 +112,9 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
    exactamente el mismo registro. Un campo que no se versiona (porque no está
    habilitado o porque su base está pendiente) **sí se importa y se conserva
    en local**: lo que se restringe es la publicación, no la importación.
+   Cada importación registra además la versión de la normalización con que
+   se leyó (puntos 16 y 20), para distinguir, si una regeneración no
+   coincide con su hash, un cambio de reglas de un original alterado.
 3. **Este ADR modifica el alcance del ADR-0004.** Lo reproducible
    («a partir de los artefactos registrados, volver a ejecutar el pipeline
    produce exactamente los mismos conteos, tablas, gráficos y reportes») pasa
@@ -121,20 +143,40 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
      ni trae una base por omisión, porque eso es de cada estudio. Que un campo
      esté «confirmado» o «pendiente» lo decide la base que el estudio registre
      para él (abajo), no esta tabla.
+   - **Alcance de la lista del paquete.** Para una fuente que el paquete
+     conoce, la lista de campos habilitables es un **techo**: el estudio no
+     puede habilitar un campo que esa fuente no aporta. Para una fuente que
+     el paquete no conoce (p. ej. una base nueva), no hay techo: el estudio
+     puede habilitar cualquier campo del esquema salvo los
+     `nunca_publicables`, registrando su base. Un nombre que no es un campo
+     del esquema es un error al cargar.
    - **Estudio: `publicacion_datos.yaml`,** en la raíz del estudio y
      versionado. Por fuente, lista los campos habilitados, y cada uno con su
      `base`: `tipo` (`institucion`, `revista` o `licencia`), `detalle` (la
      institución, la revista o la licencia concreta), `medio` y `fecha`. El
-     paquete rechaza al cargarla cualquier campo `nunca_publicables`. Cada
+     paquete rechaza al cargarla cualquier campo `nunca_publicables` dentro
+     de `fuentes`; la única salida permitida de esos campos es la cita de
+     `evidencia_literal` (punto 5). Cada
      importación registra el hash de este archivo y el de la política del
      paquete. **La plantilla lo genera neutro:** con los campos de metadatos
      bibliográficos habituales (título, autores, DOI y fuente de publicación)
      y su base incompleta (`detalle`, `medio` y `fecha` vacíos), hasta que el
      investigador registre la suya.
+   - **Base completa.** `tipo`, `detalle` y `fecha` (en `AAAA-MM-DD`, no
+     futura) siempre; `medio` solo con `tipo: institucion`, porque documenta
+     cómo se obtuvo la confirmación. Un término de contrato se registra como
+     `licencia`. Con algún obligatorio ausente, la base está incompleta y el
+     campo no se versiona.
    - **Regla de versionado.** Un campo se versiona solo si no es
      `nunca_publicables`, el estudio lo habilita para esa fuente y su base está
      completa. Una fuente sin entrada no tiene campos habilitados por omisión:
      el estudio los habilita registrando la base.
+   - **`id_fuente` rige por el campo que repite.** Si el tipo del
+     identificador es `doi` o `pmid` (en ACS, el ID de la fuente es el DOI,
+     punto 19), `id_fuente` se versiona solo si `doi` o `pmid` está
+     habilitado con base completa: habilitar el identificador no publica un
+     DOI que el estudio no habilitó. Con `eid`, `ut` o `lens_id` rige su
+     propia habilitación.
    - **Ejemplo documentado: el caso del investigador (Universidad del
      Cauca).** No es un dato del paquete ni de la plantilla; es lo que su
      estudio registrará en `publicacion_datos.yaml`:
@@ -154,6 +196,10 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
      ambas listas en el evento. Así ningún dato real se versiona sin base, y la
      importación no espera a una respuesta externa. `importar leer`
      funciona igual.
+   - **Lo inválido sí bloquea.** Una `publicacion_datos.yaml` ausente,
+     ilegible o que no cumple el esquema impide registrar (regla I-E13 de la
+     especificación): a diferencia de una base incompleta, el archivo no dice
+     con certeza qué se versiona.
    - **Ampliar o reducir.** Habilitar más campos después se aplica a las
      importaciones nuevas; regenerar las ya registradas exigirá un comando que
      queda fuera del hito 2 (ver «Consecuencias»). Retirar un campo que ya se
@@ -179,7 +225,10 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
         habilitado, el texto del fragmento se versiona **solo si
         `publicacion_datos.yaml` lo permite** (`evidencia_literal`, con su
         base registrada) y no supera la longitud máxima que `registrar` valida
-        (valor que fija el hito 5). Por omisión no se permite.
+        (valor que fija el hito 5). Por omisión no se permite. La
+        configuración lo declara por campo de origen (`resumen`,
+        `palabras_clave_autor` y `palabras_clave_indexadas`) con la forma
+        `{estado, base}`, y `permitido` exige una base completa.
      4. Con cualquier configuración, la decisión versionada guarda el campo de
         origen, las posiciones de inicio y fin del fragmento y su SHA-256, de
         modo que quien tenga el original verifica la evidencia sin que el
@@ -225,7 +274,8 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
      en un respaldo fuera de los servicios de nube compartidos (p. ej. un
      disco externo).
    - La nube institucional solo se recomienda para una fuente si el estudio
-     registra en su configuración (`respaldo_nube: permitido`, con su base:
+     registra en su configuración (`respaldo_nube.<fuente>.estado:
+     permitido`, con su base completa:
      el término del contrato o la confirmación de la institución, el medio y
      la fecha). Para ACS no se recomienda: la licencia individual prohíbe
      guardar sus contenidos en servicios de nube compartidos (punto 26).
@@ -248,8 +298,9 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
       ruta de su copia.
 11. **Solo con el protocolo vigente.** `importar registrar` se niega si el
     protocolo no está vigente según el registro, si hay P-E09 o P-E10, si la
-    fuente no está declarada con `tipo: exportacion`, o si la fecha de la
-    búsqueda es futura o anterior a la aprobación.
+    fuente no está declarada con `tipo: exportacion`, si la fecha de la
+    búsqueda es futura o anterior a la aprobación, o si
+    `publicacion_datos.yaml` no existe o no es válida (punto 4).
 12. **Ecuación esperada y ejecutada.**
     - **Esperada:** la de esa fuente para la versión del protocolo vigente
       en la fecha de la búsqueda (la última aprobación o enmienda con fecha
@@ -313,7 +364,8 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
     punto 10, el hash de `importacion.json`, `registros.jsonl` y
     `registros.csv`, el hash de la política del paquete y el de
     `publicacion_datos.yaml`, y las listas de campos versionados y
-    campos solo locales (punto 4). Se valida con un
+    campos solo locales (punto 4), y la versión de la normalización
+    (punto 20). Se valida con un
     esquema pydantic estricto, y P-E10 incorpora su coherencia: números de
     importación consecutivos y archivos con los hashes registrados.
 17. **Una carpeta por importación**, `importaciones/imp-NNNN/`:
@@ -329,13 +381,20 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
     Si algo falla antes del evento, la carpeta queda huérfana y el siguiente
     intento la sobrescribe con el mismo número.
 19. **Procedencia.** Cada registro guarda su importación, su posición (el
-    archivo y la línea o fila) y el identificador de la fuente: EID en
+    archivo y la línea física donde empieza el registro; el número de orden
+    en la búsqueda va de 1 a 99 999, y superarlo es un error) y el
+    identificador de la fuente: EID en
     Scopus, UT en Web of Science, DOI en ACS, PMID en PubMed e ID de Lens.
 20. **Hash del registro normalizado.** Se calcula sobre el JSON canónico de
     los campos del esquema normalizado, que nunca incluye campos volátiles
     (la fecha de descarga `Y2` del RIS de ACS, la fecha de generación del
     archivo en Web of Science). Así, el mismo registro descargado dos veces
-    tiene el mismo hash.
+    tiene el mismo hash. Tampoco incluye los identificadores de importación,
+    el archivo ni la posición, que cambian entre descargas. La normalización
+    lleva una `VERSION_NORMALIZACION`, que no entra al hash y se registra con
+    la importación (punto 16): si una regeneración no coincide, comparar esa
+    versión con la vigente distingue un cambio de reglas de un original
+    alterado.
 
 ### Modelo de datos
 
@@ -351,7 +410,18 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
     (se extrae la forma `10.…` de cualquier URL, incluido el proxy de la
     biblioteca, y se pasa a minúsculas ASCII, porque el DOI Handbook, §2.4,
     define el DOI como insensible a mayúsculas ASCII). Ningún registro se
-    inventa ni se corrige a mano (regla 6).
+    inventa ni se corrige a mano (regla 6). Reglas precisas (la
+    especificación las detalla):
+    - cada secuencia de espacios Unicode, incluidos el espacio duro y los
+      saltos de línea, pasa a un espacio, y se recortan los extremos; los
+      saltos de párrafo del resumen se pierden, y la evidencia literal del
+      hito 5 se calcula sobre el texto normalizado;
+    - en el DOI, de una URL se quitan la consulta y el fragmento y se
+      decodifican los `%XX`; se descarta la puntuación final `.`, `,`, `;` o
+      `:`; se admiten subdivisiones del registrante (`10.1000.10/`); y solo
+      las letras A–Z pasan a minúsculas;
+    - cambiar cualquiera de estas reglas incrementa `VERSION_NORMALIZACION`
+      (punto 20).
 
 ### Lectores
 
@@ -506,6 +576,16 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
   2026-09-29): garantiza que nada sin confirmar se versione, pero ata la
   importación a una respuesta externa. Se prefirió importar todo en local y
   restringir solo la publicación.
+- **Lista del paquete solo informativa** (sin techo): un campo que la fuente
+  no aporta podría habilitarse por error, y un error tipográfico pasaría como
+  «no publicado». Se eligió un techo para las fuentes conocidas y un error
+  ante nombres desconocidos.
+- **`id_fuente` como campo independiente de `doi`:** es simple, pero publica
+  un DOI no habilitado cuando el identificador de la fuente es el DOI (ACS).
+  Se eligió regirlo por el campo que repite.
+- **Sin versión de la normalización:** si una regla cambia, la regeneración no
+  coincide con el hash y no se distingue de un original alterado. Se eligió
+  una versión explícita, registrada con la importación.
 - **Evidencia literal: versionar siempre el fragmento, o no versionarlo
   nunca.** Siempre publica texto del resumen sin una decisión del estudio;
   nunca rompe la regla 2 de CLAUDE.md en el repositorio público. Se eligió
@@ -582,3 +662,7 @@ El asesor revisó la propuesta y esta versión incorpora sus ajustes:
   revisar la política de campos y la tabla del punto 25. Mientras sigan «por
   verificar» (puntos 25 y 26), ninguna decisión del agente debe apoyarse en
   esos límites ni en esas cláusulas.
+- Cambiar una regla de normalización (punto 22) exige incrementar
+  `VERSION_NORMALIZACION` y declararlo en las notas de la versión del agente.
+  Las importaciones ya registradas conservan la versión con que se
+  normalizaron.
