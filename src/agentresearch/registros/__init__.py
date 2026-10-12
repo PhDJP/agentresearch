@@ -1,0 +1,76 @@
+"""Registros normalizados, artículos y estudios, y política de datos de terceros (ADR-0010)."""
+
+from agentresearch.registros.modelo import (
+    CAMPOS_DEL_HASH,
+    LIMITE_POSICION,
+    FormatoRegistro,
+    LimiteDePosicionExcedido,
+    Registro,
+    RegistroNormalizado,
+    TipoIdFuente,
+    construir_registros,
+    formatear_id_registro,
+)
+from agentresearch.registros.normalizacion import (
+    VERSION_NORMALIZACION,
+    normalizar_doi,
+    normalizar_texto,
+    normalizar_texto_opcional,
+)
+from agentresearch.registros.politica import (
+    CAMPOS_HABILITABLES,
+    Base,
+    ConfiguracionPublicacion,
+    ErrorConfiguracionPublicacion,
+    ErrorPoliticaDatos,
+    PoliticaDatos,
+    ProblemaConfiguracion,
+    cargar_configuracion,
+    cargar_politica,
+    decodificar_configuracion,
+    hash_configuracion,
+    hash_politica,
+)
+from agentresearch.registros.salidas import (
+    COLUMNAS_CSV,
+    escribir_registros_jsonl,
+    escribir_vista_csv,
+    serializar_registros_jsonl,
+    serializar_vista_csv,
+)
+from agentresearch.registros.versionado import campos_versionables, registro_versionable
+
+__all__ = [
+    "CAMPOS_DEL_HASH",
+    "CAMPOS_HABILITABLES",
+    "COLUMNAS_CSV",
+    "LIMITE_POSICION",
+    "FormatoRegistro",
+    "Base",
+    "ConfiguracionPublicacion",
+    "ErrorConfiguracionPublicacion",
+    "ErrorPoliticaDatos",
+    "LimiteDePosicionExcedido",
+    "PoliticaDatos",
+    "ProblemaConfiguracion",
+    "Registro",
+    "RegistroNormalizado",
+    "TipoIdFuente",
+    "VERSION_NORMALIZACION",
+    "campos_versionables",
+    "cargar_configuracion",
+    "cargar_politica",
+    "construir_registros",
+    "decodificar_configuracion",
+    "escribir_registros_jsonl",
+    "escribir_vista_csv",
+    "formatear_id_registro",
+    "hash_configuracion",
+    "hash_politica",
+    "normalizar_doi",
+    "normalizar_texto",
+    "normalizar_texto_opcional",
+    "registro_versionable",
+    "serializar_registros_jsonl",
+    "serializar_vista_csv",
+]
