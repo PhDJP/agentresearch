@@ -9,6 +9,8 @@ estudio en su `publicacion_datos.yaml`, con la base registrada de cada campo.
 - `publicacion_datos.yaml` (en el estudio): por fuente, los campos que el
   estudio habilita y la base de cada uno; el permiso de la evidencia literal y
   el del respaldo en la nube.
+
+La regla que combina ambos está en `agentresearch.registros.versionado`.
 """
 
 import re

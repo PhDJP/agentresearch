@@ -31,6 +31,7 @@ from agentresearch.registros.politica import (
     hash_configuracion,
     hash_politica,
 )
+from agentresearch.registros.versionado import campos_versionables, registro_versionable
 
 __all__ = [
     "CAMPOS_DEL_HASH",
@@ -48,6 +49,7 @@ __all__ = [
     "RegistroNormalizado",
     "TipoIdFuente",
     "VERSION_NORMALIZACION",
+    "campos_versionables",
     "cargar_configuracion",
     "cargar_politica",
     "construir_registros",
@@ -58,4 +60,5 @@ __all__ = [
     "normalizar_doi",
     "normalizar_texto",
     "normalizar_texto_opcional",
+    "registro_versionable",
 ]
