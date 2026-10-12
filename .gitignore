@@ -20,6 +20,10 @@ secretos/
 # Material con derechos de autor (solo uso local)
 referencias_locales/
 
+# Exportaciones reales de prueba de las bases (datos de terceros con licencia;
+# solo se leen con `importar leer`, nunca se versionan; ADR-0010, punto 1)
+exportaciones_prueba_local/
+
 # Configuración local de Claude Code
 .claude/settings.local.json
 
