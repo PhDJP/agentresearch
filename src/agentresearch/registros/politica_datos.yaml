@@ -1,0 +1,38 @@
+# Política de datos de terceros del agente (ADR-0010, punto 4).
+#
+# Es una tabla de datos, no código: cambiarla exige una versión nueva del agente.
+# Es neutral: no atribuye ninguna confirmación a una institución ni trae una base
+# por omisión. Qué campos se versionan, y con qué base, lo decide cada estudio en su
+# `publicacion_datos.yaml`.
+#
+# `nunca_publicables`: campos que ningún estudio puede habilitar. La única salida
+# de texto derivada del resumen es la cita breve de la evidencia literal, con las
+# condiciones del punto 5 del ADR-0010.
+#
+# `fuentes.<id>.campos_habilitables`: el techo de lo que esa fuente aporta y que un
+# estudio puede habilitar. `id_fuente` es el identificador de la base (EID en
+# Scopus, UT en Web of Science, ID de Lens; en ACS, el DOI). Los techos son cotas
+# superiores y se afinan con las exportaciones reales de prueba (hito 2, 2e).
+#
+# `version` sube con cada cambio de esta tabla; cada importación registra la
+# versión y el hash del archivo.
+version: 1
+
+nunca_publicables:
+  - resumen
+  - palabras_clave_autor
+  - palabras_clave_indexadas
+  - referencias
+  - conteos_citas
+  - afiliaciones
+  - financiacion
+
+fuentes:
+  scopus:
+    campos_habilitables: [id_fuente, titulo, autores, anio, fuente_publicacion, volumen, numero, paginas, doi, pmid, tipo_documento, idioma]
+  wos:
+    campos_habilitables: [id_fuente, titulo, autores, anio, fuente_publicacion, volumen, numero, paginas, doi, pmid, tipo_documento, idioma]
+  acs:
+    campos_habilitables: [id_fuente, titulo, autores, anio, fuente_publicacion, volumen, numero, paginas, doi, tipo_documento, idioma]
+  lens:
+    campos_habilitables: [id_fuente, titulo, autores, anio, fuente_publicacion, volumen, numero, paginas, doi, pmid, tipo_documento, idioma]
