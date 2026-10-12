@@ -71,6 +71,8 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 
 Especificación detallada, dividida en los sub-hitos 2a a 2e: [especificaciones/hito_2_registros_e_importacion.md](especificaciones/hito_2_registros_e_importacion.md). Decisiones: [ADR-0010](decisiones/0010-registros-importacion-y-datos-de-terceros.md) (propuesta).
 
+**Avance:** 2a ✅ completo (2026-10-12): módulo `agentresearch.registros` con el registro normalizado y su `hash_completo`, la normalización de texto y DOI, artículo y estudio provisionales, la política de datos de terceros (paquete y estudio), la regla de versionado y los archivos `registros.jsonl` y `registros.csv`. Quedan 2b a 2e.
+
 - Modelo normalizado de registro con procedencia y distinción entre artículo y estudio.
 - Lectores de RIS, BibTeX, CSV de Scopus, WoS (.txt) y CSV genérico, probados con archivos sintéticos.
 - Hash de cada archivo importado y conteos por fuente para el diagrama de flujo.
@@ -181,6 +183,10 @@ Hallazgos de las revisiones del asesor y de auditorías, pendientes para el hito
   - cada archivo exportado, con su hash.
 
   Las exportaciones originales no se versionan en ningún repositorio, ni público ni privado, porque el historial publicado no se reescribe y el repositorio del estudio se publica al final (ADR-0010). El investigador guarda una copia local y otra en la nube institucional, y el hash prueba que son idénticas; `/importar` se lo recuerda.
+- **Hito 2 (2b y 2c), decisiones de código del 2a que los siguientes sub-hitos deben respetar:**
+  - **2b:** los lectores entregan `RegistroNormalizado` (sin ID de importación); el modelo aplica la normalización al construirse, así que un lector pasa el texto crudo. Un campo repetido de `otros` se une en un solo texto, porque `otros` es `dict[str, str]`. Si `tipo_id_fuente` es `doi`, el lector pone en `id_fuente` el DOI ya normalizado (`normalizar_doi`). `posicion` es la línea física donde empieza el registro. Cada lector declara sus campos volátiles.
+  - **2c:** `importar registrar` guarda `VERSION_NORMALIZACION` y los hashes de la política y de la configuración. Para `campos_versionados` y `campos_solo_locales` (con el motivo) hay que construir, sobre `campos_versionables`, la lista de motivos (sin habilitar, base incompleta, fuera del techo, regido por otro campo); hoy el módulo no la entrega. El ID de regla de una configuración inválida es la I-E13.
+  - **Hito 4:** el versionado efectivo de `id_fuente` depende de cada registro (`registro_versionable`), no solo de la fuente.
 - **Hito 3:** los conectores de OpenAlex y PubMed aplican como parámetros los límites de la búsqueda (periodo, idiomas y tipos de documento), que `ecuaciones.md` solo lista como texto para esas fuentes (ADR-0009, punto 10).
 - **Hito 3:** los conectores deben quitar `api_key` (y cualquier otra clave o credencial) de la URL, los parámetros y los encabezados que se guardan con la respuesta cruda y su hash, y de los mensajes de error y los registros. Una prueba debe verificar que la clave no aparece en nada de lo que se guarda. El saneo cubre también el **correo del investigador** (`mailto` de Crossref y `email` de NCBI), incluido el encabezado `User-Agent`, y los eventos de la cadena. La clave de Springer viaja en la URL, así que es el caso más expuesto.
 - **Hito 3:** el control de tasa de Springer cuenta el **presupuesto diario** (500 consultas, plan Basic) y no solo el ritmo por minuto (100). Propuesta: la caché de respuestas crudas es obligatoria para Springer.
