@@ -31,11 +31,19 @@ from agentresearch.registros.politica import (
     hash_configuracion,
     hash_politica,
 )
+from agentresearch.registros.salidas import (
+    COLUMNAS_CSV,
+    escribir_registros_jsonl,
+    escribir_vista_csv,
+    serializar_registros_jsonl,
+    serializar_vista_csv,
+)
 from agentresearch.registros.versionado import campos_versionables, registro_versionable
 
 __all__ = [
     "CAMPOS_DEL_HASH",
     "CAMPOS_HABILITABLES",
+    "COLUMNAS_CSV",
     "LIMITE_POSICION",
     "FormatoRegistro",
     "Base",
@@ -54,6 +62,8 @@ __all__ = [
     "cargar_politica",
     "construir_registros",
     "decodificar_configuracion",
+    "escribir_registros_jsonl",
+    "escribir_vista_csv",
     "formatear_id_registro",
     "hash_configuracion",
     "hash_politica",
@@ -61,4 +71,6 @@ __all__ = [
     "normalizar_texto",
     "normalizar_texto_opcional",
     "registro_versionable",
+    "serializar_registros_jsonl",
+    "serializar_vista_csv",
 ]
