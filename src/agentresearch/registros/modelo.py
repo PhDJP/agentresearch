@@ -196,6 +196,11 @@ class Registro(RegistroNormalizado):
         return self
 
 
+def es_id_de_registro(valor: str) -> bool:
+    """Indica si `valor` tiene la forma `imp-NNNN-NNNNN` de un `Registro.id`."""
+    return _PATRON_ID_REGISTRO.fullmatch(valor) is not None
+
+
 def formatear_id_registro(id_importacion: str, posicion: int) -> str:
     """Arma `imp-NNNN-NNNNN`; lanza `LimiteDePosicionExcedido` si no cabe en cinco dígitos."""
     if posicion > LIMITE_POSICION:
