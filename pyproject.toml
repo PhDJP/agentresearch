@@ -10,7 +10,9 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "bibtexparser==2.0.1",
     "pydantic>=2.13.5",
+    "pylatexenc==2.11",
     "ruamel-yaml>=0.19.1",
 ]
 
@@ -41,6 +43,12 @@ python_version = "3.12"
 strict = true
 files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# pylatexenc 2.11 no trae py.typed. Su uso queda en una sola función con tipos propios
+# (agentresearch.importacion.lector_bibtex).
+module = ["pylatexenc.*"]
+ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
