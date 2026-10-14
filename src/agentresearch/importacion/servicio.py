@@ -8,6 +8,7 @@ from pathlib import Path
 
 from agentresearch.importacion.ensamblado import Lectura
 from agentresearch.importacion.entrada import Carga, cargar
+from agentresearch.importacion.lector_bibtex import leer_bibtex
 from agentresearch.importacion.lector_csv import leer_csv
 from agentresearch.importacion.lector_ris import leer_ris
 from agentresearch.importacion.lector_scopus_csv import leer_scopus_csv
@@ -18,6 +19,7 @@ from agentresearch.registros import FormatoRegistro
 
 _LECTORES: dict[str, Callable[[Carga, str, Mapeo | None], Lectura]] = {
     "ris": lambda carga, fuente, _mapeo: leer_ris(carga, fuente),
+    "bibtex": lambda carga, fuente, _mapeo: leer_bibtex(carga, fuente),
     "scopus_csv": lambda carga, fuente, _mapeo: leer_scopus_csv(carga, fuente),
     "wos_txt": lambda carga, fuente, _mapeo: leer_wos(carga, fuente),
     "csv": lambda carga, fuente, mapeo: leer_csv(carga, fuente, _exigir(mapeo)),

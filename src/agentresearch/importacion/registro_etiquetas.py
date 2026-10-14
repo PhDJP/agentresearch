@@ -35,6 +35,12 @@ def construir_registro(
     """Construye el registro. `etiquetas` son pares `(etiqueta, valor)` en orden de aparición."""
     restantes: dict[str, list[str]] = {}
     for etiqueta, valor in etiquetas:
+        filtro = perfil.filtros_de_valor.get(etiqueta)
+        if filtro is not None:
+            filtrado = filtro(valor)
+            if filtrado is None:
+                continue
+            valor = filtrado
         restantes.setdefault(etiqueta, []).append(valor)
     for volatil in perfil.volatiles:
         restantes.pop(volatil, None)

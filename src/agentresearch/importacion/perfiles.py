@@ -15,10 +15,11 @@ Procedencia general de los perfiles: exportaciones reales de prueba del
   lo que no apareció en la exportación de prueba queda «por verificar».
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
 
+from agentresearch.importacion.volatiles import quitar_conteo_de_nota
 from agentresearch.registros import TipoIdFuente
 
 TipoEtiqueta = Literal["texto", "lista_por_linea", "lista_con_separador"]
@@ -46,6 +47,8 @@ class PerfilEtiquetas:
     """Tipo de las etiquetas que no son `texto` (Web of Science)."""
     separadores: Mapping[str, str] = field(default_factory=dict)
     """Etiqueta o columna -> separador con que se parte su valor en una lista."""
+    filtros_de_valor: Mapping[str, Callable[[str], str | None]] = field(default_factory=dict)
+    """Etiqueta -> función que quita de un valor lo volátil; `None` descarta el valor entero."""
     tipo_id_desde_doi: bool = False
     """El identificador de la fuente es el DOI (ACS, ADR-0010, punto 19)."""
     id_etiqueta: tuple[TipoIdFuente, str] | None = None
@@ -175,3 +178,54 @@ SCOPUS_CSV = PerfilEtiquetas(
 
 COLUMNAS_OBLIGATORIAS_SCOPUS_CSV = ("Title",)
 """Sin esta columna el archivo no es un CSV de Scopus utilizable (L-E02)."""
+
+
+BIB_BASE = PerfilEtiquetas(
+    escalares={
+        "titulo": ("title",),
+        "fuente_publicacion": ("journal", "booktitle"),
+        "volumen": ("volume",),
+        "numero": ("number",),
+        "doi": ("doi",),
+        "pmid": ("pmid",),
+        "tipo_documento": ("type",),
+        "idioma": ("language",),
+        "resumen": ("abstract",),
+    },
+    listas={
+        "autores": ("author",),
+        "palabras_clave_autor": ("author_keywords",),
+    },
+    anio=("year",),
+    paginas_inicio="pages",
+    paginas_fin="",
+    separadores={
+        "author": " and ",
+        "author_keywords": "; ",
+    },
+)
+"""Tabla base de BibTeX (nombres de campo en minúsculas). Autores separados por ` and `. La clave
+de la entrada (`Cristal2024`) y los campos repetidos no entran: la clave se genera en la
+exportación y puede variar entre descargas. El tipo de entrada va a `otros` como `entry_type`
+(en Scopus es `@article` también en una revisión; el tipo de documento está en `type`)."""
+
+BIB_SCOPUS = PerfilEtiquetas(
+    escalares=BIB_BASE.escalares,
+    listas={**BIB_BASE.listas, "palabras_clave_indexadas": ("keywords",)},
+    anio=BIB_BASE.anio,
+    paginas_inicio=BIB_BASE.paginas_inicio,
+    paginas_fin=BIB_BASE.paginas_fin,
+    separadores={**BIB_BASE.separadores, "keywords": "; "},
+    filtros_de_valor={"note": quitar_conteo_de_nota},
+)
+"""Perfil de Scopus: `keywords` son las palabras clave indexadas y `author_keywords` las de autor
+(verificado el 2026-10-13); `note` trae el conteo de citas, volátil, junto con el estado de acceso
+abierto: se descarta solo el elemento `Cited by: n` (H2). Scopus no exporta el EID en BibTeX, así
+que `tipo_id_fuente` queda `ninguno`."""
+
+PERFILES_BIBTEX: Mapping[str, PerfilEtiquetas] = {"scopus": BIB_SCOPUS}
+
+
+def perfil_bibtex(fuente: str) -> PerfilEtiquetas:
+    """El perfil BibTeX de la fuente, o la tabla base si la fuente no tiene uno propio."""
+    return PERFILES_BIBTEX.get(fuente, BIB_BASE)
