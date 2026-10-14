@@ -11,7 +11,7 @@ from agentresearch.importacion.ensamblado import (
     extraer_anio,
     unir_otros,
 )
-from agentresearch.importacion.perfiles import SEPARADOR_LISTA, PerfilEtiquetas
+from agentresearch.importacion.perfiles import PerfilEtiquetas
 from agentresearch.importacion.volatiles import procesar_n1_scopus
 from agentresearch.registros import FormatoRegistro, RegistroNormalizado, normalizar_texto
 
@@ -49,9 +49,10 @@ def construir_registro(
     for campo, candidatas in perfil.listas.items():
         elementos: list[str] = []
         for etiqueta in candidatas:
+            separador = perfil.separadores.get(etiqueta)
             for valor in restantes.pop(etiqueta, []):
-                if perfil.tipos.get(etiqueta) == "lista_con_separador":
-                    elementos.extend(valor.split(SEPARADOR_LISTA))
+                if separador is not None:
+                    elementos.extend(valor.split(separador))
                 else:
                     elementos.append(valor)
         campos[campo] = tuple(elementos)

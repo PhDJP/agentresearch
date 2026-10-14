@@ -36,7 +36,7 @@ class PerfilEtiquetas:
     escalares: Mapping[str, tuple[str, ...]]
     """Campo -> etiquetas candidatas, en orden de prioridad (gana la primera presente)."""
     listas: Mapping[str, tuple[str, ...]]
-    """Campo de lista -> etiquetas; una de tipo `lista_con_separador` se separa por «; »."""
+    """Campo de lista -> etiquetas o columnas; las que tienen separador se parten por él."""
     anio: tuple[str, ...] = ("PY",)
     paginas_inicio: str = "SP"
     paginas_fin: str = "EP"
@@ -44,6 +44,8 @@ class PerfilEtiquetas:
     """Etiquetas que se descartan porque cambian en cada descarga."""
     tipos: Mapping[str, TipoEtiqueta] = field(default_factory=dict)
     """Tipo de las etiquetas que no son `texto` (Web of Science)."""
+    separadores: Mapping[str, str] = field(default_factory=dict)
+    """Etiqueta o columna -> separador con que se parte su valor en una lista."""
     tipo_id_desde_doi: bool = False
     """El identificador de la fuente es el DOI (ACS, ADR-0010, punto 19)."""
     id_etiqueta: tuple[TipoIdFuente, str] | None = None
@@ -121,6 +123,7 @@ WOS_BASE = PerfilEtiquetas(
         "DE": "lista_con_separador",
         "ID": "lista_con_separador",
     },
+    separadores={"DE": SEPARADOR_LISTA, "ID": SEPARADOR_LISTA},
     id_etiqueta=("ut", "UT"),
 )
 """Tabla de Web of Science (texto plano). Verificado con la exportación del 2026-10-13: `AU` y
@@ -135,3 +138,40 @@ def perfil_wos(fuente: str) -> PerfilEtiquetas:
     """El perfil de Web of Science: el formato `wos_txt` tiene una sola tabla."""
     del fuente
     return WOS_BASE
+
+
+SCOPUS_CSV = PerfilEtiquetas(
+    escalares={
+        "titulo": ("Title",),
+        "fuente_publicacion": ("Source title",),
+        "volumen": ("Volume",),
+        "numero": ("Issue",),
+        "doi": ("DOI",),
+        "pmid": ("PubMed ID",),
+        "tipo_documento": ("Document Type",),
+        "idioma": ("Language of Original Document",),
+        "resumen": ("Abstract",),
+    },
+    listas={
+        "autores": ("Authors",),
+        "palabras_clave_autor": ("Author Keywords",),
+        "palabras_clave_indexadas": ("Index Keywords",),
+    },
+    anio=("Year",),
+    paginas_inicio="Page start",
+    paginas_fin="Page end",
+    volatiles=frozenset({"Cited by"}),
+    separadores={
+        "Authors": SEPARADOR_LISTA,
+        "Author Keywords": SEPARADOR_LISTA,
+        "Index Keywords": SEPARADOR_LISTA,
+    },
+    id_etiqueta=("eid", "EID"),
+)
+"""Perfil del CSV de Scopus, por nombre de columna (verificado con la exportación del
+2026-10-13, 45 columnas). `Author full names` y `Author(s) ID`, `Art. No.`, `Link`,
+`Affiliations`, `References`, `Funding Details`, etc. van a `otros`. `Cited by` es volátil
+(decisión H2, 2026-10-13)."""
+
+COLUMNAS_OBLIGATORIAS_SCOPUS_CSV = ("Title",)
+"""Sin esta columna el archivo no es un CSV de Scopus utilizable (L-E02)."""
