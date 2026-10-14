@@ -9,6 +9,7 @@ campos repetidos de `otros` y los hallazgos que no dependen del formato
 
 import re
 from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass
 
 from agentresearch.importacion.hallazgos import Hallazgo, crear_hallazgo
 from agentresearch.importacion.resultado import LineaCabecera
@@ -23,6 +24,16 @@ CAMPOS_ESPERADOS = ("titulo", "autores", "anio", "doi", "resumen")
 _PATRON_ANIO = re.compile(r"(?<![0-9])[0-9]{4}(?![0-9])")
 
 ValoresPorClave = Mapping[str, Sequence[str]]
+
+
+@dataclass(frozen=True)
+class Lectura:
+    """Lo que entrega un lector, antes de que `leer` le agregue el hash y el archivo."""
+
+    registros: tuple[RegistroNormalizado, ...]
+    hallazgos: tuple[Hallazgo, ...]
+    lineas_cabecera: tuple[LineaCabecera, ...] = ()
+    detenido_en_fila: int | None = None
 
 
 def unir_otros(valores: ValoresPorClave) -> dict[str, str]:
