@@ -59,7 +59,7 @@ def construir_registro(
 
     extra: dict[str, list[str]] = {}
     texto_anio: str | None = None
-    etiqueta_anio = perfil.anio[0]
+    etiqueta_anio = perfil.anio[0] if perfil.anio else ""
     for candidata in perfil.anio:
         texto_anio = _primero_no_vacio(restantes.get(candidata, []))
         if texto_anio is not None:
