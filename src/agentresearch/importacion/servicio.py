@@ -9,11 +9,13 @@ from pathlib import Path
 from agentresearch.importacion.ensamblado import Lectura
 from agentresearch.importacion.entrada import Carga, cargar
 from agentresearch.importacion.lector_ris import leer_ris
+from agentresearch.importacion.lector_wos import leer_wos
 from agentresearch.importacion.resultado import ResultadoLectura
 from agentresearch.registros import FormatoRegistro
 
 _LECTORES: dict[str, Callable[[Carga, str], Lectura]] = {
     "ris": leer_ris,
+    "wos_txt": leer_wos,
 }
 
 

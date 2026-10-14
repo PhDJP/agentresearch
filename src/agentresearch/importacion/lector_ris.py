@@ -12,20 +12,15 @@ from dataclasses import dataclass, field
 
 from agentresearch.importacion.ensamblado import (
     Lectura,
-    agregar_otros,
-    componer_paginas,
-    extraer_anio,
     hallazgo_de_cabecera,
     hallazgos_de_calidad,
     hallazgos_de_campos_esperados,
-    unir_otros,
 )
 from agentresearch.importacion.entrada import Carga
 from agentresearch.importacion.hallazgos import Hallazgo, crear_hallazgo
 from agentresearch.importacion.identidad import hallazgos_de_identidad
-from agentresearch.importacion.perfiles import PerfilRis, perfil_ris
-from agentresearch.importacion.volatiles import procesar_n1_scopus
-from agentresearch.registros import RegistroNormalizado, normalizar_texto
+from agentresearch.importacion.perfiles import perfil_ris
+from agentresearch.importacion.registro_etiquetas import construir_registro
 
 _ETIQUETA = re.compile(r"^([A-Z][A-Z0-9])  - ?(.*)$")
 
@@ -34,81 +29,6 @@ _ETIQUETA = re.compile(r"^([A-Z][A-Z0-9])  - ?(.*)$")
 class _Abierto:
     inicio: int
     etiquetas: list[tuple[str, str]] = field(default_factory=list)
-
-
-def _primero_no_vacio(valores: list[str]) -> str | None:
-    """Quita de la lista y devuelve el primer valor no vacío; el resto queda en ella."""
-    for indice, valor in enumerate(valores):
-        if normalizar_texto(valor):
-            return valores.pop(indice)
-    return None
-
-
-def _construir(
-    fuente: str, archivo: str, inicio: int, etiquetas: list[tuple[str, str]], perfil: PerfilRis
-) -> RegistroNormalizado:
-    restantes: dict[str, list[str]] = {}
-    for etiqueta, valor in etiquetas:
-        restantes.setdefault(etiqueta, []).append(valor)
-    for volatil in perfil.volatiles:
-        restantes.pop(volatil, None)
-
-    campos: dict[str, object] = {}
-    for campo, candidatas in perfil.escalares.items():
-        for etiqueta in candidatas:
-            elegido = _primero_no_vacio(restantes.get(etiqueta, []))
-            if elegido is not None:
-                campos[campo] = elegido
-                break
-    for campo, candidatas in perfil.listas.items():
-        elementos: list[str] = []
-        for etiqueta in candidatas:
-            elementos.extend(restantes.pop(etiqueta, []))
-        campos[campo] = tuple(elementos)
-
-    extra: dict[str, list[str]] = {}
-    texto_anio: str | None = None
-    etiqueta_anio = perfil.anio[0]
-    for candidata in perfil.anio:
-        texto_anio = _primero_no_vacio(restantes.get(candidata, []))
-        if texto_anio is not None:
-            etiqueta_anio = candidata
-            break
-    anio, sobrante = extraer_anio(etiqueta_anio, texto_anio)
-    agregar_otros(extra, sobrante)
-    paginas, sobrante = componer_paginas(
-        (perfil.paginas_inicio, _primero_no_vacio(restantes.get(perfil.paginas_inicio, []))),
-        (perfil.paginas_fin, _primero_no_vacio(restantes.get(perfil.paginas_fin, []))),
-    )
-    agregar_otros(extra, sobrante)
-
-    tipo_id: str = "ninguno"
-    id_fuente: str | None = None
-    if perfil.eid_en_n1:
-        eid, resto_n1 = procesar_n1_scopus(restantes.pop("N1", []))
-        restantes["N1"] = resto_n1
-        if eid is not None:
-            tipo_id, id_fuente = "eid", eid
-    elif perfil.tipo_id_desde_doi:
-        doi = campos.get("doi")
-        if isinstance(doi, str) and normalizar_texto(doi):
-            tipo_id, id_fuente = "doi", doi
-
-    agregar_otros(restantes, extra)
-    return RegistroNormalizado.model_validate(
-        {
-            "fuente": fuente,
-            "formato": "ris",
-            "archivo": archivo,
-            "posicion": inicio,
-            "tipo_id_fuente": tipo_id,
-            "id_fuente": id_fuente,
-            "anio": anio,
-            "paginas": paginas,
-            "otros": unir_otros(restantes),
-            **campos,
-        }
-    )
 
 
 def leer_ris(carga: Carga, fuente: str) -> Lectura:
@@ -180,7 +100,9 @@ def leer_ris(carga: Carga, fuente: str) -> Lectura:
     if abierto is not None:
         _sin_cierre(abierto)
 
-    registros = tuple(_construir(fuente, archivo, r.inicio, r.etiquetas, perfil) for r in cerrados)
+    registros = tuple(
+        construir_registro(fuente, "ris", archivo, r.inicio, r.etiquetas, perfil) for r in cerrados
+    )
     lineas_cabecera, aviso = hallazgo_de_cabecera(archivo, cabecera)
     if aviso is not None:
         hallazgos.append(aviso)
