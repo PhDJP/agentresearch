@@ -81,9 +81,12 @@ agregan:
 - la identidad de un registro para detectar repetidos: el identificador de la
   fuente es un error si se repite; un DOI repetido en registros sin
   identificador de la fuente es una advertencia (punto 14);
-- los campos volátiles observados: `Y2` de ACS y la línea `Export Date:` de la
-  nota `N1` del RIS de Scopus; `DA` de Web of Science sigue «por verificar»,
-  porque no apareció (punto 20);
+- los campos volátiles observados: `Y2` de ACS, la línea `Export Date:` de la
+  nota `N1` del RIS de Scopus y, por decisión del 2026-10-13, el conteo de
+  citas de Scopus en sus tres formatos; `DA` de Web of Science sigue «por
+  verificar», porque no apareció (punto 20);
+- que el RIS de Scopus aporta el identificador de la fuente (EID) desde una
+  línea de la nota `N1` (punto 23);
 - el comienzo y el final de un registro de Web of Science y el significado de
   sus líneas de continuación (punto 23);
 - que `bibtexparser` 2.0.1 no resuelve las concatenaciones `#` y deja fuera de
@@ -421,8 +424,14 @@ El detalle y la lista de lo que sigue sin poder verificarse están en la
     (la fecha de descarga `Y2` del RIS de ACS, la línea `Export Date:` de la
     nota `N1` del RIS de Scopus, y la fecha de generación `DA` de Web of
     Science, que está «por verificar»: no apareció en la exportación de
-    prueba). Un volátil puede ser una etiqueta o una línea con prefijo dentro
-    de una etiqueta repetible. Así, el mismo registro descargado dos veces
+    prueba). Un volátil puede ser una etiqueta, una línea con prefijo dentro
+    de una etiqueta repetible o un elemento dentro de un campo de texto.
+    **Decidido el 2026-10-13: el conteo de citas es volátil** y se descarta:
+    la columna `Cited by` del CSV de Scopus, la línea `Cited By:` de `N1` del
+    RIS y solo el elemento `Cited by: n` del campo `note` del BibTeX, cuyo
+    resto se conserva (la regla exacta está en la especificación, 2b). El
+    conteo de citas es `nunca_publicable`, cambia con la fecha de descarga y
+    no lo usa ningún hito del protocolo. Así, el mismo registro descargado dos veces
     tiene el mismo hash. Tampoco incluye los identificadores de importación,
     el archivo ni la posición, que cambian entre descargas. La normalización
     lleva una `VERSION_NORMALIZACION`, que no entra al hash y se registra con
@@ -476,8 +485,12 @@ El detalle y la lista de lo que sigue sin poder verificarse están en la
     (entre `VR` y el primer `PT` hay cabecera, y `EF` cierra el archivo); sus
     líneas con tres espacios iniciales son un elemento por línea en las listas
     de autores (`AU`, `AF`) y texto cortado en los demás campos, que se une con
-    un espacio. Los perfiles por fuente y las dudas abiertas están en la
-    especificación (2b).
+    un espacio. **El RIS de Scopus no tiene etiqueta de EID**: lo trae una
+    línea `EID:` dentro de `N1`. El perfil `scopus` del RIS la toma como
+    identificador de la fuente (`tipo_id_fuente` `eid`; decidido el
+    2026-10-13). Sin esa línea, el registro queda sin identificador de la
+    fuente y no se deriva de ningún otro campo (regla 6 de CLAUDE.md). Los
+    perfiles por fuente están en la especificación (2b).
 24. **BibTeX con `bibtexparser==2.0.1` y `pylatexenc==2.11`,** con la versión
     exacta fijada, detrás de una interfaz de lector propia para poder
     cambiarla sin tocar el resto. Verificado en PyPI el 2026-09-29:
@@ -496,7 +509,8 @@ El detalle y la lista de lo que sigue sin poder verificarse están en la
       deja en `failed_blocks` como `DuplicateBlockKeyBlock`, y los conteos
       serían menores en silencio. El lector la recupera desde
       `ignore_error_block` del bloque (no existe `duplicate_block`). Una clave
-      repetida no es un identificador de la fuente y no es un error.
+      repetida no es un identificador de la fuente, no es un error y no
+      genera hallazgo.
 
     Ninguno de los dos casos apareció en la exportación real de Scopus del
     2026-10-13; se cubren con archivos sintéticos.
@@ -657,6 +671,11 @@ El detalle y la lista de lo que sigue sin poder verificarse están en la
 - **`id_fuente` como campo independiente de `doi`:** es simple, pero publica
   un DOI no habilitado cuando el identificador de la fuente es el DOI (ACS).
   Se eligió regirlo por el campo que repite.
+- **Una regla L-A06 que avise de una clave BibTeX repetida:** se descartó
+  (decidido el 2026-10-13). Añade una regla y pruebas para un caso que casi no
+  ocurre en las exportaciones de bases de datos. La entrada se recupera, se
+  cuenta y no genera hallazgo; sin la recuperación, los conteos serían
+  menores en silencio (punto 24).
 - **El DOI como identidad para el error de repetido** (cuando falta el
   identificador de la fuente): detectaría tandas solapadas en el BibTeX de
   Scopus, que no trae EID, pero marcaría como error dos registros distintos

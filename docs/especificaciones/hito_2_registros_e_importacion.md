@@ -255,8 +255,8 @@ Perfiles observados el 2026-10-13 (una sola exportación por fuente, de 1 a 5 re
 | `resumen` | `Abstract` | `AB` | `abstract` | `AB` (por verificar) | `AB` |
 | `palabras_clave_autor` | `Author Keywords` (`"; "`) | — (`KW` mezcla ambas: `otros`) | `author_keywords` (`"; "`) | `DE` (por verificar) | — |
 | `palabras_clave_indexadas` | `Index Keywords` (`"; "`) | — | `keywords` (`"; "`) | `ID` (por verificar) | — |
-| `tipo_id_fuente`, `id_fuente` | `eid`, `EID` | ver «Decisiones abiertas», H1 | `ninguno` (la exportación no trae EID, dato oficial confirmado) | `ut`, `UT` (`WOS:` + 15 dígitos, tal cual) | `doi`, `DO` |
-| volátiles (se descartan) | `Cited by` (H2) | línea `Export Date:` de `N1`; `Cited By:` (H2) | `Cited by:` de `note` (H2) | `DA` (por verificar) | `Y2` |
+| `tipo_id_fuente`, `id_fuente` | `eid`, `EID` | `eid`, valor de la línea `EID:` de `N1` (H1); `ninguno` si no hay esa línea | `ninguno` (la exportación no trae EID, dato oficial confirmado) | `ut`, `UT` (`WOS:` + 15 dígitos, tal cual) | `doi`, `DO` |
+| volátiles (se descartan) | columna `Cited by` | líneas de `N1` que empiezan con `Export Date:` y con `Cited By:` | el elemento `Cited by: n` de `note` | `DA` (por verificar) | `Y2` |
 
 En la tabla, los campos nunca publicables (`Affiliations` o `AD`, `References`, `Funding Details`…) se leen igual: van a `otros` y se conservan en local.
 
@@ -277,9 +277,30 @@ Cada tabla declara los campos que se descartan porque cambian en cada descarga y
 | Fuente y formato | Volátil | Estado |
 |---|---|---|
 | ACS, RIS | `Y2`: fecha de descarga, `MM/DD/AAAA` (verificado: coincide con la fecha UTC del nombre del archivo) | verificado 2026-10-13 |
-| Scopus, RIS | la línea de `N1` que empieza con `Export Date:` (una por registro, `DD Mes AAAA`). El resto de las líneas de `N1` va a `otros` | verificado 2026-10-13 |
+| Scopus, RIS | la línea de `N1` que empieza con `Export Date:` (una por registro, `DD Mes AAAA`) | verificado 2026-10-13 |
+| Scopus, RIS | la línea de `N1` que empieza con `Cited By:` (conteo de citas) | decidido 2026-10-13 (H2) |
+| Scopus, CSV | la columna `Cited by` | decidido 2026-10-13 (H2) |
+| Scopus, BibTeX | el elemento `Cited by: n` del campo `note` (regla exacta abajo); el resto de `note` se conserva | decidido 2026-10-13 (H2) |
 | Web of Science, texto plano | `DA` (fecha de generación del informe) | **por verificar:** no aparece en la exportación de prueba; el archivo no trae ninguna fecha de generación, ni por registro ni de cabecera |
-| Scopus, `Cited by`, `Cited By:` de `N1` y `Cited by:` de `note` | conteo de citas, que cambia con la fecha | pendiente de decisión (H2) |
+
+El resto de las líneas de `N1` va a `otros` (campo repetido, unido con `"; "`). El conteo de citas es `nunca_publicable`, no lo usa ningún hito del protocolo, y cambia con la fecha de descarga: descartarlo mantiene el mismo `hash_completo` para el mismo registro descargado en fechas distintas (ADR-0010, punto 20).
+
+**Regla exacta para `note` del BibTeX de Scopus** (propuesta para la revisión del asesor antes de programarla). En los cinco registros de la prueba, `note` era `Cited by: n`, seguido a veces de `; ` y de elementos de estado de acceso abierto; `Cited by: n` fue siempre el primer elemento, pero la regla no depende de la posición.
+
+1. El valor se toma con los espacios colapsados (paso 2 de la normalización) y se divide por el separador exacto `"; "` (punto y coma y un espacio) en elementos.
+2. Se descartan los elementos que coinciden **completos** con la expresión regular `^Cited by: [0-9]+$`, sensible a mayúsculas. Un elemento como `Cited by 5`, `cited by: 5` o `Cited by: 5 (2)` no coincide y se conserva.
+3. Los elementos restantes se unen de nuevo con `"; "`. El separador vecino desaparece con el fragmento: no queda `"; "` al inicio, al final ni doble, y un elemento que no coincide queda sin cambios.
+4. Si no queda ningún elemento, `note` no entra a `otros`; si ninguno coincide, el valor queda como estaba. Si `Cited by: n` aparece más de una vez, se descartan todas.
+5. Se aplica antes de construir el registro, así que `otros["note"]` y el `hash_completo` nunca contienen el conteo.
+
+| Valor ficticio de `note` | Resultado en `otros["note"]` |
+|---|---|
+| `Cited by: 12; All Open Access; Gold Open Access` | `All Open Access; Gold Open Access` |
+| `All Open Access; Cited by: 3; Gold Open Access` | `All Open Access; Gold Open Access` |
+| `All Open Access; Cited by: 3` | `All Open Access` |
+| `Cited by: 7` | (ausente) |
+| `All Open Access` | `All Open Access` |
+| `Cited by 7; Gold Open Access` | `Cited by 7; Gold Open Access` |
 
 ### Codificación
 
@@ -297,7 +318,7 @@ Exportaciones reales de una búsqueda de prueba, guardadas en `exportaciones_pru
 | Web of Science | `wos_txt` | sí | LF | 3 | `FN`, `VR`; registros de `PT` a `ER` con una línea vacía después; `EF` al final y sin salto de línea final; `PT` vale `J` |
 | ACS | `ris` | no | CRLF | 1 | cabecera de 3 líneas y una vacía; `TY` a `ER`; tres líneas vacías al final |
 
-- **Conteos.** Scopus: 5 registros en cada uno de los tres formatos, que corresponden a los «primeros 5» de 466 resultados anotados. ACS: 1 registro de 3 946 resultados, el seleccionado. Web of Science: el archivo trae **3 registros**, y la nota del investigador dice «Resultado: 3 articulos» y «Articulos seleccionados 1»; la cuenta coincide con los resultados, no con la selección: ver «Por confirmar».
+- **Conteos.** Scopus: 5 registros en cada uno de los tres formatos, que corresponden a los «primeros 5» de 466 resultados anotados. ACS: 1 registro de 3 946 resultados, el seleccionado. Web of Science: 3 registros, que coinciden con los 3 resultados anotados; el investigador confirmó que exportó los 3.
 - **Scopus: el mismo documento en tres formatos.** El orden, el DOI, el título, el año, la fuente, el volumen, el número, el PMID y el idioma son idénticos. Difieren:
   - los autores: el CSV da `Apellido I.`; el RIS, `Apellido, I.`; el BibTeX, el nombre completo `Apellido, Nombre`;
   - en un registro de 13 autores, el RIS trae 12: falta el único nombre de una sola palabra (el BibTeX y el CSV sí lo traen). La causa no está verificada; no se corrige (regla 6);
@@ -322,7 +343,7 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
 | L-A05 | advertencia | El mismo DOI en dos o más registros que **no tienen identificador de la fuente**, dentro del archivo o entre archivos; se informan las ubicaciones. Puede ser un documento repetido o dos registros que comparten el DOI: la deduplicación es del hito 4 |
 
 - **Identidad para L-E03:** el par `(tipo_id_fuente, id_fuente)`. El DOI **no** hace de identidad para el error: un DOI repetido entre registros sin identificador de la fuente (p. ej. el BibTeX de Scopus, que no trae EID) es la advertencia L-A05. Un registro con identificador de la fuente se compara solo por él.
-- **Lo que no es regla de lectura:** una clave BibTeX repetida (se recupera sin hallazgo) y las diferencias entre formatos de una misma fuente.
+- **Lo que no es regla de lectura:** una clave BibTeX repetida (se recupera, se cuenta y no genera hallazgo; decidido el 2026-10-13, y la regla L-A06 que la avisaría se descartó: ADR-0010, «Alternativas consideradas») y las diferencias entre formatos de una misma fuente.
 
 ### `agentresearch importar leer ARCHIVO... --formato F --fuente ID [--mapeo mapeo.json] [--json]`
 
@@ -339,14 +360,14 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
   El 2 solo lo emite el analizador de argumentos, antes de abrir ningún archivo: es un error de uso del comando. Todo lo que se descubre al leer, incluido un archivo que no existe, es 1.
 - `--json` devuelve la forma común del ADR-0008 (punto 26): `{"comando": "importar leer", "exito": bool, "errores": [], "version_agente": "…", "resultado": ResultadoBusqueda}`; `exito` es verdadero solo con código 0. Con código 2, argparse escribe su mensaje en el flujo de error y no hay JSON.
 
-### Decisiones abiertas tras las exportaciones reales
+### Decisiones tras las exportaciones reales (H1 y H2)
 
-Quedan para la revisión del asesor; el 2b no las implementa hasta que se resuelvan.
+Decididas por el investigador y el asesor al revisar el commit `6412781`.
 
-| ID | Pregunta | Opciones | Recomendación |
+| ID | Pregunta | Estado y opción elegida | Alternativa descartada |
 |---|---|---|---|
-| H1 | El RIS de Scopus no tiene etiqueta de EID: lo trae una línea `EID:` dentro de `N1`, igual al del CSV en los 5 registros | (a) el perfil `scopus` toma `EID:` de `N1` como `id_fuente` (`eid`); (b) queda en `otros` y el registro se identifica por su DOI | (a): es determinista, está verificado contra el CSV, y deja a `L-E03` y al hito 4 con el identificador de la fuente. Es la única lectura de un valor dentro de una nota |
-| H2 | `Cited by` (CSV), `Cited By:` (línea de `N1`) y `Cited by:` (campo `note` del BibTeX) cambian con la fecha de descarga, y `hash_completo` incluye `otros` | (a) volátil: se descarta, y el mismo registro descargado en fechas distintas conserva el mismo hash (ADR-0010, punto 20); (b) se conserva y el hash cambia entre descargas de fechas distintas | (a), con `Export Date:`. El conteo de citas es `nunca_publicable` y no lo usa ningún hito del protocolo. En BibTeX, `note` mezcla el conteo con el estado de acceso abierto: habría que descartar solo el fragmento `Cited by: n`, y se decide al implementarlo |
+| H1 | El RIS de Scopus no tiene etiqueta de EID: lo trae una línea `EID:` dentro de `N1`, igual al del CSV en los 5 registros | **Decidido el 2026-10-13: (a).** El perfil `scopus` del RIS toma el valor de la línea `EID:` de `N1` como `id_fuente`, con `tipo_id_fuente = eid`. La línea se consume y no pasa a `otros`; el resto de las líneas de `N1` sí. Si el registro no trae esa línea, o su valor está vacío, queda `tipo_id_fuente = ninguno`: no se deriva del `UR` ni de otra fuente (regla 6). Si hubiera varias líneas `EID:`, se toma la primera y las demás siguen a `otros` | (b) dejarlo en `otros` y identificar el registro por su DOI: dejaría a L-E03 y al hito 4 sin el identificador de la fuente en un formato que lo trae |
+| H2 | `Cited by` (CSV), `Cited By:` (línea de `N1`) y `Cited by:` (campo `note` del BibTeX) cambian con la fecha de descarga, y `hash_completo` incluye `otros` | **Decidido el 2026-10-13: (a).** Son volátiles y se descartan: la columna `Cited by`, la línea `Cited By:` de `N1` y solo el elemento `Cited by: n` de `note`, que conserva el resto en `otros`. La regla exacta de `note` está en «Campos volátiles» | (b) conservarlos: el hash cambiaría entre descargas de fechas distintas del mismo registro (ADR-0010, punto 20) |
 
 ### Pruebas (archivos sintéticos)
 
@@ -360,6 +381,16 @@ Todos los archivos son sintéticos, con temas ficticios. Las exportaciones reale
 - Varias tandas de una misma búsqueda: suma correcta; identificador repetido dentro de un archivo (L-E03) y entre archivos; DOI repetido sin identificador de la fuente (L-A05); un registro con identificador de la fuente y el mismo DOI que otro no dispara L-A05.
 - El mismo registro en dos descargas con distinto `Y2` (ACS) y con distinta línea `Export Date:` de `N1` (Scopus): mismo `hash_completo`.
 - `otros`: un campo repetido se une con `"; "`; los volátiles no están en `otros`.
+- Identificador del RIS de Scopus (H1):
+  - con una línea `N1` `EID:`: `tipo_id_fuente = eid`, `id_fuente` igual al valor, y esa línea no aparece en `otros` mientras las demás líneas de `N1` sí;
+  - sin la línea `EID:`: `ninguno` e `id_fuente` nulo, sin L-E02 ni L-A01 si el registro tiene DOI, y sin derivar nada de `UR`;
+  - con `EID:` de valor vacío: `ninguno`;
+  - con dos líneas `EID:`: se toma la primera y la otra queda en `otros`;
+  - el mismo EID en dos registros: L-E03; sin EID y con el mismo DOI en dos registros: L-A05.
+- Conteo de citas (H2):
+  - el mismo registro con distinta columna `Cited by` (CSV), distinta línea `Cited By:` de `N1` (RIS) o distinto `Cited by: n` de `note` (BibTeX): mismo `hash_completo`, y ninguno de los tres está en `otros`;
+  - `note` con el fragmento al inicio, en medio, al final y solo; sin el fragmento; y con una variante que no coincide (`Cited by 7`): los resultados de la tabla de la regla exacta;
+  - el resto de `N1` y de `note` se conserva sin cambios.
 - CSV genérico con mapeo válido (campo, objeto con separador, `id_fuente:lens_id`); con columna inexistente, campo desconocido, lista sin separador, separador en un campo escalar y dos columnas al mismo destino (L-E02); archivo de mapeo ilegible o no JSON (código 1, con el error en `errores` y sin leer el CSV).
 - `importar leer`: salida de texto y `--json`; los tres códigos de salida, con un caso por cada causa de la tabla (el 2, con las invocaciones que rechaza el analizador, y el 1, con un archivo inexistente y con otro leído en la misma invocación); que no escribe nada; y que ningún mensaje contiene un valor de campo.
 
@@ -541,7 +572,7 @@ Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
 - El investigador anota el máximo por exportación que ofrece cada interfaz, para verificar los de Scopus y Web of Science, que el ADR-0010 (punto 25) deja «por verificar».
 - Queda constancia en el ADR-0010, «Aceptación»: formatos, número de registros por archivo, máximos observados, hallazgos y correcciones, sin copiar datos de los registros.
 - **Estado tras la verificación estructural del 2026-10-13** (2b, «Verificado con las exportaciones de prueba»). Ya hay Scopus en los tres formatos (5 registros), Web of Science (3, sin resumen) y ACS (1). El 2e debe cerrar lo que esa prueba no pudo verificar:
-  - **Web of Science:** repetir la exportación con el contenido de registro completo, para ver `AB`, `DT`, `LA`, `DE`, `ID` y `PM`, y en dos tandas, para probar L-E03 y I-E05 entre archivos; y confirmar el número de registros exportados frente a la selección (la nota decía «seleccionados 1» y el archivo trae 3);
+  - **Web of Science:** repetir la exportación con el contenido de registro completo, para ver `AB`, `DT`, `LA`, `DE`, `ID` y `PM`, y en dos tandas, para probar L-E03 y I-E05 entre archivos. **Resuelto el 2026-10-13:** el investigador confirmó que exportó los 3 registros del archivo;
   - **ACS:** un registro con volumen y número, y con palabras clave (`KW`), para fijar `VL`, `IS`, `SP`, `EP` y `KW`; y la respuesta a la comprobación adicional del punto 28 del ADR-0010 (la nota del investigador dice «No permite exportación de metadatos» para más de un artículo: confirmar su alcance);
   - **Lens:** el CSV, que no se pudo exportar, con los nombres de columna reales para el mapeo;
   - **Scopus:** un CSV con celdas de varias líneas y comillas internas, si la búsqueda las produce; y una exportación con un registro sin autores o con un autor de una sola palabra, para ver qué hace cada formato;
