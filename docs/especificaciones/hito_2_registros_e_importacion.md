@@ -188,7 +188,7 @@ El 2b también agrega `importacion` al `--include` del paso de cobertura mínima
 - el hash del archivo y el número de registros;
 - la cobertura de cada campo: cuántos registros lo tienen. Se cuenta sobre el registro ya normalizado: un valor vacío (`pages = {}` en BibTeX, una celda vacía en un CSV) cuenta como ausente.
 
-`leer_busqueda(rutas, formato, fuente, mapeo=None) -> ResultadoBusqueda` agrupa los archivos de una misma búsqueda, en el orden declarado: la lista de `ResultadoLectura`, la suma de registros, los identificadores repetidos entre archivos (con archivo y línea de cada ocurrencia) y la cobertura total. Es la forma del campo `resultado` de `--json` (ADR-0008, punto 26).
+`leer_busqueda(rutas, formato, fuente, mapeo=None) -> ResultadoBusqueda` agrupa los archivos de una misma búsqueda, en el orden declarado: la lista de `ResultadoLectura`, la suma de registros, los identificadores repetidos entre archivos (con archivo y línea de cada ocurrencia) y la cobertura total. **No es lo que sale por `--json` ni por la terminal:** esa salida es una vista de resumen sin registros (ver `importar leer`).
 
 - **Los mensajes no contienen datos de los registros.** Citan regla, archivo y línea, nunca un valor de campo: Claude Code ve la salida y los resúmenes tienen licencia (ADR-0010, punto 26).
 - El formato lo declara el investigador; el lector no lo adivina.
@@ -199,7 +199,7 @@ El 2b también agrega `importacion` al `--include` del paso de cobertura mínima
 |---|---|---|
 | `ris` | propio | Etiquetas de dos caracteres. `TY` abre y `ER` cierra; la línea `ER` puede llevar o no el espacio final (`ER  - ` en ACS, `ER  -` en Scopus). Tolera líneas de cabecera antes del primer `TY` (RIS de ACS), líneas vacías entre registros y al final, y líneas de continuación. |
 | `wos_txt` | propio | Texto plano con etiquetas de Web of Science. `FN` y `VR` de cabecera; el registro **abre con `PT` y cierra con `ER`**, seguido de una línea vacía; `EF` cierra el archivo. Las líneas que empiezan con tres espacios continúan la etiqueta anterior (ver «Continuaciones de Web of Science»). |
-| `scopus_csv` | propio, con `csv` | Columnas leídas por nombre; campos entre comillas dobles y separados por comas; celdas entre comillas con saltos de línea (no observados en la prueba). El lector fija un **límite explícito de campo de 10 MB** (10 485 760 caracteres, con `csv.field_size_limit`) y no el máximo posible: el valor por omisión de `csv` es 131 072 y la celda más larga de la prueba mide 23 411. Una celda que supere el límite da L-E02 con el número de fila, no un fallo del programa. |
+| `scopus_csv` | propio, con `csv` | Columnas leídas por nombre; campos entre comillas dobles y separados por comas; celdas entre comillas con saltos de línea (no observados en la prueba). El lector fija un **límite explícito de campo de 10 MB** (10 485 760 caracteres, con `csv.field_size_limit`) y no el máximo posible: el valor por omisión de `csv` es 131 072 y la celda más larga de la prueba mide 23 411. Una celda que supere el límite da L-E02 con el número de fila y **detiene la lectura de ese archivo en esa fila**, no un fallo del programa: los registros leídos antes se conservan y se informa cuántos fueron. No se continúa, porque una celda entrecomillada con saltos de línea que supera el límite deja filas basura después del error. |
 | `csv` | propio, con `csv` | Un archivo de mapeo JSON declara qué columna va a cada campo (ver «Archivo de mapeo»); se valida y su hash queda en el resultado. Cubre Lens. Mismo límite explícito de campo de 10 MB y mismo L-E02 que `scopus_csv`. |
 | `bibtex` | bibtexparser 2.0.1 | Tildes de LaTeX decodificadas con pylatexenc. La biblioteca resuelve `@string`, pero **no** las concatenaciones con `#`: un resolvedor propio mínimo las resuelve (cadenas entre `{}` o `""`, nombres de `@string` y números unidos por `#`, con espacios o saltos opcionales). La entrada de **clave repetida** no queda en `entries`: la biblioteca la deja en `failed_blocks` como `DuplicateBlockKeyBlock`, y el lector la recupera desde su atributo `ignore_error_block` (no existe `duplicate_block` en la 2.0.1). Una prueba confirma el nombre del atributo con la versión fijada. La biblioteca escribe sus advertencias en `stderr`: el lector las **captura** (no llegan a la terminal) y las convierte en hallazgos. La biblioteca cuenta las líneas desde 0 (`start_line`, verificado con la 2.0.1 fijada), así que la línea que se informa es `start_line + 1`, la línea física del archivo. |
 
@@ -334,7 +334,7 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
 | ID | Severidad | Regla |
 |---|---|---|
 | L-E01 | error | El archivo no es UTF-8 (con o sin BOM); se informa la línea |
-| L-E02 | error | Estructura inválida para el formato: registro sin cierre, etiqueta fuera de un registro, columna obligatoria ausente, fila con más o con menos columnas que el encabezado, celda que supera el límite de campo (10 MB), BibTeX mal formado, o un mapeo inválido (ver «Archivo de mapeo»); se informa la línea (en un CSV, el número de fila) |
+| L-E02 | error | Estructura inválida para el formato: registro sin cierre, etiqueta fuera de un registro, columna obligatoria ausente, fila con más o con menos columnas que el encabezado, celda que supera el límite de campo (10 MB; detiene la lectura del archivo en esa fila), BibTeX mal formado, o un mapeo inválido (ver «Archivo de mapeo»); se informa la línea (en un CSV, el número de fila) |
 | L-E03 | error | Identificador de la fuente (`tipo_id_fuente` e `id_fuente`) repetido **dentro del archivo o entre archivos de la búsqueda**; se informan las dos ubicaciones (archivo y línea) |
 | L-A01 | advertencia | Registro sin identificador de la fuente ni DOI: no se podrá detectar si está repetido |
 | L-A02 | advertencia | Registro sin título |
@@ -348,7 +348,7 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
 ### `agentresearch importar leer ARCHIVO... --formato F --fuente ID [--mapeo mapeo.json] [--json]`
 
 - Lee uno o varios archivos de una misma búsqueda. No necesita un estudio y **no escribe nada**. Claude Code lo puede ejecutar en el estudio (2d), y es el comando de la aceptación en este repositorio (2e).
-- Muestra por archivo el hash, el número de registros, los hallazgos con su línea y la cobertura de campos; y en total, la suma de registros y los identificadores repetidos entre archivos.
+- Muestra por archivo el hash, el número de registros, los hallazgos con su línea, las líneas de cabecera y la cobertura de campos; y en total, la suma de registros y los identificadores repetidos entre archivos. **Ni la salida de texto ni `--json` llevan registros ni valores de campo:** Claude Code ve esa salida y los resúmenes tienen licencia (ADR-0010, punto 26). Las líneas de cabecera se muestran (L-A03) porque no son datos de un registro.
 - **Códigos de salida** (ADR-0008, punto 26):
 
 | Código | Cuándo | Qué se leyó |
@@ -358,7 +358,7 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
 | 2 | **El analizador de argumentos rechazó la invocación y no se ejecutó nada** (ADR-0008, punto 26): falta algún `ARCHIVO`, `--formato` o `--fuente`; `--formato` no es uno de los cinco admitidos; `--fuente` vacía; `--mapeo` con un formato que no es `csv`, o ausente con `csv`; una opción desconocida | nada |
 
   El 2 solo lo emite el analizador de argumentos, antes de abrir ningún archivo: es un error de uso del comando. Todo lo que se descubre al leer, incluido un archivo que no existe, es 1.
-- `--json` devuelve la forma común del ADR-0008 (punto 26): `{"comando": "importar leer", "exito": bool, "errores": [], "version_agente": "…", "resultado": ResultadoBusqueda}`; `exito` es verdadero solo con código 0. Con código 2, argparse escribe su mensaje en el flujo de error y no hay JSON.
+- `--json` devuelve la forma común del ADR-0008 (punto 26): `{"comando": "importar leer", "exito": bool, "errores": [], "version_agente": "…", "resultado": {...}}`; `exito` es verdadero solo con código 0. `resultado` es una **vista de resumen sin registros**: `archivos` (por cada uno: nombre, formato, hash, número de registros, hallazgos con regla, severidad, línea y mensaje, líneas de cabecera y cobertura de campos) y `total` (suma de registros, identificadores repetidos entre archivos con archivo y línea de cada ocurrencia, y cobertura total). Con código 2, argparse escribe su mensaje en el flujo de error y no hay JSON.
 
 ### Decisiones tras las exportaciones reales (H1 y H2)
 
@@ -376,7 +376,7 @@ Todos los archivos son sintéticos, con temas ficticios. Las exportaciones reale
 - Por formato: un archivo válido; con BOM; con CRLF; con campos faltantes; con caracteres no ASCII.
 - Errores con su número de línea: registro sin cierre, etiqueta fuera de registro, columna ausente, fila con más y con menos columnas que el encabezado, UTF-16 o Latin-1, BibTeX mal formado.
 - Línea de un BibTeX mal formado (A10): un archivo sintético con varias entradas válidas y una mal formada más abajo; la línea informada coincide con la línea física de esa entrada en el archivo (y no con la anterior, que es lo que daría `start_line` sin sumar 1). Con el mismo archivo, ninguna advertencia de la biblioteca llega a `stderr`.
-- Celda que supera el límite (A8): un CSV de `scopus_csv` y otro de `csv` con mapeo, cada uno con una celda de 10 485 761 caracteres sintéticos (por ejemplo `"x" * 10_485_761`) en una fila posterior al encabezado: L-E02 con el número de fila, sin excepción, y las demás filas se leen. Una celda de exactamente 10 485 760 caracteres se lee.
+- Celda que supera el límite (A8): un CSV de `scopus_csv` y otro de `csv` con mapeo, cada uno con una celda de 10 485 761 caracteres sintéticos (por ejemplo `"x" * 10_485_761`) en una fila posterior al encabezado: L-E02 con el número de fila, sin excepción, y la lectura de ese archivo se detiene en esa fila (se conservan y se cuentan los registros anteriores, y no aparece ningún registro posterior, ni siquiera con una celda entrecomillada con saltos de línea). Una celda de exactamente 10 485 760 caracteres se lee.
 - RIS con cabecera de ACS antes del primer `TY`; `ER` con y sin espacio final; líneas vacías entre registros y al final; líneas de continuación; celdas con saltos de línea y comillas en CSV.
 - Web of Science: registro de `PT` a `ER`; `FN` y `VR` de cabecera; archivo sin `EF` y sin salto final; `AU` con un autor por línea, `TI` con líneas unidas con espacio y `OI` cortado dentro de un elemento.
 - BibTeX con tildes de LaTeX (`{\'e}`, `{\"u}`, `\~{n}`), `@string` y concatenación con `#` (entre cadenas, con `@string` y con número); valor vacío `{}` (campo ausente); clave repetida recuperada y contada, sin L-E03.
