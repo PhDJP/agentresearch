@@ -412,3 +412,52 @@ def test_scopus_pone_entre_comillas_una_variante_con_guion(
         a.tipo == "nota" and a.termino == "freeze-drying" and "entre comillas" in a.mensaje
         for a in scopus.avisos
     )
+
+
+# --- ACS: fuente sin traductor con aviso propio (ADR-0010, punto 29) -------------------
+
+
+def _con_acs(datos_sinteticos: dict[str, Any]) -> ConjuntoEcuaciones:
+    datos = _protocolo(datos_sinteticos, "con_variantes").model_dump()
+    datos["fuentes"] = [*datos["fuentes"], {**datos["fuentes"][0], "id": "acs"}]
+    return generar_ecuaciones(Protocolo.model_validate(datos))
+
+
+def test_acs_es_una_fuente_sin_traductor_y_lleva_el_aviso(
+    datos_sinteticos: dict[str, Any],
+) -> None:
+    conjunto = _con_acs(datos_sinteticos)
+
+    texto = texto_ecuaciones(conjunto, ORIGEN)
+
+    assert "acs" in conjunto.sin_traductor
+    assert "acs" not in TRADUCTORES
+    seccion = texto.split("## Fuentes sin traductor", 1)[1]
+    assert "- acs: no tiene traductor propio" in seccion
+    assert "Use siempre los paréntesis" in seccion
+    assert "No use «All»" in seccion
+    assert "en lugar de `*` dentro de frases" in seccion
+    assert "ACS lematiza" in seccion
+    assert "Receta opcional por filas" in seccion
+    assert "TITLE-ABS-KEY(A AND B)" in seccion
+
+
+def test_el_aviso_de_acs_no_aparece_en_las_demas_fuentes_sin_traductor(
+    datos_sinteticos: dict[str, Any],
+) -> None:
+    conjunto = _con_acs(datos_sinteticos)
+
+    texto = texto_ecuaciones(conjunto, ORIGEN)
+
+    assert texto.count("Aviso de ACS Publications") == 1
+    linea_lens = next(linea for linea in texto.splitlines() if linea.startswith("- lens:"))
+    assert "ACS" not in linea_lens
+
+
+def test_un_protocolo_sin_acs_produce_el_mismo_ecuaciones_md_que_antes(
+    datos_sinteticos: dict[str, Any],
+) -> None:
+    texto = texto_ecuaciones(_conjunto(datos_sinteticos, "con_variantes"), ORIGEN)
+
+    assert "ACS" not in texto
+    assert texto.encode("utf-8") == (DATOS / "con_variantes" / "ecuaciones.md").read_bytes()

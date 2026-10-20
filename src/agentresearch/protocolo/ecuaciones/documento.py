@@ -31,6 +31,23 @@ _PASOS_MANUALES = {
 }
 
 
+_AVISO_ACS = [
+    "  Aviso de ACS Publications (ADR-0010, punto 29), verificado en su interfaz el 2026-09-29:",
+    "  - Use siempre los paréntesis.",
+    "  - No use «All»: busca en el texto completo y cambia el alcance frente a las demás fuentes.",
+    "  - Use las variantes de la palabra en lugar de `*` dentro de frases entre comillas: los "
+    "comodines no se admiten al inicio de un término ni dentro de una frase.",
+    "  - ACS lematiza y las comillas no lo desactivan en una palabra suelta: anote al registrar "
+    "la búsqueda el estado de la lematización que observe.",
+    "  - Receta opcional por filas: una fila por campo (Title, Abstract y Keyword), cada una con "
+    "la ecuación completa entre paréntesis, unidas con OR. Solo usa OR entre filas, así que no "
+    "depende de una precedencia. Limitación: es más estrecha que `TITLE-ABS-KEY(A AND B)`, "
+    "porque no recupera un registro con el bloque A en el título y el bloque B solo en el "
+    "resumen.",
+]
+"""Aviso de la entrada de ACS en «Fuentes sin traductor» (ADR-0010, punto 29)."""
+
+
 @dataclass(frozen=True, slots=True)
 class OrigenEcuaciones:
     """De qué protocolo salen las ecuaciones."""
@@ -66,11 +83,13 @@ def texto_ecuaciones(conjunto: ConjuntoEcuaciones, origen: OrigenEcuaciones) -> 
         lineas += ["", *_seccion(ecuacion)]
     if conjunto.sin_traductor:
         lineas += ["", "## Fuentes sin traductor", ""]
-        lineas += [
-            f"- {fuente}: no tiene traductor propio; use la ecuación genérica y adáptela a la "
-            "sintaxis de la base."
-            for fuente in conjunto.sin_traductor
-        ]
+        for fuente in conjunto.sin_traductor:
+            lineas.append(
+                f"- {fuente}: no tiene traductor propio; use la ecuación genérica y adáptela a "
+                "la sintaxis de la base."
+            )
+            if fuente.strip().lower() == "acs":
+                lineas += _AVISO_ACS
     return "\n".join(lineas) + "\n"
 
 
