@@ -15,6 +15,7 @@ from agentresearch.cli import construir_analizador, ejecutar_nuevo_estudio, main
 from agentresearch.estudio import creacion
 from agentresearch.estudio.creacion import (
     PLANTILLAS,
+    SEMILLAS,
     ErrorCreacion,
     crear_estudio,
     fuente_del_agente,
@@ -45,6 +46,9 @@ MODELO = "claude-opus-5-5"
 
 ARCHIVOS_ESPERADOS = [
     ".claude/settings.json",
+    ".claude/skills/importar/SKILL.md",
+    ".claude/skills/importar/formatos.md",
+    ".claude/skills/importar/fuentes.md",
     ".claude/skills/protocolo/SKILL.md",
     ".claude/skills/protocolo/formatos.md",
     ".claude/skills/protocolo/secciones.md",
@@ -56,6 +60,7 @@ ARCHIVOS_ESPERADOS = [
     "protocolo/anclaje.json",
     "protocolo/eventos.jsonl",
     "protocolo/protocolo.yaml",
+    "publicacion_datos.yaml",
     "pyproject.toml",
 ]
 
@@ -133,7 +138,7 @@ def test_las_plantillas_no_dejan_marcadores_sin_reemplazar(tmp_path: Path) -> No
     destino = tmp_path / "mapeo-zarambo"
     _crear(destino)
 
-    for relativa in PLANTILLAS.values():
+    for relativa in (*PLANTILLAS.values(), *SEMILLAS.values()):
         texto = _texto(destino, relativa)
         assert "{{" not in texto and "}}" not in texto, relativa
         assert "\r" not in texto, relativa
@@ -161,8 +166,8 @@ def test_claude_md_nombra_el_modelo_y_las_reglas(tmp_path: Path) -> None:
     assert f"fija el modelo `{MODELO}`" in texto
     assert "es de mejor esfuerzo" in texto
     assert (
-        "`protocolo aprobar`, `protocolo enmendar`, `protocolo decision confirmar` y "
-        "`estudio actualizar`"
+        "`protocolo aprobar`, `protocolo enmendar`, `protocolo decision confirmar`, "
+        "`importar registrar` y `estudio actualizar`"
     ) in texto
 
 
@@ -351,6 +356,9 @@ def test_registra_el_evento_inicial_con_el_hash_de_cada_archivo(tmp_path: Path) 
     assert datos["modelo"] == MODELO
     assert [a["ruta"] for a in datos["instrucciones"]] == [
         ".claude/settings.json",
+        ".claude/skills/importar/SKILL.md",
+        ".claude/skills/importar/formatos.md",
+        ".claude/skills/importar/fuentes.md",
         ".claude/skills/protocolo/SKILL.md",
         ".claude/skills/protocolo/formatos.md",
         ".claude/skills/protocolo/secciones.md",
@@ -362,6 +370,7 @@ def test_registra_el_evento_inicial_con_el_hash_de_cada_archivo(tmp_path: Path) 
         "README.md",
         "estudio.yaml",
         "protocolo/protocolo.yaml",
+        "publicacion_datos.yaml",
         "pyproject.toml",
     ]
     for archivo in datos["archivos"] + datos["instrucciones"]:
@@ -667,3 +676,13 @@ def test_main_nuevo_estudio(
     assert salida.value.code == 0
     assert json.loads(capsys.readouterr().out)["exito"] is True
     assert (destino / "protocolo" / "insumos" / "contexto.md").is_file()
+
+
+def test_el_evento_de_creacion_registra_la_semilla_publicacion_datos(tmp_path: Path) -> None:
+    destino = tmp_path / "mapeo-zarambo"
+    _crear(destino)
+
+    [evento, *_] = RegistroEncadenado(destino / "protocolo" / "eventos.jsonl").leer()
+
+    registrados = {archivo["ruta"]: archivo["hash"] for archivo in evento.datos["archivos"]}
+    assert registrados["publicacion_datos.yaml"] == hash_archivo(destino / "publicacion_datos.yaml")

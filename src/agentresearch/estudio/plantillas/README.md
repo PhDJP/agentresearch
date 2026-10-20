@@ -20,7 +20,8 @@ Para pasar el estudio a otra versión del agente: cambie la versión en `pyproje
 
 1. Abra Claude Code en esta carpeta y acepte el diálogo de confianza del proyecto; sin él, no se aplican los permisos de `.claude/settings.json`.
 2. Escriba `/protocolo` para construir el protocolo con el agente, sección por sección.
-3. Los comandos que el agente no puede ejecutar (aprobar, enmendar y confirmar decisiones) se ejecutan en una terminal propia: PowerShell o la terminal de VS Code. En Windows, Git Bash abierto como aplicación independiente no ofrece la consola que exigen.
+3. Con el protocolo vigente, escriba `/importar` para guiar una búsqueda manual en una base de datos, leer sus exportaciones y registrarla.
+4. Los comandos que el agente no puede ejecutar (aprobar, enmendar, confirmar decisiones y registrar búsquedas) se ejecutan en una terminal propia: PowerShell o la terminal de VS Code. En Windows, Git Bash abierto como aplicación independiente no ofrece la consola que exigen.
 
 Ayuda de los comandos: `uv run agentresearch --help`.
 
@@ -34,9 +35,12 @@ Ayuda de los comandos: `uv run agentresearch --help`.
 | `protocolo/versiones/` | Copia exacta de cada versión registrada del protocolo |
 | `protocolo/ecuaciones.md` | Ecuaciones de búsqueda por fuente |
 | `protocolo/insumos/` | Insumos aportados por el investigador |
+| `importaciones/` | Una carpeta por búsqueda registrada: los registros que se pueden versionar y su procedencia |
+| `exportaciones_originales/` | Copias de las exportaciones originales de las bases (datos de terceros): Git las ignora; guárdelas también en un respaldo propio |
+| `publicacion_datos.yaml` | Qué campos de datos de terceros se versionan y con qué base |
 | `CLAUDE.md`, `.claude/` | Instrucciones del agente: reglas, modelo fijado, permisos y *skills* |
 
-Las fases siguientes (búsquedas, importaciones, registros, cribado, bola de nieve, texto completo, extracción, análisis y reportes) crean sus carpetas cuando se ejecutan.
+Las fases siguientes (cribado, bola de nieve, texto completo, extracción, análisis y reportes) crean sus carpetas cuando se ejecutan.
 
 ## Trazabilidad
 

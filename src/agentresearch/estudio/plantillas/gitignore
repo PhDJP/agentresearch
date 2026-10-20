@@ -17,6 +17,10 @@ __pycache__/
 *.pdf
 material_con_derechos/
 
+# Exportaciones originales de las bases de datos (datos de terceros, solo uso local;
+# ADR-0010 del agente). De cada importación se versionan sus hashes, no los archivos.
+exportaciones_originales/
+
 # Archivos temporales del sistema y de Office
 .DS_Store
 Thumbs.db
