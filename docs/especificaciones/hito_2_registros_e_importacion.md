@@ -531,6 +531,19 @@ Advertencia (no impide registrar):
 - `importar historial`: totales por fuente, originales ausentes y `--json`.
 - `ecuaciones.md` con y sin `acs`.
 
+### Decisiones de implementación del 2c (2026-10-20)
+
+Detalles que la especificación dejaba abiertos y que el código fija; el asesor puede revisarlos.
+
+- **Reintentos de la terminal:** la fecha, la hora y el desfase se vuelven a pedir hasta 3 veces si la respuesta no es válida; después se cancela sin escribir. Un desfase vacío acepta el propuesto.
+- **Versión vigente:** es la última aprobación o enmienda cuyo evento está registrado en la fecha y hora de la búsqueda o antes (usa la hora UTC del evento, no la del `protocolo.yaml`).
+- **Ecuación esperada:** se toma del bloque de `ecuaciones.md` solo si su cabecera tiene el hash de esa versión; si no, se regenera desde `versiones/X.Y.Z.yaml`. La relación se calcula comparando las ecuaciones sin diferencias de espacios ni saltos de línea; el hash guardado es el del texto tal como se ejecutó.
+- **`importacion.json`:** contiene los mismos datos del evento, salvo los tres hashes de la carpeta (que son del propio archivo y de sus hermanos); JSON con claves ordenadas y sangría de 2.
+- **`campos_solo_locales`:** lista, con su motivo, todos los campos habilitables que no se versionan (`sin_habilitar` o `base_incompleta`) y los campos del registro que son `nunca_publicable` (resumen y palabras clave). `id_fuente` de tipo `doi` o `pmid` sin ese campo habilitado figura como `sin_habilitar`.
+- **Nombres de archivos:** dos archivos de una búsqueda con el mismo nombre se rechazan (I-E05), porque sus copias van juntas en una carpeta.
+- **Comprobación de Git (I-E10):** solo se acepta la salida 0 de `git check-ignore -q`; los archivos de origen que están dentro del estudio se comprueban por su ruta absoluta.
+- **Avisos de `importar registrar` con éxito:** I-A01 se muestra en el resumen previo a la confirmación y en el resultado final.
+
 ## 2d. Plantillas del estudio
 
 Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
