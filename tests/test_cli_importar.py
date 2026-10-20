@@ -1,13 +1,23 @@
 """Pruebas de `agentresearch importar leer` (todo sintético; tema ficticio)."""
 
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from agentresearch.cli import construir_analizador, ejecutar_importar_leer, main
+from agentresearch.cli import (
+    construir_analizador,
+    ejecutar_importar_historial,
+    ejecutar_importar_leer,
+    ejecutar_importar_registrar,
+    main,
+)
 
+from .apoyo import TerminalSimulada
+from .apoyo_busquedas import crear_estudio, reloj_de_registro
 from .apoyo_importacion import csv_texto, escribir
 
 TITULO = "Abejas de cristal secretas"
@@ -254,3 +264,114 @@ def test_main_sale_con_cero_y_con_uno(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
     assert bien.value.code == 0
     assert mal.value.code == 1
+
+
+# --- importar registrar e importar historial ---------------------------------------
+
+
+def test_el_analizador_asigna_los_argumentos_de_registrar_y_de_historial(tmp_path: Path) -> None:
+    analizador = construir_analizador()
+
+    registrar = analizador.parse_args(
+        ["importar", "registrar", "--busqueda", "b.json", "--registrado-por", "inv-1", "--json"]
+    )
+    historial = analizador.parse_args(["importar", "historial", "--estudio", str(tmp_path)])
+
+    assert (registrar.comando, registrar.subcomando) == ("importar", "registrar")
+    assert registrar.busqueda == Path("b.json")
+    assert registrar.registrado_por == "inv-1"
+    assert registrar.estudio == Path(".")
+    assert registrar.como_json is True
+    assert (historial.comando, historial.subcomando) == ("importar", "historial")
+    assert historial.estudio == tmp_path
+
+
+@pytest.mark.parametrize(
+    "argumentos",
+    [
+        ["importar", "registrar", "--registrado-por", "inv-1"],
+        ["importar", "registrar", "--busqueda", "b.json"],
+        ["importar", "registrar", "--busqueda", "b.json", "--registrado-por", "x", "--otra"],
+    ],
+)
+def test_registrar_con_argumentos_incompletos_sale_con_dos(
+    monkeypatch: pytest.MonkeyPatch, argumentos: list[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["agentresearch", *argumentos])
+
+    with pytest.raises(SystemExit) as salida:
+        main()
+
+    assert salida.value.code == 2
+
+
+def test_registrar_imprime_el_anclaje_y_el_recordatorio_de_respaldo(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    if shutil.which("git") is None:
+        pytest.skip("Git no está instalado")
+    estudio = crear_estudio(tmp_path)
+    subprocess.run(["git", "init", "-q"], cwd=estudio.raiz, check=True)
+    escribir(estudio.raiz / ".gitignore", "exportaciones_originales/\n")
+    busqueda = estudio.busqueda([estudio.archivo_ris("a.ris", 1)])
+    terminal = TerminalSimulada(["2026-10-14", "09:30", "-05:00", "registrar imp-0001"])
+
+    codigo = ejecutar_importar_registrar(
+        busqueda, "investigador-1", estudio.raiz, terminal=terminal, reloj=reloj_de_registro()
+    )
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "búsqueda registrada: imp-0001" in salida
+    assert "anclaje: evt-" in salida
+    assert "respaldo" in salida
+    assert "a.ris" not in salida.replace("exportaciones_originales/", "")
+
+
+def test_registrar_rechazado_devuelve_uno_y_lista_los_problemas(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    estudio = crear_estudio(tmp_path)
+    busqueda = estudio.busqueda([estudio.archivo_ris("a.ris", 1)], fuente="wos")
+
+    codigo = ejecutar_importar_registrar(
+        busqueda, "claude", estudio.raiz, como_json=True, terminal=TerminalSimulada([])
+    )
+
+    datos = json.loads(capsys.readouterr().out)
+    assert codigo == 1
+    assert datos["exito"] is False
+    assert datos["comando"] == "importar registrar"
+    assert any("I-E02" in e for e in datos["errores"])
+    assert any("I-E11" in e for e in datos["errores"])
+
+
+def test_registrar_cancelado_devuelve_uno(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    if shutil.which("git") is None:
+        pytest.skip("Git no está instalado")
+    estudio = crear_estudio(tmp_path)
+    subprocess.run(["git", "init", "-q"], cwd=estudio.raiz, check=True)
+    escribir(estudio.raiz / ".gitignore", "exportaciones_originales/\n")
+    busqueda = estudio.busqueda([estudio.archivo_ris("a.ris", 1)])
+    terminal = TerminalSimulada(["2026-10-14", "09:30", "-05:00", "no"])
+
+    codigo = ejecutar_importar_registrar(
+        busqueda, "investigador-1", estudio.raiz, terminal=terminal, reloj=reloj_de_registro()
+    )
+
+    assert codigo == 1
+    assert "cancelado" in capsys.readouterr().out
+    assert not (estudio.raiz / "importaciones").exists()
+
+
+def test_historial_de_un_estudio_sin_protocolo_aprobado(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    estudio = crear_estudio(tmp_path, aprobar=False)
+
+    codigo = ejecutar_importar_historial(estudio.raiz)
+
+    assert codigo == 0
+    assert "no hay búsquedas registradas" in capsys.readouterr().out

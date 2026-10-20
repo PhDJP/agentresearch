@@ -36,6 +36,12 @@ from agentresearch.protocolo.eventos import (
     DatosEstudioCreado,
     Nivel,
 )
+from agentresearch.protocolo.eventos_busqueda import (
+    CARPETA_IMPORTACIONES,
+    NOMBRES_ARCHIVOS_IMPORTACION,
+    TIPO_BUSQUEDA_REGISTRADA,
+    DatosBusquedaRegistrada,
+)
 from agentresearch.trazabilidad import (
     Anclaje,
     EventoRegistro,
@@ -121,6 +127,14 @@ class ActualizacionRegistrada:
     datos: DatosEstudioActualizado
 
 
+@dataclass(frozen=True, slots=True)
+class BusquedaRegistrada:
+    """Un evento `busqueda_registrada` y sus datos validados (ADR-0010, punto 16)."""
+
+    evento: EventoRegistro
+    datos: DatosBusquedaRegistrada
+
+
 @dataclass(slots=True)
 class EstadoRegistro:
     """Lo que el directorio del estudio dice sobre el ciclo de vida del protocolo."""
@@ -142,6 +156,8 @@ class EstadoRegistro:
     """El evento inicial del estudio, si el registro lo tiene (lo crea `nuevo-estudio`)."""
     actualizaciones: list[ActualizacionRegistrada] = field(default_factory=list)
     """Actualizaciones del agente en el estudio (`estudio actualizar`), en orden."""
+    busquedas: list[BusquedaRegistrada] = field(default_factory=list)
+    """Búsquedas registradas con `importar registrar`, en orden."""
     problemas: list[str] = field(default_factory=list)
     """Mensajes de la regla P-E10; vacío si el registro es íntegro y coherente."""
 
@@ -227,6 +243,7 @@ def leer_estado_registro(rutas: RutasProtocolo) -> EstadoRegistro:
         _verificar_anclaje_guardado(estado, registro)
     _interpretar_eventos(estado)
     _verificar_copias(estado)
+    _verificar_importaciones(estado)
     return estado
 
 
@@ -298,6 +315,10 @@ def _interpretar_eventos(estado: EstadoRegistro) -> None:
             actualizado = _validar_datos(estado, evento, DatosEstudioActualizado)
             if actualizado is not None:
                 _registrar_actualizacion(estado, evento, actualizado)
+        elif evento.tipo == TIPO_BUSQUEDA_REGISTRADA:
+            busqueda = _validar_datos(estado, evento, DatosBusquedaRegistrada)
+            if busqueda is not None:
+                _registrar_busqueda(estado, evento, busqueda)
         # Otros tipos no afectan el ciclo de vida.
 
 
@@ -329,6 +350,24 @@ def _registrar_actualizacion(
         )
         return
     estado.actualizaciones.append(ActualizacionRegistrada(evento, datos))
+
+
+def _registrar_busqueda(
+    estado: EstadoRegistro, evento: EventoRegistro, datos: DatosBusquedaRegistrada
+) -> None:
+    esperado = f"imp-{len(estado.busquedas) + 1:04d}"
+    if datos.id_importacion != esperado:
+        estado.problemas.append(
+            f"{evento.id} registra la importación {datos.id_importacion}, pero las "
+            f"importaciones deben ser consecutivas y la siguiente es {esperado}"
+        )
+        return
+    if estado.ultima_version is None:
+        estado.problemas.append(
+            f"{evento.id} registra una búsqueda sin que el protocolo tenga una aprobación"
+        )
+        return
+    estado.busquedas.append(BusquedaRegistrada(evento, datos))
 
 
 def _registrar_aprobacion(
@@ -445,6 +484,33 @@ def _verificar_copias(estado: EstadoRegistro) -> None:
                 f"la copia {ruta_rel} no coincide con el hash de la versión {version.version} "
                 f"registrada en {version.evento.id}"
             )
+
+
+def _verificar_importaciones(estado: EstadoRegistro) -> None:
+    """Los tres archivos de cada `importaciones/imp-NNNN/` existen con los hashes registrados.
+
+    Que falten los originales no es P-E10: no se versionan, y lo informa `importar historial`.
+    """
+    for busqueda in estado.busquedas:
+        datos = busqueda.datos
+        hashes = dict(
+            zip(
+                NOMBRES_ARCHIVOS_IMPORTACION,
+                (datos.hash_importacion_json, datos.hash_registros_jsonl, datos.hash_registros_csv),
+                strict=True,
+            )
+        )
+        for nombre, esperado in hashes.items():
+            relativa = f"{CARPETA_IMPORTACIONES}/{datos.id_importacion}/{nombre}"
+            ruta = estado.rutas.estudio.joinpath(*relativa.split("/"))
+            if not ruta.is_file():
+                estado.problemas.append(
+                    f"falta {relativa} de la importación registrada en {busqueda.evento.id}"
+                )
+            elif hash_bytes(ruta.read_bytes()) != esperado:
+                estado.problemas.append(
+                    f"{relativa} no coincide con el hash registrado en {busqueda.evento.id}"
+                )
 
 
 # --- Regla P-E09 -----------------------------------------------------------------

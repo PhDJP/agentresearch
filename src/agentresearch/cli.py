@@ -12,7 +12,9 @@ from typing import Any, Protocol
 from agentresearch.estudio.actualizacion import ResultadoActualizacion, actualizar_estudio
 from agentresearch.estudio.creacion import ErrorCreacion, ResultadoCreacion, crear_estudio
 from agentresearch.importacion.busqueda import ResultadoBusqueda, leer_busqueda
+from agentresearch.importacion.historial import construir_historial_importaciones
 from agentresearch.importacion.mapeo import ErrorDeMapeo, Mapeo
+from agentresearch.importacion.registrar import ResultadoRegistro, registrar_busqueda
 from agentresearch.protocolo import RutasProtocolo, validar_archivo
 from agentresearch.protocolo.aprobacion import (
     ErrorCicloDeVida,
@@ -149,6 +151,28 @@ def construir_analizador() -> argparse.ArgumentParser:
         help="archivo JSON de mapeo de columnas (obligatorio con --formato csv)",
     )
     _argumento_json(leer_parser)
+
+    registrar_parser = subcomandos_importar.add_parser(
+        "registrar",
+        help="Registra una búsqueda manual en el estudio (solo el investigador, en su terminal)",
+    )
+    registrar_parser.add_argument(
+        "--busqueda", required=True, type=Path, help="archivo JSON de la búsqueda (.borradores/)"
+    )
+    registrar_parser.add_argument(
+        "--registrado-por",
+        required=True,
+        dest="registrado_por",
+        help="ID del revisor humano declarado en el protocolo que registra la búsqueda",
+    )
+    _argumento_estudio(registrar_parser)
+    _argumento_json(registrar_parser)
+
+    historial_importar = subcomandos_importar.add_parser(
+        "historial", help="Lista las búsquedas registradas y comprueba importaciones/"
+    )
+    _argumento_estudio(historial_importar)
+    _argumento_json(historial_importar)
 
     protocolo = subcomandos.add_parser("protocolo", help="Operaciones sobre el protocolo")
     subcomandos_protocolo = protocolo.add_subparsers(dest="subcomando", required=True)
@@ -299,6 +323,16 @@ def _argumento_ruta(parser: argparse.ArgumentParser) -> None:
         nargs="?",
         default=RUTA_PROTOCOLO_POR_DEFECTO,
         help=f"archivo del protocolo (por defecto, {RUTA_PROTOCOLO_POR_DEFECTO.as_posix()})",
+    )
+
+
+def _argumento_estudio(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--estudio",
+        type=Path,
+        default=Path("."),
+        metavar="RUTA",
+        help="raíz del estudio (por defecto, el directorio actual)",
     )
 
 
@@ -483,6 +517,56 @@ def _texto_hallazgo(regla: str, linea: int | None, mensaje: str) -> str:
 
 def _texto_cobertura(cobertura: dict[str, int]) -> str:
     return ", ".join(f"{campo} {cuenta}" for campo, cuenta in cobertura.items())
+
+
+def ejecutar_importar_registrar(
+    busqueda: Path,
+    registrado_por: str,
+    estudio: Path = Path("."),
+    como_json: bool = False,
+    terminal: Terminal | None = None,
+    reloj: Reloj | None = None,
+) -> int:
+    """Registra una búsqueda manual. Devuelve 0 si se registró y 1 si se rechazó o se canceló."""
+    return _ejecutar_operacion(
+        "importar registrar",
+        como_json,
+        lambda: registrar_busqueda(busqueda, registrado_por, estudio, _terminal(terminal), reloj),
+        _describir_registro,
+    )
+
+
+def _describir_registro(resultado: ResultadoRegistro) -> list[str]:
+    datos = resultado.como_dict()
+    return [
+        f"búsqueda registrada: {resultado.id_importacion} ({resultado.evento.id})",
+        f"  fuente: {datos['fuente']}",
+        f"  fecha y hora: {datos['fecha_hora_busqueda']} ({datos['fecha_hora_busqueda_utc']})",
+        f"  protocolo: {datos['version_protocolo']}; ecuación: {datos['relacion_ecuacion']}",
+        f"  registros leídos: {datos['registros_leidos']} "
+        f"(interfaz: {datos['resultados_interfaz']})",
+        f"  carpeta: {resultado.carpeta}",
+        *[f"aviso: {aviso}" for aviso in resultado.advertencias],
+        *_aviso_anclaje(resultado.anclaje_recreado),
+        f"anclaje: {resultado.anclaje}",
+        f'haga el commit con el anclaje en el mensaje, p. ej.: git commit -am "Registrar la '
+        f'búsqueda {resultado.id_importacion} (anclaje {resultado.anclaje})"',
+        "recuerde guardar los originales de exportaciones_originales/ en un respaldo fuera de "
+        "los servicios de nube compartidos: no se versionan",
+    ]
+
+
+def ejecutar_importar_historial(estudio: Path = Path("."), como_json: bool = False) -> int:
+    """Lista las búsquedas registradas. Devuelve 1 si las importaciones no son íntegras."""
+    _tolerar_caracteres_no_representables()
+    historial = construir_historial_importaciones(estudio)
+    if como_json:
+        errores = list(historial.problemas)
+        _imprimir_json("importar historial", historial.integro, errores, historial.como_dict())
+    else:
+        for linea in historial.lineas():
+            print(linea)
+    return 0 if historial.integro else 1
 
 
 def ejecutar_protocolo_validar(ruta: Path, como_json: bool = False) -> int:
@@ -909,6 +993,19 @@ def main() -> None:
                 argumentos.como_json,
             )
         )
+
+    if argumentos.comando == "importar" and argumentos.subcomando == "registrar":
+        sys.exit(
+            ejecutar_importar_registrar(
+                argumentos.busqueda,
+                argumentos.registrado_por,
+                argumentos.estudio,
+                argumentos.como_json,
+            )
+        )
+
+    if argumentos.comando == "importar" and argumentos.subcomando == "historial":
+        sys.exit(ejecutar_importar_historial(argumentos.estudio, argumentos.como_json))
 
     if argumentos.comando == "protocolo" and argumentos.subcomando == "validar":
         sys.exit(ejecutar_protocolo_validar(argumentos.ruta, argumentos.como_json))
