@@ -30,6 +30,7 @@ Se ejecutan desde la raíz del estudio con `uv run agentresearch …`.
 | `protocolo escribir <sección> --archivo .borradores/<sección>.yaml [--json]` | Claude | Escribir una sección completa, validada contra el esquema |
 | `protocolo decision registrar --archivo .borradores/decision-<ID>.json [--json]` | Claude | Registrar una decisión como propuesta |
 | `protocolo ecuaciones [--escribir] [--json]` | Claude | Ecuaciones de búsqueda por fuente |
+| `importar leer <archivo>… --formato <F> --fuente <ID> [--mapeo <archivo>] [--json]` | Claude | Leer y revisar exportaciones de una búsqueda, sin escribir nada ni mostrar registros |
 | `protocolo enmendar --simular [--nivel mayor\|menor]` | Claude, con permiso del investigador | Mostrar el diff y la versión siguiente, sin escribir |
 | `protocolo decision confirmar --confirmado-por <id>` | el investigador, en su terminal | Confirmar las decisiones pendientes |
 | `protocolo aprobar --aprobado-por <id> [--justificaciones <archivo>]` | el investigador, en su terminal | Aprobar el protocolo como `1.0.0` |
