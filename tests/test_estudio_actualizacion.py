@@ -20,7 +20,12 @@ from agentresearch.protocolo.aprobacion import ErrorCicloDeVida, OperacionCancel
 from agentresearch.protocolo.eventos import DatosEstudioActualizado
 from agentresearch.protocolo.historial import construir_historial, texto_historial
 from agentresearch.protocolo.terminal import MENSAJE_SIN_TERMINAL
-from agentresearch.trazabilidad import RegistroEncadenado, hash_archivo, hash_bytes
+from agentresearch.trazabilidad import (
+    RegistroEncadenado,
+    escribir_atomico,
+    hash_archivo,
+    hash_bytes,
+)
 
 from .apoyo import TerminalSimulada, agregar_evento, aprobar_protocolo, reloj_incremental
 from .conftest import RUTA_PROTOCOLO_SINTETICO
@@ -139,6 +144,9 @@ def test_registra_el_evento_con_los_hashes_y_actualiza_el_anclaje(
         ".claude/skills/protocolo/SKILL.md",
         ".claude/skills/protocolo/secciones.md",
         ".claude/skills/protocolo/formatos.md",
+        ".claude/skills/importar/SKILL.md",
+        ".claude/skills/importar/fuentes.md",
+        ".claude/skills/importar/formatos.md",
         "estudio.yaml",
     ]
     for archivo in datos["archivos"]:
@@ -688,3 +696,120 @@ def test_main_estudio_actualizar_exige_una_justificacion(
 
     assert salida.value.code == 2
     assert "--justificacion" in capsys.readouterr().err
+
+
+# --- Plantillas de la importación (2d) -------------------------------------------------
+
+NUEVOS_DEL_HITO_2 = (
+    "publicacion_datos.yaml",
+    ".claude/skills/importar/SKILL.md",
+    ".claude/skills/importar/fuentes.md",
+    ".claude/skills/importar/formatos.md",
+)
+
+
+def _como_en_v010(estudio: Path) -> None:
+    """Deja el estudio como lo crearía la v0.1.0: sin las plantillas del hito 2."""
+    for relativa in NUEVOS_DEL_HITO_2:
+        (estudio / relativa).unlink()
+    (estudio / ".claude" / "skills" / "importar").rmdir()
+    gitignore = estudio / ".gitignore"
+    lineas = [
+        linea
+        for linea in gitignore.read_text(encoding="utf-8").splitlines()
+        if "exportaciones_originales" not in linea and "ADR-0010" not in linea
+    ]
+    gitignore.write_text("\n".join(lineas) + "\n", encoding="utf-8")
+
+
+def test_lleva_las_plantillas_del_hito_2_a_un_estudio_de_v010(
+    estudio: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _como_en_v010(estudio)
+    _instalar(estudio, monkeypatch)
+    terminal = TerminalSimulada([f"actualizar {NUEVA}"])
+
+    resultado = _actualizar(estudio, terminal=terminal)
+
+    for relativa in NUEVOS_DEL_HITO_2:
+        assert (estudio / relativa).is_file(), relativa
+        assert relativa in resultado.archivos_cambiados
+        assert f"+++ b/{relativa}" in terminal.texto
+    assert ".gitignore" in resultado.archivos_cambiados
+    assert "exportaciones_originales/" in (estudio / ".gitignore").read_text("utf-8").splitlines()
+    datos = DatosEstudioActualizado.model_validate(resultado.evento.datos)
+    nuevos = {a.ruta: a for a in datos.archivos if a.ruta in NUEVOS_DEL_HITO_2}
+    assert set(nuevos) == set(NUEVOS_DEL_HITO_2)
+    assert all(a.hash_anterior is None for a in nuevos.values())
+    assert nuevos["publicacion_datos.yaml"].hash_nuevo == hash_archivo(
+        estudio / "publicacion_datos.yaml"
+    )
+    assert {a.ruta for a in datos.instrucciones} >= {
+        ".claude/skills/importar/SKILL.md",
+        ".claude/skills/importar/fuentes.md",
+        ".claude/skills/importar/formatos.md",
+    }
+
+
+def test_no_sobrescribe_un_publicacion_datos_que_el_estudio_ya_modifico(
+    estudio: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    propio = "fuentes: {}\n# Configuración propia del estudio.\n".encode()
+    (estudio / "publicacion_datos.yaml").write_bytes(propio)
+    _instalar(estudio, monkeypatch)
+    terminal = TerminalSimulada([f"actualizar {NUEVA}"])
+
+    resultado = _actualizar(estudio, terminal=terminal)
+
+    assert (estudio / "publicacion_datos.yaml").read_bytes() == propio
+    assert "publicacion_datos.yaml" not in resultado.archivos_cambiados
+    assert "publicacion_datos.yaml" not in terminal.texto
+    datos = DatosEstudioActualizado.model_validate(resultado.evento.datos)
+    assert "publicacion_datos.yaml" not in {a.ruta for a in datos.archivos}
+
+
+def test_no_hay_nada_que_actualizar_si_solo_falta_publicacion_datos_y_hay_cambio(
+    estudio: Path,
+) -> None:
+    """Con la misma versión, un `publicacion_datos.yaml` ausente basta para actualizar."""
+    (estudio / "publicacion_datos.yaml").unlink()
+
+    resultado = actualizar_estudio(
+        estudio,
+        "investigador-1",
+        TerminalSimulada([f"actualizar {INSTALADA}"]),
+        justificacion=JUSTIFICACION,
+        reloj=reloj_incremental(),
+    )
+
+    assert resultado.archivos_cambiados == ["publicacion_datos.yaml"]
+    assert (estudio / "publicacion_datos.yaml").is_file()
+
+
+def test_completa_una_actualizacion_interrumpida_despues_de_escribir_la_semilla(
+    estudio: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _como_en_v010(estudio)
+    _instalar(estudio, monkeypatch)
+
+    escribir = escribir_atomico
+
+    def fallar_en_estudio_yaml(ruta: Path, contenido: bytes) -> None:
+        if ruta.name == "estudio.yaml":
+            raise OSError("disco lleno (simulado)")
+        escribir(ruta, contenido)
+
+    destino = "agentresearch.estudio.actualizacion.escribir_atomico"
+    monkeypatch.setattr(destino, fallar_en_estudio_yaml)
+    with pytest.raises(OSError, match="simulado"):
+        _actualizar(estudio)
+    monkeypatch.setattr(destino, escribir)
+    # La semilla ya se escribió, pero estudio.yaml conserva la versión anterior.
+    assert (estudio / "publicacion_datos.yaml").is_file()
+    assert leer_estudio(estudio / "estudio.yaml").agente.version == INSTALADA
+
+    resultado = _actualizar(estudio, terminal=TerminalSimulada(interactiva=False))
+
+    assert resultado.completada
+    assert leer_estudio(estudio / "estudio.yaml").agente.version == NUEVA
+    assert len(RegistroEncadenado(estudio / "protocolo" / "eventos.jsonl").leer()) == 2

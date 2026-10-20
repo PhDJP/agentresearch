@@ -3,6 +3,7 @@
 - **Estado:** propuesta de Claude Code (2026-09-29), con las decisiones del investigador y del asesor. Se revisa con el asesor antes de programar, y cada sub-hito se revisa antes de implementarlo.
 - **Revisión del 2026-10-04:** incorpora los ajustes del asesor al ADR-0010 (principio «local completo, nube mínima y configurable»; los campos pendientes ya no bloquean `importar registrar`; regla de la evidencia literal; respaldo separado de la publicación; `adaptacion_generica` solo con datos sintéticos; máximos y términos «por verificar»).
 - **Revisión del 2026-10-12:** incorpora la revisión de diseño del 2a: registro en dos tipos, `id_fuente` regido por el campo que repite, techo de `campos_habilitables`, base completa, forma de `evidencia_literal` y `respaldo_nube`, regla I-E13 y versión de la normalización. Los cambios están en el 2a, el 2b, el 2c, el 2d y el criterio de terminado, y en el ADR-0010 (propuesta).
+- **Revisión del 2026-10-13:** incorpora la preparación del 2b y las exportaciones reales de prueba. El 2b cambia en: el resolvedor de concatenaciones `#` y la recuperación de la clave BibTeX repetida (la biblioteca no hace ninguna de las dos), el comienzo del registro de Web of Science (`PT`), la regla L-E03 «dentro del archivo o entre archivos», la nueva L-A05, el archivo de mapeo con objeto y tipo de identificador, los campos volátiles (`Export Date:` en `N1` del RIS de Scopus; `DA` de Web of Science «por verificar»), las continuaciones de Web of Science, los perfiles por fuente y los códigos de salida de `importar leer`. El 2c, el 2d y el 2e llevan los ajustes que de ahí se derivan. Los cambios están en el ADR-0010 (puntos 14, 20, 23, 24 y 28).
 - **Relación con otros documentos:** desarrolla el hito 2 de la [hoja de ruta](../hoja_de_ruta.md) y su nota, y se apoya en el [ADR-0010](../decisiones/0010-registros-importacion-y-datos-de-terceros.md) (propuesta). Si algo aquí contradice un ADR aceptado, prevalece el ADR y se corrige este documento.
 
 ## Objetivo
@@ -36,7 +37,7 @@ Al cerrar 2e se etiqueta `v0.2.0`.
 - Solo se registra con el protocolo vigente, sin P-E09 ni P-E10, y con la fuente declarada en `fuentes` con `tipo: exportacion` (ADR-0010, punto 11).
 - Ningún registro se inventa ni se corrige a mano (CLAUDE.md, regla 6). Las únicas transformaciones son las normalizaciones deterministas del punto 22 del ADR-0010.
 - Las pruebas usan archivos sintéticos escritos para ellas, con temas ficticios. Nunca contienen datos del caso piloto ni texto copiado de una exportación real.
-- Las exportaciones reales de prueba nunca entran a este repositorio: van en `exportaciones_prueba_local/`, que se agrega al `.gitignore` del agente en el 2b.
+- Las exportaciones reales de prueba nunca entran a este repositorio: van en `exportaciones_prueba_local/`, que ya está en el `.gitignore` del agente (commit `d6b1790`, rama del 2b).
 - Todos los comandos nuevos admiten `--json`, con la forma común del ADR-0008 (punto 26): código 0 si la operación se completa, 1 si se rechaza o se cancela y 2 si los argumentos no son válidos.
 
 ## 2a. Módulo `registros`
@@ -173,38 +174,158 @@ Principio del ADR-0010: **local completo, nube mínima y configurable**. Todo se
 
 **Dependencias nuevas:** `bibtexparser==2.0.1` y `pylatexenc==2.11`, con la versión exacta fijada y justificadas en el commit (ADR-0010, punto 24).
 
-El 2b también agrega `importacion` al `--include` del paso de cobertura mínima de la integración continua (el 2a agregó `registros`).
+El 2b también agrega `importacion` al `--include` del paso de cobertura mínima de la integración continua (el 2a agregó `registros`). La carpeta `exportaciones_prueba_local/` ya está en el `.gitignore` del agente (commit `d6b1790`).
+
+**Revisión del 2026-10-13.** Esta sección incorpora: las cinco contradicciones (C1 a C5) y las ambigüedades (A1 a A10) de la preparación del 2b, con las decisiones del investigador y del asesor; y lo verificado con las exportaciones reales de prueba del 2026-10-13 (abajo, «Verificado con las exportaciones de prueba»).
 
 ### Interfaz común
 
 `leer(ruta, formato, fuente, mapeo=None) -> ResultadoLectura`, con:
 
-- los registros completos normalizados;
-- los hallazgos: ID de regla, severidad, mensaje y número de línea;
+- los registros completos normalizados (`RegistroNormalizado`, sin `id` ni `id_importacion`: los asigna el 2c);
+- los hallazgos: ID de regla, severidad, archivo, número de línea y mensaje;
 - las líneas de cabecera anteriores al primer registro;
 - el hash del archivo y el número de registros;
-- la cobertura de cada campo: cuántos registros lo tienen.
+- la cobertura de cada campo: cuántos registros lo tienen. Se cuenta sobre el registro ya normalizado: un valor vacío (`pages = {}` en BibTeX, una celda vacía en un CSV) cuenta como ausente.
 
-El formato lo declara el investigador; el lector no lo adivina.
+`leer_busqueda(rutas, formato, fuente, mapeo=None) -> ResultadoBusqueda` agrupa los archivos de una misma búsqueda, en el orden declarado: la lista de `ResultadoLectura`, la suma de registros, los identificadores repetidos entre archivos (con archivo y línea de cada ocurrencia) y la cobertura total. **No es lo que sale por `--json` ni por la terminal:** esa salida es una vista de resumen sin registros (ver `importar leer`).
+
+- **Los mensajes no contienen datos de los registros.** Citan regla, archivo y línea, nunca un valor de campo: Claude Code ve la salida y los resúmenes tienen licencia (ADR-0010, punto 26).
+- El formato lo declara el investigador; el lector no lo adivina.
 
 ### Formatos
 
 | Formato | Lector | Notas |
 |---|---|---|
-| `ris` | propio | Etiquetas de dos caracteres, `TY` abre y `ER` cierra. Tolera líneas de cabecera antes del primer `TY` (RIS de ACS) y líneas de continuación. |
-| `wos_txt` | propio | Texto plano con etiquetas de Web of Science: `FN` y `VR` de cabecera, `ER` fin de registro, `EF` fin de archivo, continuación con tres espacios. |
-| `scopus_csv` | propio, con `csv` | Columnas leídas por nombre; celdas entre comillas con saltos de línea. |
-| `csv` | propio, con `csv` | Un archivo de mapeo JSON (`{"columna": "campo"}`) declara qué columna va a cada campo; se valida y su hash queda en el resultado. Cubre Lens. |
-| `bibtex` | bibtexparser 2.0.1 | Tildes de LaTeX decodificadas con pylatexenc; `@string` y concatenaciones resueltas por la biblioteca. |
+| `ris` | propio | Etiquetas de dos caracteres. `TY` abre y `ER` cierra; la línea `ER` puede llevar o no el espacio final (`ER  - ` en ACS, `ER  -` en Scopus). Tolera líneas de cabecera antes del primer `TY` (RIS de ACS), líneas vacías entre registros y al final, y líneas de continuación. |
+| `wos_txt` | propio | Texto plano con etiquetas de Web of Science. `FN` y `VR` de cabecera; el registro **abre con `PT` y cierra con `ER`**, seguido de una línea vacía; `EF` cierra el archivo. Las líneas que empiezan con tres espacios continúan la etiqueta anterior (ver «Continuaciones de Web of Science»). |
+| `scopus_csv` | propio, con `csv` | Columnas leídas por nombre; campos entre comillas dobles y separados por comas; celdas entre comillas con saltos de línea (no observados en la prueba). El lector fija un **límite explícito de campo de 10 MB** (10 485 760 caracteres, con `csv.field_size_limit`) y no el máximo posible: el valor por omisión de `csv` es 131 072 y la celda más larga de la prueba mide 23 411. Una celda que supere el límite da L-E02 con el número de fila y **detiene la lectura de ese archivo en esa fila**, no un fallo del programa: los registros leídos antes se conservan y se informa cuántos fueron. No se continúa, porque una celda entrecomillada con saltos de línea que supera el límite deja filas basura después del error. |
+| `csv` | propio, con `csv` | Un archivo de mapeo JSON declara qué columna va a cada campo (ver «Archivo de mapeo»); se valida y su hash queda en el resultado. Cubre Lens. Mismo límite explícito de campo de 10 MB y mismo L-E02 que `scopus_csv`. |
+| `bibtex` | bibtexparser 2.0.1 | Tildes de LaTeX decodificadas con pylatexenc. La biblioteca resuelve `@string`, pero **no** las concatenaciones con `#`: un resolvedor propio mínimo las resuelve (cadenas entre `{}` o `""`, nombres de `@string` y números unidos por `#`, con espacios o saltos opcionales). La entrada de **clave repetida** no queda en `entries`: la biblioteca la deja en `failed_blocks` como `DuplicateBlockKeyBlock`, y el lector la recupera desde su atributo `ignore_error_block` (no existe `duplicate_block` en la 2.0.1). Una prueba confirma el nombre del atributo con la versión fijada. La biblioteca escribe sus advertencias en `stderr`: el lector las **captura** (no llegan a la terminal) y las convierte en hallazgos. La biblioteca cuenta las líneas desde 0 (`start_line`, verificado con la 2.0.1 fijada), así que la línea que se informa es `start_line + 1`, la línea física del archivo. |
 
-- **Correspondencia de campos.** Cada lector lleva una tabla de etiquetas o columnas a campos del esquema, con la URL de la documentación oficial y la fecha de verificación:
-  - Web of Science: la [lista oficial de etiquetas](https://support.clarivate.com/ScientificandAcademicResearch/s/article/Web-of-Science-Core-Collection-List-of-field-tags-in-output?language=en_US) (`TI`, `AU`, `SO`, `PY`, `VL`, `IS`, `BP`, `EP`, `AR`, `DI`, `PM`, `UT`, `DT`, `LA`, …);
-  - Scopus: la página oficial de los campos que exporta, que se consulta al implementar;
-  - RIS: la especificación RIS y el RIS de ACS observado el 2026-09-29.
+- **Una clave BibTeX repetida no es un identificador de la fuente:** la entrada se recupera y se cuenta, y no dispara L-E03.
+- **`--mapeo`** solo se admite con `csv` y es obligatorio con él; con otro formato, o sin él con `csv`, el analizador de argumentos rechaza la invocación (código 2).
 
-  Lo que no se pueda verificar en la documentación se confirma con las exportaciones de prueba del 2e antes de cerrar.
-- **Campos volátiles.** Cada tabla declara los campos que se descartan porque cambian en cada descarga y no describen el documento: `Y2` en el RIS de ACS (fecha de descarga), la fecha de generación del archivo en Web of Science, y los que revelen las exportaciones de prueba.
-- **Codificación.** UTF-8, con o sin BOM. Cualquier otra se rechaza con la línea del primer byte inválido. Fin de línea LF o CRLF.
+### Archivo de mapeo
+
+JSON de un solo nivel `{"columna": destino}`, donde `destino` es:
+
+- un nombre de campo del esquema (`"titulo"`, `"doi"`, `"anio"`…), o
+- un objeto `{"campo": "autores", "separador": "; "}`, que es obligatorio para los campos de lista (`autores`, `palabras_clave_autor`, `palabras_clave_indexadas`) y no se admite en los demás, o
+- `"id_fuente:TIPO"`, con `TIPO` en `eid`, `ut`, `doi`, `pmid` o `lens_id`: la columna es el identificador de la fuente y `tipo_id_fuente` toma ese valor.
+
+```json
+{
+  "Titulo": "titulo",
+  "Autores": {"campo": "autores", "separador": "; "},
+  "Identificador": "id_fuente:lens_id",
+  "DOI": "doi"
+}
+```
+
+Los nombres de columna son del ejemplo. Los de la exportación de patentes de Lens se confirmaron el 2026-10-20 (ADR-0010, «Aceptación»); el mapeo real está en `formatos.md` de la *skill* `/importar`, y los de sus publicaciones académicas siguen por confirmar. Las columnas sin destino van a `otros` con el nombre de la columna. Si la celda de una columna `id_fuente:TIPO` está vacía, el registro queda con `tipo_id_fuente: ninguno`. Es L-E02 (con el nombre del archivo de mapeo): una columna del mapeo que no está en el encabezado, un campo que no es del esquema, un campo de lista sin separador, un separador en un campo que no es de lista, o dos columnas con el mismo destino. Un archivo de mapeo que no se puede leer o no es JSON no es un error de lectura de una exportación: el comando lo informa en `errores` y sale con 1, sin leer el CSV (ver los códigos de salida).
+
+### Correspondencia de campos
+
+Cada lector lleva una tabla de etiquetas o columnas a campos del esquema: una **tabla base** por formato y un **perfil por ID de fuente** (`scopus`, `wos`, `acs`, `lens`) para lo que difiere de la base. Lo que no se mapea va a `otros` con la etiqueta o la columna de origen, sin traducir.
+
+- **Campos repetidos de `otros`** (una etiqueta que aparece varias veces en un registro) se unen con `"; "`, fijo. Entra al `hash_completo`.
+- **`anio`:** el primer grupo de cuatro dígitos del valor. Si no se obtiene, `anio` queda nulo y el valor crudo va a `otros`.
+- **`paginas`:** `inicio-fin`, o solo el inicio. El número de artículo (`AR` en Web of Science, `C7` en el RIS de Scopus, `Art. No.` en el CSV de Scopus) va a `otros`.
+- **`KW` del RIS** va a `otros` hasta que el 2e verifique si la fuente distingue palabras clave de autor e indexadas. En el RIS de Scopus no las distingue (ver abajo).
+- **Documentación de cada fila:** la tabla del lector lleva la URL oficial y la fecha de verificación, y una columna «verificado con» (`oficial`, `exportación 2026-10-13` o `por verificar`).
+  - Web of Science: la [lista oficial de etiquetas](https://support.clarivate.com/ScientificandAcademicResearch/s/article/Web-of-Science-Core-Collection-List-of-field-tags-in-output?language=en_US) (`TI`, `AU`, `SO`, `PY`, `VL`, `IS`, `BP`, `EP`, `AR`, `DI`, `PM`, `UT`, `DT`, `LA`, …); no se pudo leer en la preparación del 2b (la sede respondió 403), así que lo que no aparece en las exportaciones de prueba queda «por verificar».
+  - Scopus: la [página oficial de los campos que exporta](https://www.elsevier.support/scopus/answer/what-fields-are-used-when-exporting-documents-from-scopus) (act. 2025-11-07).
+  - RIS: la especificación RIS (reconstrucción secundaria en [gris](https://gris.readthedocs.io/en/stable/specification.html), porque la original no tiene sede mantenida) y las exportaciones de ACS y Scopus.
+
+Perfiles observados el 2026-10-13 (una sola exportación por fuente, de 1 a 5 registros: son una verificación, no una especificación cerrada; el 2e los completa):
+
+| Destino | Scopus CSV | Scopus RIS | Scopus BibTeX | WoS | ACS RIS |
+|---|---|---|---|---|---|
+| `titulo` | `Title` | `TI` | `title` | `TI` | `T1` |
+| `autores` | `Authors` (`"; "`) | `AU`, uno por línea | `author` (` and `) | `AU`, uno por línea | `AU`, uno por línea |
+| `anio` | `Year` | `PY` | `year` | `PY` | `PY` |
+| `fuente_publicacion` | `Source title` | `T2` | `journal` | `SO` | `JO` |
+| `volumen`, `numero` | `Volume`, `Issue` | `VL`, `IS` | `volume`, `number` | `VL`, `IS` | `VL`, `IS` (no aparecieron en el registro observado) |
+| `paginas` | `Page start`, `Page end` (vacíos en la prueba) | no hay `SP`/`EP` | `pages` (vacío) | `BP`, `EP` | `SP`, `EP` (no aparecieron) |
+| `doi` | `DOI` | `DO` | `doi` | `DI` | `DO` |
+| `pmid` | `PubMed ID` | `C2` (perfil `scopus`) | `pmid` | `PM` (por verificar) | — |
+| `tipo_documento` | `Document Type` | `M3` (perfil `scopus`; `TY` es `JOUR` también en una revisión) | `type` (el tipo de entrada es `@article` también en una revisión) | `DT` (por verificar) | — |
+| `idioma` | `Language of Original Document` | `LA` | `language` | `LA` (por verificar) | — |
+| `resumen` | `Abstract` | `AB` | `abstract` | `AB` (por verificar) | `AB` |
+| `palabras_clave_autor` | `Author Keywords` (`"; "`) | — (`KW` mezcla ambas: `otros`) | `author_keywords` (`"; "`) | `DE` (por verificar) | — |
+| `palabras_clave_indexadas` | `Index Keywords` (`"; "`) | — | `keywords` (`"; "`) | `ID` (por verificar) | — |
+| `tipo_id_fuente`, `id_fuente` | `eid`, `EID` | `eid`, valor de la línea `EID:` de `N1` (H1); `ninguno` si no hay esa línea | `ninguno` (la exportación no trae EID, dato oficial confirmado) | `ut`, `UT` (`WOS:` + 15 dígitos, tal cual) | `doi`, `DO` |
+| volátiles (se descartan) | columna `Cited by` | líneas de `N1` que empiezan con `Export Date:` y con `Cited By:` | el elemento `Cited by: n` de `note` | `DA` (por verificar) | `Y2` |
+
+En la tabla, los campos nunca publicables (`Affiliations` o `AD`, `References`, `Funding Details`…) se leen igual: van a `otros` y se conservan en local.
+
+### Continuaciones de Web of Science
+
+Una línea con tres espacios iniciales continúa la etiqueta anterior. Qué significa depende de la etiqueta:
+
+- **Listas (`AU`, `AF`):** cada línea es un elemento (un autor por línea). Se observó en los tres registros de la prueba.
+- **Texto (`TI`; se espera lo mismo en `SO` y `AB`, por verificar):** las líneas son un texto cortado a unos 74 caracteres (longitud máxima observada: 75); se unen con un espacio.
+- **Listas con `"; "` (`OI`, `RI`; se espera lo mismo en `DE` e `ID`, por verificar):** el corte puede caer dentro de un elemento (observado en `OI` y `RI`); las líneas se unen con un espacio y el valor se separa por `"; "`.
+
+La tabla del lector declara el tipo de cada etiqueta (`lista_por_linea`, `texto` o `lista_con_separador`). Una etiqueta no declarada se trata como `texto`.
+
+### Campos volátiles
+
+Cada tabla declara los campos que se descartan porque cambian en cada descarga y no describen el documento. Un volátil nunca entra a `otros`, así que no entra al `hash_completo`. Un volátil puede ser una etiqueta o **una línea con prefijo dentro de una etiqueta repetible**:
+
+| Fuente y formato | Volátil | Estado |
+|---|---|---|
+| ACS, RIS | `Y2`: fecha de descarga, `MM/DD/AAAA` (verificado: coincide con la fecha UTC del nombre del archivo) | verificado 2026-10-13 |
+| Scopus, RIS | la línea de `N1` que empieza con `Export Date:` (una por registro, `DD Mes AAAA`) | verificado 2026-10-13 |
+| Scopus, RIS | la línea de `N1` que empieza con `Cited By:` (conteo de citas) | decidido 2026-10-13 (H2) |
+| Scopus, CSV | la columna `Cited by` | decidido 2026-10-13 (H2) |
+| Scopus, BibTeX | el elemento `Cited by: n` del campo `note` (regla exacta abajo); el resto de `note` se conserva | decidido 2026-10-13 (H2) |
+| Web of Science, texto plano | `DA` (fecha de generación del informe) | **por verificar:** no aparece en la exportación de prueba; el archivo no trae ninguna fecha de generación, ni por registro ni de cabecera |
+
+El resto de las líneas de `N1` va a `otros` (campo repetido, unido con `"; "`). El conteo de citas es `nunca_publicable`, no lo usa ningún hito del protocolo, y cambia con la fecha de descarga: descartarlo mantiene el mismo `hash_completo` para el mismo registro descargado en fechas distintas (ADR-0010, punto 20).
+
+**Regla exacta para `note` del BibTeX de Scopus** (propuesta para la revisión del asesor antes de programarla). En los cinco registros de la prueba, `note` era `Cited by: n`, seguido a veces de `; ` y de elementos de estado de acceso abierto; `Cited by: n` fue siempre el primer elemento, pero la regla no depende de la posición.
+
+1. El valor se toma con los espacios colapsados (paso 2 de la normalización) y se divide por el separador exacto `"; "` (punto y coma y un espacio) en elementos.
+2. Se descartan los elementos que coinciden **completos** con la expresión regular `^Cited by: [0-9]+$`, sensible a mayúsculas. Un elemento como `Cited by 5`, `cited by: 5` o `Cited by: 5 (2)` no coincide y se conserva.
+3. Los elementos restantes se unen de nuevo con `"; "`. El separador vecino desaparece con el fragmento: no queda `"; "` al inicio, al final ni doble, y un elemento que no coincide queda sin cambios.
+4. Si no queda ningún elemento, `note` no entra a `otros`; si ninguno coincide, el valor queda como estaba. Si `Cited by: n` aparece más de una vez, se descartan todas.
+5. Se aplica antes de construir el registro, así que `otros["note"]` y el `hash_completo` nunca contienen el conteo.
+
+| Valor ficticio de `note` | Resultado en `otros["note"]` |
+|---|---|
+| `Cited by: 12; All Open Access; Gold Open Access` | `All Open Access; Gold Open Access` |
+| `All Open Access; Cited by: 3; Gold Open Access` | `All Open Access; Gold Open Access` |
+| `All Open Access; Cited by: 3` | `All Open Access` |
+| `Cited by: 7` | (ausente) |
+| `All Open Access` | `All Open Access` |
+| `Cited by 7; Gold Open Access` | `Cited by 7; Gold Open Access` |
+
+### Codificación
+
+UTF-8, con o sin BOM. Cualquier otra se rechaza con la línea del primer byte inválido. Fin de línea LF o CRLF.
+
+### Verificado con las exportaciones de prueba (2026-10-13)
+
+Exportaciones reales de una búsqueda de prueba, guardadas en `exportaciones_prueba_local/` y leídas solo para comprobar estructura. Sin datos de los registros.
+
+| Archivo | Formato | BOM | Fin de línea | Registros | Estructura |
+|---|---|---|---|---|---|
+| Scopus CSV | `scopus_csv` | sí | LF | 5 | 45 columnas; 1 línea física por registro; ninguna celda con salto de línea (máximo 23 411 caracteres por celda) |
+| Scopus RIS | `ris` | no | LF | 5 | sin cabecera; línea vacía tras cada `ER`; etiquetas `AB AD AU C2 C7 DB DO ER IS J2 KW LA M3 N1 PB PY SN T2 TI TY UR VL`; sin líneas de continuación |
+| Scopus BibTeX | `bibtex` | no | LF | 5 | 5 `@article`; claves únicas; todos los valores entre `{}`; sin `#`, `@string` ni secuencias LaTeX; UTF-8 directo (letras griegas, espacio duro, `±`) |
+| Web of Science | `wos_txt` | sí | LF | 3 | `FN`, `VR`; registros de `PT` a `ER` con una línea vacía después; `EF` al final y sin salto de línea final; `PT` vale `J` |
+| ACS | `ris` | no | CRLF | 1 | cabecera de 3 líneas y una vacía; `TY` a `ER`; tres líneas vacías al final |
+
+- **Conteos.** Scopus: 5 registros en cada uno de los tres formatos, que corresponden a los «primeros 5» de 466 resultados anotados. ACS: 1 registro de 3 946 resultados, el seleccionado. Web of Science: 3 registros, que coinciden con los 3 resultados anotados; el investigador confirmó que exportó los 3.
+- **Scopus: el mismo documento en tres formatos.** El orden, el DOI, el título, el año, la fuente, el volumen, el número, el PMID y el idioma son idénticos. Difieren:
+  - los autores: el CSV da `Apellido I.`; el RIS, `Apellido, I.`; el BibTeX, el nombre completo `Apellido, Nombre`;
+  - en un registro de 13 autores, el RIS trae 12: falta el único nombre de una sola palabra (el BibTeX y el CSV sí lo traen). La causa no está verificada; no se corrige (regla 6);
+  - el resumen del BibTeX conserva marcas `<sub>…</sub>` que el CSV y el RIS no traen. Un mismo documento leído de otro formato **no** da el mismo `hash_completo`, y no es un objetivo que lo dé: el hash identifica lo leído de un archivo (ADR-0010, punto 20);
+  - el BibTeX no trae el número de artículo (`pages` vacío) ni el EID; el RIS lo trae en `C7` y en una línea `EID:` de `N1`.
+- **`KW` del RIS de Scopus mezcla** palabras clave de autor e indexadas: en los cinco registros, la cuenta de `KW` es la suma de ambas columnas del CSV. Por eso va a `otros` y no a `palabras_clave_autor`.
+- **Web of Science sin resumen.** Las etiquetas presentes son `AF AR AU BP DI EA EF EI EP ER FN IS OI PD PT PY RI SN SO TI UT VL VR`. Faltan `AB`, `DT`, `LA`, `DE`, `ID`, `C1`, `CR` y otras que trae el registro completo: la exportación se hizo con un contenido de registro reducido, no con el completo. Con ella, L-A04 avisa del resumen, y para el cribado no sirve.
 
 ### Reglas de lectura
 
@@ -213,29 +334,67 @@ Cada regla tiene un ID estable, que aparece en los mensajes y en las pruebas.
 | ID | Severidad | Regla |
 |---|---|---|
 | L-E01 | error | El archivo no es UTF-8 (con o sin BOM); se informa la línea |
-| L-E02 | error | Estructura inválida para el formato: registro sin cierre, etiqueta fuera de un registro, columna obligatoria ausente, fila con más columnas que el encabezado o BibTeX mal formado; se informa la línea |
-| L-E03 | error | Identificador de la fuente repetido dentro del archivo; se informan las dos líneas |
+| L-E02 | error | Estructura inválida para el formato: registro sin cierre, etiqueta fuera de un registro, columna obligatoria ausente, fila con más o con menos columnas que el encabezado, celda que supera el límite de campo (10 MB; detiene la lectura del archivo en esa fila), BibTeX mal formado, o un mapeo inválido (ver «Archivo de mapeo»); se informa la línea (en un CSV, el número de fila) |
+| L-E03 | error | Identificador de la fuente (`tipo_id_fuente` e `id_fuente`) repetido **dentro del archivo o entre archivos de la búsqueda**; se informan las dos ubicaciones (archivo y línea) |
 | L-A01 | advertencia | Registro sin identificador de la fuente ni DOI: no se podrá detectar si está repetido |
 | L-A02 | advertencia | Registro sin título |
 | L-A03 | advertencia | Líneas de cabecera antes del primer registro (se muestran) |
-| L-A04 | advertencia | Una columna o etiqueta esperada no aparece en el archivo (p. ej. sin resumen): la exportación no incluyó ese campo |
+| L-A04 | advertencia | Un campo esperado (`titulo`, `autores`, `anio`, `doi` y `resumen`) no aparece en el archivo: en un CSV, la columna que el perfil le asigna no está en el encabezado; en un formato con etiquetas, la etiqueta no aparece en ningún registro. La exportación no incluyó ese campo |
+| L-A05 | advertencia | El mismo DOI en dos o más registros que **no tienen identificador de la fuente**, dentro del archivo o entre archivos; se informan las ubicaciones. Puede ser un documento repetido o dos registros que comparten el DOI: la deduplicación es del hito 4 |
+
+- **Identidad para L-E03:** el par `(tipo_id_fuente, id_fuente)`. El DOI **no** hace de identidad para el error: un DOI repetido entre registros sin identificador de la fuente (p. ej. el BibTeX de Scopus, que no trae EID) es la advertencia L-A05. Un registro con identificador de la fuente se compara solo por él.
+- **Lo que no es regla de lectura:** una clave BibTeX repetida (se recupera, se cuenta y no genera hallazgo; decidido el 2026-10-13, y la regla L-A06 que la avisaría se descartó: ADR-0010, «Alternativas consideradas») y las diferencias entre formatos de una misma fuente.
 
 ### `agentresearch importar leer ARCHIVO... --formato F --fuente ID [--mapeo mapeo.json] [--json]`
 
 - Lee uno o varios archivos de una misma búsqueda. No necesita un estudio y **no escribe nada**. Claude Code lo puede ejecutar en el estudio (2d), y es el comando de la aceptación en este repositorio (2e).
-- Muestra por archivo el hash, el número de registros, los hallazgos con su línea y la cobertura de campos; y en total, la suma de registros y los identificadores repetidos entre archivos.
-- Sale con 1 si hay algún error (L-E) o identificadores repetidos entre archivos, y con 0 si solo hay advertencias.
+- Muestra por archivo el hash, el número de registros, los hallazgos con su línea, las líneas de cabecera y la cobertura de campos; y en total, la suma de registros y los identificadores repetidos entre archivos. **Ni la salida de texto ni `--json` llevan registros ni valores de campo:** Claude Code ve esa salida y los resúmenes tienen licencia (ADR-0010, punto 26). Las líneas de cabecera se muestran (L-A03) porque no son datos de un registro.
+- **Códigos de salida** (ADR-0008, punto 26):
+
+| Código | Cuándo | Qué se leyó |
+|---|---|---|
+| 0 | La lectura se completó y solo hay advertencias (L-A) o ninguna | todo |
+| 1 | Algún archivo tiene un error de lectura (L-E01 a L-E03, incluidos un identificador repetido entre archivos y un mapeo con contenido inválido), no se pudo abrir (no existe, es una carpeta o no hay permiso) o el archivo de mapeo no se pudo leer | los archivos que se pudieron leer; el resultado se muestra completo y lo que no se pudo abrir va en `errores` |
+| 2 | **El analizador de argumentos rechazó la invocación y no se ejecutó nada** (ADR-0008, punto 26): falta algún `ARCHIVO`, `--formato` o `--fuente`; `--formato` no es uno de los cinco admitidos; `--fuente` vacía; `--mapeo` con un formato que no es `csv`, o ausente con `csv`; una opción desconocida | nada |
+
+  El 2 solo lo emite el analizador de argumentos, antes de abrir ningún archivo: es un error de uso del comando. Todo lo que se descubre al leer, incluido un archivo que no existe, es 1.
+- `--json` devuelve la forma común del ADR-0008 (punto 26): `{"comando": "importar leer", "exito": bool, "errores": [], "version_agente": "…", "resultado": {...}}`; `exito` es verdadero solo con código 0. `resultado` es una **vista de resumen sin registros**: `archivos` (por cada uno: nombre, formato, hash, número de registros, hallazgos con regla, severidad, línea y mensaje, líneas de cabecera y cobertura de campos) y `total` (suma de registros, identificadores repetidos entre archivos con archivo y línea de cada ocurrencia, y cobertura total). Con código 2, argparse escribe su mensaje en el flujo de error y no hay JSON.
+
+### Decisiones tras las exportaciones reales (H1 y H2)
+
+Decididas por el investigador y el asesor al revisar el commit `6412781`.
+
+| ID | Pregunta | Estado y opción elegida | Alternativa descartada |
+|---|---|---|---|
+| H1 | El RIS de Scopus no tiene etiqueta de EID: lo trae una línea `EID:` dentro de `N1`, igual al del CSV en los 5 registros | **Decidido el 2026-10-13: (a).** El perfil `scopus` del RIS toma el valor de la línea `EID:` de `N1` como `id_fuente`, con `tipo_id_fuente = eid`. La línea se consume y no pasa a `otros`; el resto de las líneas de `N1` sí. Si el registro no trae esa línea, o su valor está vacío, queda `tipo_id_fuente = ninguno`: no se deriva del `UR` ni de otra fuente (regla 6). Si hubiera varias líneas `EID:`, se toma la primera y las demás siguen a `otros` | (b) dejarlo en `otros` y identificar el registro por su DOI: dejaría a L-E03 y al hito 4 sin el identificador de la fuente en un formato que lo trae |
+| H2 | `Cited by` (CSV), `Cited By:` (línea de `N1`) y `Cited by:` (campo `note` del BibTeX) cambian con la fecha de descarga, y `hash_completo` incluye `otros` | **Decidido el 2026-10-13: (a).** Son volátiles y se descartan: la columna `Cited by`, la línea `Cited By:` de `N1` y solo el elemento `Cited by: n` de `note`, que conserva el resto en `otros`. La regla exacta de `note` está en «Campos volátiles» | (b) conservarlos: el hash cambiaría entre descargas de fechas distintas del mismo registro (ADR-0010, punto 20) |
 
 ### Pruebas (archivos sintéticos)
 
+Todos los archivos son sintéticos, con temas ficticios. Las exportaciones reales de prueba nunca se copian a una prueba.
+
 - Por formato: un archivo válido; con BOM; con CRLF; con campos faltantes; con caracteres no ASCII.
-- Errores con su número de línea: registro sin cierre, etiqueta fuera de registro, columna ausente, UTF-16 o Latin-1, BibTeX mal formado.
-- RIS con cabecera de ACS antes del primer `TY`; líneas de continuación en RIS y WoS; celdas con saltos de línea y comillas en CSV.
-- BibTeX con tildes de LaTeX (`{\'e}`, `{\"u}`, `\~{n}`), `@string` y concatenación.
-- Varias tandas de una misma búsqueda: suma correcta; identificador repetido dentro de un archivo (L-E03) y entre archivos.
-- El mismo registro en dos descargas con distinto `Y2`: mismo `hash_completo`.
-- CSV genérico con mapeo válido, con columna inexistente y con campo desconocido.
-- `importar leer`: salida de texto y `--json`, códigos de salida y que no escribe nada.
+- Errores con su número de línea: registro sin cierre, etiqueta fuera de registro, columna ausente, fila con más y con menos columnas que el encabezado, UTF-16 o Latin-1, BibTeX mal formado.
+- Línea de un BibTeX mal formado (A10): un archivo sintético con varias entradas válidas y una mal formada más abajo; la línea informada coincide con la línea física de esa entrada en el archivo (y no con la anterior, que es lo que daría `start_line` sin sumar 1). Con el mismo archivo, ninguna advertencia de la biblioteca llega a `stderr`.
+- Celda que supera el límite (A8): un CSV de `scopus_csv` y otro de `csv` con mapeo, cada uno con una celda de 10 485 761 caracteres sintéticos (por ejemplo `"x" * 10_485_761`) en una fila posterior al encabezado: L-E02 con el número de fila, sin excepción, y la lectura de ese archivo se detiene en esa fila (se conservan y se cuentan los registros anteriores, y no aparece ningún registro posterior, ni siquiera con una celda entrecomillada con saltos de línea). Una celda de exactamente 10 485 760 caracteres se lee.
+- RIS con cabecera de ACS antes del primer `TY`; `ER` con y sin espacio final; líneas vacías entre registros y al final; líneas de continuación; celdas con saltos de línea y comillas en CSV.
+- Web of Science: registro de `PT` a `ER`; `FN` y `VR` de cabecera; archivo sin `EF` y sin salto final; `AU` con un autor por línea, `TI` con líneas unidas con espacio y `OI` cortado dentro de un elemento.
+- BibTeX con tildes de LaTeX (`{\'e}`, `{\"u}`, `\~{n}`), `@string` y concatenación con `#` (entre cadenas, con `@string` y con número); valor vacío `{}` (campo ausente); clave repetida recuperada y contada, sin L-E03.
+- Varias tandas de una misma búsqueda: suma correcta; identificador repetido dentro de un archivo (L-E03) y entre archivos; DOI repetido sin identificador de la fuente (L-A05); un registro con identificador de la fuente y el mismo DOI que otro no dispara L-A05.
+- El mismo registro en dos descargas con distinto `Y2` (ACS) y con distinta línea `Export Date:` de `N1` (Scopus): mismo `hash_completo`.
+- `otros`: un campo repetido se une con `"; "`; los volátiles no están en `otros`.
+- Identificador del RIS de Scopus (H1):
+  - con una línea `N1` `EID:`: `tipo_id_fuente = eid`, `id_fuente` igual al valor, y esa línea no aparece en `otros` mientras las demás líneas de `N1` sí;
+  - sin la línea `EID:`: `ninguno` e `id_fuente` nulo, sin L-E02 ni L-A01 si el registro tiene DOI, y sin derivar nada de `UR`;
+  - con `EID:` de valor vacío: `ninguno`;
+  - con dos líneas `EID:`: se toma la primera y la otra queda en `otros`;
+  - el mismo EID en dos registros: L-E03; sin EID y con el mismo DOI en dos registros: L-A05.
+- Conteo de citas (H2):
+  - el mismo registro con distinta columna `Cited by` (CSV), distinta línea `Cited By:` de `N1` (RIS) o distinto `Cited by: n` de `note` (BibTeX): mismo `hash_completo`, y ninguno de los tres está en `otros`;
+  - `note` con el fragmento al inicio, en medio, al final y solo; sin el fragmento; y con una variante que no coincide (`Cited by 7`): los resultados de la tabla de la regla exacta;
+  - el resto de `N1` y de `note` se conserva sin cambios.
+- CSV genérico con mapeo válido (campo, objeto con separador, `id_fuente:lens_id`); con columna inexistente, campo desconocido, lista sin separador, separador en un campo escalar y dos columnas al mismo destino (L-E02); archivo de mapeo ilegible o no JSON (código 1, con el error en `errores` y sin leer el CSV).
+- `importar leer`: salida de texto y `--json`; los tres códigos de salida, con un caso por cada causa de la tabla (el 2, con las invocaciones que rechaza el analizador, y el 1, con un archivo inexistente y con otro leído en la misma invocación); que no escribe nada; y que ningún mensaje contiene un valor de campo.
 
 ## 2c. Registro de búsquedas
 
@@ -302,7 +461,7 @@ Claude Code lo prepara en `.borradores/` con lo que dice el investigador (`/impo
 | I-E03 | Retirada (2026-10-04): los campos pendientes ya no bloquean el registro; ver I-A01. El número no se reutiliza |
 | I-E04 | La fecha de la búsqueda es futura o anterior a la aprobación del protocolo |
 | I-E05 | Un archivo ya está registrado en el estudio (mismo hash) o aparece dos veces en la búsqueda |
-| I-E06 | Un identificador de la fuente se repite dentro de un archivo o entre archivos de la búsqueda |
+| I-E06 | Un identificador de la fuente se repite dentro de un archivo o entre archivos de la búsqueda (es la L-E03 del 2b). Un DOI repetido en registros sin identificador de la fuente es la advertencia L-A05 y no impide registrar |
 | I-E07 | Un archivo tiene errores de lectura (L-E) |
 | I-E08 | Los registros leídos no coinciden con los resultados de la interfaz y no hay justificación |
 | I-E09 | La ecuación de una fuente con traductor se modificó y no hay justificación |
@@ -372,6 +531,19 @@ Advertencia (no impide registrar):
 - `importar historial`: totales por fuente, originales ausentes y `--json`.
 - `ecuaciones.md` con y sin `acs`.
 
+### Decisiones de implementación del 2c (2026-10-20)
+
+Detalles que la especificación dejaba abiertos y que el código fija; el asesor puede revisarlos.
+
+- **Reintentos de la terminal:** la fecha, la hora y el desfase se vuelven a pedir hasta 3 veces si la respuesta no es válida; después se cancela sin escribir. Un desfase vacío acepta el propuesto.
+- **Versión vigente:** es la última aprobación o enmienda cuyo evento está registrado en la fecha y hora de la búsqueda o antes (usa la hora UTC del evento, no la del `protocolo.yaml`).
+- **Ecuación esperada:** se toma del bloque de `ecuaciones.md` solo si su cabecera tiene el hash de esa versión; si no, se regenera desde `versiones/X.Y.Z.yaml`. La relación se calcula comparando las ecuaciones sin diferencias de espacios ni saltos de línea; el hash guardado es el del texto tal como se ejecutó.
+- **`importacion.json`:** contiene los mismos datos del evento, salvo los tres hashes de la carpeta (que son del propio archivo y de sus hermanos); JSON con claves ordenadas y sangría de 2.
+- **`campos_solo_locales`:** lista, con su motivo, todos los campos habilitables que no se versionan (`sin_habilitar` o `base_incompleta`) y los campos del registro que son `nunca_publicable` (resumen y palabras clave). `id_fuente` de tipo `doi` o `pmid` sin ese campo habilitado figura como `sin_habilitar`.
+- **Nombres de archivos:** dos archivos de una búsqueda con el mismo nombre se rechazan (I-E05), porque sus copias van juntas en una carpeta.
+- **Comprobación de Git (I-E10):** solo se acepta la salida 0 de `git check-ignore -q`; los archivos de origen que están dentro del estudio se comprueban por su ruta absoluta.
+- **Avisos de `importar registrar` con éxito:** I-A01 se muestra en el resumen previo a la confirmación y en el resultado final.
+
 ## 2d. Plantillas del estudio
 
 Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
@@ -385,7 +557,7 @@ Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
   `importar leer` no coincide con la regla `deny` porque el subcomando es distinto.
 - **Skill `/importar`** (`.claude/skills/importar/`, con `disable-model-invocation: true`):
   1. comprueba con `validar` e `historial` que el protocolo esté vigente, sin P-E09 ni P-E10, y que el `.gitignore` ignore `exportaciones_originales/`; si no, explica `estudio actualizar`;
-  2. muestra la ecuación de la fuente desde `ecuaciones.md` y los pasos manuales: dónde pegarla, qué filtros aplicar, en qué formato exportar y el máximo por exportación de la base, presentado como «según la documentación consultada, por verificar» (ADR-0010, punto 25);
+  2. muestra la ecuación de la fuente desde `ecuaciones.md` y los pasos manuales: dónde pegarla, qué filtros aplicar, en qué formato exportar y el máximo por exportación de la base, presentado como «según la documentación consultada, por verificar» (ADR-0010, punto 25), y **el contenido del registro: el completo, con resumen**. La exportación de prueba de Web of Science del 2026-10-13 no traía resumen, lo que habría producido L-A04 en cada registro; la opción de la interfaz que lo incluye se confirma en el 2e;
   3. pide al investigador, una cosa a la vez: plataforma, institución, cobertura, filtros, lematización, la ecuación tal como la ejecutó, los resultados de la interfaz y dónde guardó los archivos;
   4. ejecuta `importar leer` y explica el resultado; si la suma no coincide con la interfaz, pregunta el motivo para la justificación;
   5. prepara `.borradores/busqueda.json` y da el comando exacto de `importar registrar` para la terminal del investigador (PowerShell o la terminal de VS Code), con lo que verá y la frase que debe escribir;
@@ -394,6 +566,16 @@ Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
 - **`CLAUDE.md` del estudio:** la tabla de comandos incluye `importar leer`, `importar registrar` (solo el investigador) e `importar historial`, y la prueba que compara la tabla con la CLI sigue pasando. Se agrega la regla: los originales y los registros completos no se versionan ni se copian a archivos versionados.
 - **`README.md` del estudio:** anuncia `importaciones/` y `exportaciones_originales/`.
 - **Pruebas:** contenido esperado de las plantillas; reglas de permisos; que `importar registrar` coincide con la regla `deny` y `importar leer` no; `estudio actualizar` lleva el `.gitignore`, la *skill* y `publicacion_datos.yaml` nuevos a un estudio de `v0.1.0`, y no sobrescribe un `publicacion_datos.yaml` que el estudio ya modificó.
+
+### Decisiones de implementación del 2d (2026-10-20)
+
+- **Semillas.** `publicacion_datos.yaml` es la primera plantilla que el estudio *posee* desde su creación: no cabe en `ADMINISTRADOS` (que `estudio actualizar` regenera siempre). Se agregó `SEMILLAS` en `estudio/creacion.py`: `nuevo-estudio` las crea y `estudio actualizar` las crea **solo si faltan**, sin tocar una existente; en ese caso no aparece en el diff, en `archivos_cambiados` ni en el evento. Un estudio de `v0.1.0` la recibe con la primera actualización, y un estudio al día en versión a quien solo le falta la semilla puede actualizarse con la misma versión.
+- **Actualización interrumpida.** Al completarla, una semilla que ya se escribió antes de la interrupción se reconoce porque su hash coincide con el que registró el evento; si el investigador la modificó en medio, los hashes dejan de coincidir y el comando pide restaurar con Git (el mismo criterio que para los archivos administrados).
+- **Contenido de `publicacion_datos.yaml`.** Las cuatro fuentes que conoce la política (`scopus`, `wos`, `acs`, `lens`) con `titulo`, `autores`, `doi` y `fuente_publicacion`, todos con `base: {tipo: institucion, detalle: null, medio: null, fecha: null}` (incompleta, por lo que nada se versiona todavía), `evidencia_literal.resumen: no_permitido` y sin `respaldo_nube`. Los comentarios explican la base y dejan un ejemplo de `respaldo_nube`. Una prueba la valida con el esquema real y comprueba que no nombra instituciones.
+- **Permisos.** Se agregan a `allow` `importar leer` e `importar historial` y a `deny` `importar registrar` (Bash y PowerShell), `Edit(/importaciones/**)` y `Edit(/exportaciones_originales/**)`. Las pruebas emulan la coincidencia de patrones con `fnmatch` (el `*` de Claude Code es un comodín): `importar registrar` coincide con `deny` y con ninguna regla `allow`, y `importar leer` e `importar historial` hacen lo contrario.
+- **Skill `/importar`.** `SKILL.md` (el procedimiento de los siete pasos), `fuentes.md` (pasos manuales y máximos por base, todos «por verificar») y `formatos.md` (formato de `busqueda.json` y del archivo de mapeo). Una prueba valida el ejemplo JSON de `formatos.md` con el esquema real de `ArchivoDeBusqueda`, para que la *skill* no se desincronice del comando. La *skill* solo afirma como verificado lo que está en el ADR-0010; la opción de Web of Science que incluye el resumen sigue pendiente del 2e.
+- **`CLAUDE.md` del estudio.** Regla nueva (11) sobre datos de terceros: los originales y los registros completos no se versionan ni se copian a archivos versionados ni se muestran en el chat. La regla 9 deja de listar la importación como fase no disponible, y la regla 1 suma `importar registrar` a los comandos que solo ejecuta el investigador.
+- **Verificación.** 1410 pruebas, cobertura de 99 %, ruff y mypy limpios; el *wheel* incluye las plantillas nuevas.
 
 ## 2e. Aceptación y cierre de `v0.2.0`
 
@@ -414,6 +596,13 @@ Llegan a los estudios existentes con `estudio actualizar` (ADR-0007, punto 20).
 - Claude Code las lee **solo con `importar leer`**: no se registran ni se versionan. Se comprueba que los conteos coinciden con la interfaz y que las correspondencias de campos son correctas, y se corrigen las tablas de los lectores con lo que revelen (columnas, etiquetas y campos volátiles).
 - El investigador anota el máximo por exportación que ofrece cada interfaz, para verificar los de Scopus y Web of Science, que el ADR-0010 (punto 25) deja «por verificar».
 - Queda constancia en el ADR-0010, «Aceptación»: formatos, número de registros por archivo, máximos observados, hallazgos y correcciones, sin copiar datos de los registros.
+- **Estado tras la verificación estructural del 2026-10-13** (2b, «Verificado con las exportaciones de prueba»). Ya hay Scopus en los tres formatos (5 registros), Web of Science (3, sin resumen) y ACS (1). El 2e debe cerrar lo que esa prueba no pudo verificar:
+  - **Web of Science:** repetir la exportación con el contenido de registro completo, para ver `AB`, `DT`, `LA`, `DE`, `ID` y `PM`, y en dos tandas, para probar L-E03 y I-E05 entre archivos. **Resuelto el 2026-10-13:** el investigador confirmó que exportó los 3 registros del archivo;
+  - **ACS:** un registro con volumen y número, y con palabras clave (`KW`), para fijar `VL`, `IS`, `SP`, `EP` y `KW`; y la respuesta a la comprobación adicional del punto 28 del ADR-0010 (la nota del investigador dice «No permite exportación de metadatos» para más de un artículo: confirmar su alcance);
+  - **Lens:** el CSV, que no se pudo exportar, con los nombres de columna reales para el mapeo;
+  - **Scopus:** un CSV con celdas de varias líneas y comillas internas, si la búsqueda las produce; y una exportación con un registro sin autores o con un autor de una sola palabra, para ver qué hace cada formato;
+  - **BibTeX y RIS:** una exportación con tildes de LaTeX, clave repetida, `#` o líneas de continuación, si alguna base las produce (en la de Scopus del 2026-10-13 no aparecieron: las pruebas sintéticas cubren esos casos);
+  - **Máximos por exportación:** no se anotaron el 2026-10-13; siguen «por verificar».
 
 ### Parte B: estudio de demostración
 

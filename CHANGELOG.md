@@ -5,6 +5,52 @@ y este proyecto sigue [versionado semántico](https://semver.org/spec/v2.0.0.htm
 
 ## [Sin publicar]
 
+Hito 2: registros e importación (ADR-0010). Candidata `v0.2.0rc1`, con la que
+el estudio de demostración `demo-mucilago-cafe` registra las búsquedas reales
+de Scopus y Web of Science (parte B del 2e).
+
+### Agregado
+
+- Módulo `agentresearch.registros`: registro normalizado con procedencia y su
+  `hash_completo`, normalización de texto y DOI, artículo y estudio
+  provisionales (artículo ≠ estudio), política de datos de terceros (paquete y
+  estudio: `publicacion_datos.yaml`), regla de versionado de campos y escritura
+  determinista de `registros.jsonl` y `registros.csv`.
+- Módulo `agentresearch.importacion`:
+  - lectores de RIS, BibTeX (con resolvedor de `#` y recuperación de clave
+    repetida), CSV de Scopus, Web of Science en texto plano y CSV genérico con
+    archivo de mapeo, con perfiles por fuente y campos volátiles fuera del
+    hash;
+  - catálogo de reglas de lectura (L-E01 a L-E03, L-A01 a L-A05) y de registro
+    (I-E y I-A01), cada una con prueba;
+  - registro de la búsqueda manual como unidad de importación: ecuación
+    esperada y ejecutada, fecha y hora con desfase, filtros, resultados de la
+    interfaz frente a registros leídos, y copia verificada de los originales.
+- CLI `agentresearch importar leer` (lee y revisa varias tandas sin escribir
+  nada ni mostrar registros), `importar registrar` (solo el investigador, en su
+  terminal interactiva, con frase de confirmación; evento `busqueda_registrada`
+  y anclaje) e `importar historial` (búsquedas, totales por fuente e
+  integridad de `importaciones/`).
+- `protocolo validar` (P-E10) comprueba el esquema del evento
+  `busqueda_registrada`, los números consecutivos y los tres archivos de cada
+  importación con sus hashes.
+- `ecuaciones.md`: aviso de ACS Publications en las fuentes sin traductor.
+- Plantillas del estudio: `.gitignore` con `exportaciones_originales/`,
+  permisos (`importar leer` e `historial` permitidos; `importar registrar` y la
+  edición de `importaciones/` y `exportaciones_originales/` negados),
+  `publicacion_datos.yaml` neutro, *skill* `/importar`, `CLAUDE.md` y
+  `README.md`. `estudio actualizar` lleva estas plantillas a estudios
+  existentes sin sobrescribir `publicacion_datos.yaml`.
+- Dependencias: `bibtexparser==2.0.1` y `pylatexenc==2.11` (ambas MIT).
+- Integración continua: la cobertura mínima de 90 % incluye `registros` e `importacion`.
+
+### Verificado
+
+- Exportaciones reales de prueba de Scopus (CSV, RIS y BibTeX), Web of
+  Science (texto plano, registro completo y reducido), ACS (RIS) y Lens
+  (CSV de patentes), leídas solo con `importar leer`, sin versionarlas y con
+  conteos correctos (ADR-0010, «Aceptación», parte A).
+
 ## [0.1.0] - 2026-09-28
 
 Hito 1: protocolo y trazabilidad. Aceptado con el estudio de

@@ -68,6 +68,9 @@ PLANTILLAS: dict[str, str] = {
     "claude/skills/protocolo/SKILL.md": ".claude/skills/protocolo/SKILL.md",
     "claude/skills/protocolo/secciones.md": ".claude/skills/protocolo/secciones.md",
     "claude/skills/protocolo/formatos.md": ".claude/skills/protocolo/formatos.md",
+    "claude/skills/importar/SKILL.md": ".claude/skills/importar/SKILL.md",
+    "claude/skills/importar/fuentes.md": ".claude/skills/importar/fuentes.md",
+    "claude/skills/importar/formatos.md": ".claude/skills/importar/formatos.md",
 }
 """Plantilla del paquete (en `agentresearch/estudio/plantillas/`) y su ruta en el estudio."""
 
@@ -78,6 +81,10 @@ ADMINISTRADOS: dict[str, str] = {
 }
 """Plantillas que `estudio actualizar` regenera: las instrucciones del agente, `.gitignore`
 y `.gitattributes`. `README.md` y `pyproject.toml` son del investigador después de crearlos."""
+
+SEMILLAS: dict[str, str] = {"publicacion_datos.yaml": "publicacion_datos.yaml"}
+"""Archivos del investigador que arrancan de una plantilla neutra. `nuevo-estudio` los crea, y
+`estudio actualizar` los crea solo si faltan: nunca sobrescribe uno que el estudio ya tiene."""
 
 _MARCADOR = re.compile(r"\{\{([a-z_]+)\}\}")
 _NOMBRE_VALIDO = re.compile(r"^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$")
@@ -225,6 +232,8 @@ def _escribir_estudio(
     valores = valores_de_plantilla(estudio)
     for origen, destino in PLANTILLAS.items():
         _escribir(raiz, destino, renderizar(texto_de_plantilla(origen), valores))
+    for origen, destino in SEMILLAS.items():
+        _escribir(raiz, destino, renderizar(texto_de_plantilla(origen), valores))
     _escribir(raiz, NOMBRE_ARCHIVO, texto_estudio(estudio))
 
     documento = cargar_protocolo(texto_plantilla())
@@ -241,7 +250,9 @@ def _escribir_estudio(
 
     instrucciones = hashes_de_instrucciones(raiz)
     otros = [NOMBRE_ARCHIVO, RUTA_PROTOCOLO] + [
-        destino for destino in PLANTILLAS.values() if destino not in instrucciones
+        destino
+        for destino in (*PLANTILLAS.values(), *SEMILLAS.values())
+        if destino not in instrucciones
     ]
     datos = DatosEstudioCreado(
         nombre=estudio.nombre,

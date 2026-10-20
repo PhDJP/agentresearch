@@ -4,6 +4,7 @@
 - Fecha: 2026-09-29
 - Revisado: 2026-10-04, con los ajustes del asesor (principio «local completo, nube mínima y configurable»; ver «Revisión del 2026-10-04»)
 - Revisado: 2026-10-12, con la revisión de diseño del 2a (ver «Revisión del 2026-10-12»)
+- Revisado: 2026-10-13, con la preparación del 2b y las exportaciones reales de prueba (ver «Revisión del 2026-10-13»)
 - Participantes: investigador doctoral, asesor (Claude en Cowork) y Claude Code
 
 ## Contexto
@@ -70,6 +71,32 @@ agrega:
   (puntos 2, 16 y 20);
 - las reglas precisas de normalización de espacios y DOI, y el tope de la
   posición (puntos 19 y 22).
+
+### Revisión del 2026-10-13
+
+La preparación del 2b y la lectura estructural de las primeras exportaciones
+reales de prueba (Scopus en CSV, RIS y BibTeX; Web of Science; ACS en RIS)
+agregan:
+
+- la identidad de un registro para detectar repetidos: el identificador de la
+  fuente es un error si se repite; un DOI repetido en registros sin
+  identificador de la fuente es una advertencia (punto 14);
+- los campos volátiles observados: `Y2` de ACS, la línea `Export Date:` de la
+  nota `N1` del RIS de Scopus y, por decisión del 2026-10-13, el conteo de
+  citas de Scopus en sus tres formatos; `DA` de Web of Science sigue «por
+  verificar», porque no apareció (punto 20);
+- que el RIS de Scopus aporta el identificador de la fuente (EID) desde una
+  línea de la nota `N1` (punto 23);
+- el comienzo y el final de un registro de Web of Science y el significado de
+  sus líneas de continuación (punto 23);
+- que `bibtexparser` 2.0.1 no resuelve las concatenaciones `#` y deja fuera de
+  `entries` la entrada de clave repetida, con el remedio de cada caso
+  (punto 24);
+- el RIS de ACS observado el 2026-10-13 (punto 28).
+
+El detalle y la lista de lo que sigue sin poder verificarse están en la
+[especificación](../especificaciones/hito_2_registros_e_importacion.md), 2b,
+«Verificado con las exportaciones de prueba» y 2e, parte A.
 
 ## Decisión
 
@@ -336,9 +363,15 @@ agrega:
 14. **Varios archivos por búsqueda.**
     - La suma de los registros de todos los archivos se compara con los
       resultados de la interfaz; si difieren, se exige justificación.
-    - Un mismo identificador de la fuente repetido, dentro de un archivo o
-      entre archivos de la búsqueda, es un error: indica tandas solapadas o
-      una descarga repetida.
+    - Un mismo identificador de la fuente (tipo y valor) repetido, dentro de un
+      archivo o entre archivos de la búsqueda, es un error: indica tandas
+      solapadas o una descarga repetida.
+    - **Un DOI repetido en registros que no tienen identificador de la fuente
+      es una advertencia, no un error** (regla L-A05 del 2b). Hay formatos
+      sin ese identificador (el BibTeX de Scopus no trae EID), y un DOI
+      repetido puede ser el mismo documento o dos registros que lo comparten:
+      distinguirlos es de la deduplicación (hito 4). El DOI nunca hace de
+      identidad para el error.
     - Cada archivo pertenece a una sola búsqueda: un archivo cuyo hash ya
       está registrado en el estudio se rechaza. Una descarga repetida con
       otro hash (p. ej. un RIS de ACS, cuyo campo `Y2` es la fecha de
@@ -388,8 +421,17 @@ agrega:
     Scopus, UT en Web of Science, DOI en ACS, PMID en PubMed e ID de Lens.
 20. **Hash del registro normalizado.** Se calcula sobre el JSON canónico de
     los campos del esquema normalizado, que nunca incluye campos volátiles
-    (la fecha de descarga `Y2` del RIS de ACS, la fecha de generación del
-    archivo en Web of Science). Así, el mismo registro descargado dos veces
+    (la fecha de descarga `Y2` del RIS de ACS, la línea `Export Date:` de la
+    nota `N1` del RIS de Scopus, y la fecha de generación `DA` de Web of
+    Science, que está «por verificar»: no apareció en la exportación de
+    prueba). Un volátil puede ser una etiqueta, una línea con prefijo dentro
+    de una etiqueta repetible o un elemento dentro de un campo de texto.
+    **Decidido el 2026-10-13: el conteo de citas es volátil** y se descarta:
+    la columna `Cited by` del CSV de Scopus, la línea `Cited By:` de `N1` del
+    RIS y solo el elemento `Cited by: n` del campo `note` del BibTeX, cuyo
+    resto se conserva (la regla exacta está en la especificación, 2b). El
+    conteo de citas es `nunca_publicable`, cambia con la fecha de descarga y
+    no lo usa ningún hito del protocolo. Así, el mismo registro descargado dos veces
     tiene el mismo hash. Tampoco incluye los identificadores de importación,
     el archivo ni la posición, que cambian entre descargas. La normalización
     lleva una `VERSION_NORMALIZACION`, que no entra al hash y se registra con
@@ -439,7 +481,16 @@ agrega:
     toleran el BOM y el fin de línea CRLF, e informan cada error con su
     número de línea. El RIS de ACS trae líneas de cabecera antes del primer
     `TY` (`Provider:`, `Database:`, `Content:`), que se toleran y se
-    informan.
+    informan. Un registro de Web of Science abre con `PT` y cierra con `ER`
+    (entre `VR` y el primer `PT` hay cabecera, y `EF` cierra el archivo); sus
+    líneas con tres espacios iniciales son un elemento por línea en las listas
+    de autores (`AU`, `AF`) y texto cortado en los demás campos, que se une con
+    un espacio. **El RIS de Scopus no tiene etiqueta de EID**: lo trae una
+    línea `EID:` dentro de `N1`. El perfil `scopus` del RIS la toma como
+    identificador de la fuente (`tipo_id_fuente` `eid`; decidido el
+    2026-10-13). Sin esa línea, el registro queda sin identificador de la
+    fuente y no se deriva de ningún otro campo (regla 6 de CLAUDE.md). Los
+    perfiles por fuente están en la especificación (2b).
 24. **BibTeX con `bibtexparser==2.0.1` y `pylatexenc==2.11`,** con la versión
     exacta fijada, detrás de una interfaz de lector propia para poder
     cambiarla sin tocar el resto. Verificado en PyPI el 2026-09-29:
@@ -449,6 +500,20 @@ agrega:
     estable (2.11, 2026-07-25), sin dependencias propias. Si las pruebas
     sintéticas revelan fallos, se reemplaza por un lector propio del
     subconjunto que exportan las bases.
+
+    **Dos límites de la 2.0.1, verificados al preparar el 2b (2026-10-13):**
+    - no resuelve las concatenaciones con `#`: el valor queda como texto crudo
+      (`"Primera " # "parte"`). El lector resuelve las concatenaciones con un
+      resolvedor propio mínimo, sobre lo que la biblioteca entrega;
+    - una entrada con clave repetida no queda en `entries`: la biblioteca la
+      deja en `failed_blocks` como `DuplicateBlockKeyBlock`, y los conteos
+      serían menores en silencio. El lector la recupera desde
+      `ignore_error_block` del bloque (no existe `duplicate_block`). Una clave
+      repetida no es un identificador de la fuente, no es un error y no
+      genera hallazgo.
+
+    Ninguno de los dos casos apareció en la exportación real de Scopus del
+    2026-10-13; se cubren con archivos sintéticos.
 25. **Máximo por exportación** (consultado el 2026-09-29; **por verificar**
     en la plataforma antes de apoyarse en él: el artículo de Clarivate es de
     2022 y los límites dependen de la plataforma y del contrato). Hasta
@@ -462,7 +527,9 @@ agrega:
     | ACS | no documentado; según la prueba del investigador, no hay descarga masiva desde los resultados | no documentado | punto 28 |
 
     La verificación se hace con las exportaciones reales de prueba del 2e
-    (parte A): el investigador anota en la interfaz el máximo que ofrece.
+    (parte A): el investigador anota en la interfaz el máximo que ofrece. Las
+    exportaciones del 2026-10-13 (5 de 466 en Scopus, 3 en Web of Science y 1
+    en ACS) no registraron el máximo: la tabla sigue «por verificar».
 
 ### Términos de uso (consultados el 2026-09-29)
 
@@ -533,11 +600,24 @@ agrega:
     - **RIS de ACS** (plataforma Silverchair): cabecera antes de `TY`, título
       en `T1`, año en `PY`, fecha de publicación en `Y1`, fecha de descarga
       en `Y2`, resumen en `AB`, DOI en `DO`.
+    - **Verificado con una exportación real el 2026-10-13** (un registro,
+      archivo `citations-….ris`): fin de línea CRLF, sin BOM; tres líneas de
+      cabecera (`Provider:`, `Database:`, `Content:`) y una vacía antes de
+      `TY`; `TY  - JOUR`; etiquetas `TY AU T1 PY Y1 DO JO JA SN AB Y2 UR ER`,
+      con `AU` repetida (un autor por línea, `Apellido, Nombre`); `JO` y
+      `JA` con el mismo valor; `Y1` como `AAAA/MM/DD` y `Y2` como
+      `MM/DD/AAAA`, que coincide con la fecha UTC de descarga del nombre del
+      archivo; `UR` es la URL del DOI; la línea `ER  - ` lleva espacio final y
+      van tres líneas vacías al final. El registro no traía `VL`, `IS`, `SP`,
+      `EP` ni `KW`: ninguno de esos cinco está verificado en ACS.
     - **Pendiente de completar por el investigador** (comprobación
       adicional): si hay botón de descarga para los resultados
       seleccionados, cuántos resultados muestra cada página, si hay una
       casilla para seleccionar toda la página y si existe una opción de
-      lematización.
+      lematización. La nota del investigador del 2026-10-13 dice, para la
+      selección de un artículo, «No permite exportación de metadatos»: su
+      alcance (más de un artículo, o el botón de la selección) está por
+      confirmar.
 29. **Ecuación de ACS: genérica con un aviso propio, sin traductor.** Si el
     protocolo declara la fuente `acs`, su entrada en «Fuentes sin
     traductor» de `ecuaciones.md` agrega un aviso con lo verificado:
@@ -562,6 +642,42 @@ agrega:
     encontraron sitios de terceros. Si una decisión futura lo necesita (p.
     ej. el protocolo del caso piloto en el hito 11), se verifica antes en
     esas dos listas.
+
+## Aceptación
+
+### Parte A: exportaciones reales de prueba (2026-10-20)
+
+Todas se leyeron solo con `importar leer`: no se registraron ni se versionaron. Los archivos están en `exportaciones_prueba_local/`, que Git ignora. Esta sección no copia datos de los registros: solo formatos, conteos, límites y hallazgos.
+
+| Fuente | Formato | Archivos | Registros | Resultado de la lectura |
+|---|---|---|---|---|
+| Scopus | RIS, CSV, BibTeX | 1 de cada uno (2026-10-13) | 5 en cada uno | sin errores ni advertencias |
+| Web of Science | texto plano, registro completo | 3 (2026-10-20) | 5, 3 y 5 | sin errores ni advertencias por archivo |
+| Web of Science | texto plano, contenido reducido | 1 (2026-10-13) | 3 | L-A04 por `resumen` |
+| ACS | RIS | 2 (2026-10-13 y 2026-10-20) | 1 y 1 | L-A03 (3 líneas de cabecera) |
+| Lens (índice de patentes) | CSV con mapeo | 1 (2026-10-20) | 10 | L-A04 por `doi` |
+
+**Hallazgos**
+
+- **Web of Science, «Full Record».** Con el contenido del registro completo, las etiquetas `AB`, `DT`, `LA`, `DE`, `ID` y `PM` se leen: resumen y palabras clave de autor e indexadas en casi todos los registros (el PMID solo cuando el registro lo tiene). «Author, Title, Source» no trae el resumen; «Author, Title, Source, Abstract» trae el resumen pero no las palabras clave ni el tipo de documento. La opción que sirve para el cribado es «Full Record».
+- **Archivos repetidos entre tandas (L-E03).** Una tanda que repite tres registros de otra se detecta con el archivo y la línea de cada uno. Un archivo nombrado «6-10» trajo 3 registros en vez de 5 (el investigador no precisó el rango que escribió): la lectura no puede saberlo, así que el número de registros leído debe compararse con el rango pedido. Un archivo idéntico (I-E05) no se probó con exportaciones reales; sigue cubierto por las pruebas sintéticas.
+- **Scopus.** En la ventana de exportación, las casillas «Abstract», «Author keywords» e «Indexed keywords» vienen desmarcadas por defecto: explica que el RIS de la prueba traiga resumen y ninguna palabra clave. La `/importar` lo indica.
+- **ACS.** Las notas del investigador del 2026-10-13 y del 2026-10-20 cierran la comprobación pendiente del punto 28: ACS **no permite descargas masivas ni extraer metadatos, solo descarga individual**. Cada artículo es un archivo, y varios de una búsqueda complementaria se registran como tandas. Un RIS con volumen, número y páginas confirma las etiquetas `VL`, `IS`, `SP` y `EP`. Siguen sin verse `KW`, el PMID, el tipo de documento y el idioma. No se comprobó si ACS lematiza.
+- **Lens.** La exportación de prueba es del índice de **patentes**: 37 columnas (`Lens ID`, `Title`, `Abstract`, `Publication Year`, `Inventors`, `Document Type`, `Applicants`, `Jurisdiction`, `Kind`, `Application Number`…), UTF-8 con BOM, fin de línea CRLF, sin resúmenes de varias líneas, inventores separados por «; ». Se lee sin errores con el CSV genérico y un mapeo (el de `/importar`, `formatos.md`). Una patente no tiene DOI, así que L-A04 por `doi` es esperable y no impide registrar. Las columnas de las **publicaciones académicas** de Lens no se observaron: quedan por confirmar cuando el protocolo declare ese índice. La ventana de exportación pide iniciar sesión para más de 1 000 documentos y recuerda la política de atribución de Lens.
+- **Correcciones a los lectores:** ninguna. Todos los formatos observados se leyeron sin cambios en las tablas.
+
+**Máximos por exportación observados (punto 25)**
+
+| Base | Observado | Estado |
+|---|---|---|
+| Scopus | «up to 20,000 documents in Plain text format» (2026-10-20) | confirma la documentación para texto plano; CSV, RIS y BibTeX sin observar |
+| Web of Science | «No more than 1000 records at a time» (2026-10-20, exportación a texto plano) | confirma la documentación para el registro completo; el de 500 con referencias citadas no se observó |
+| ACS | solo descarga individual | no hay máximo por exportación |
+| Lens | 1 000 documentos sin iniciar sesión (2026-10-20) | observado |
+
+**Pendiente de la parte A:** `KW` y el PMID en ACS, las columnas de publicaciones académicas de Lens y, si la búsqueda las produce, un CSV de Scopus con celdas de varias líneas, un registro sin autores y una exportación con tildes de LaTeX. Ninguno bloquea el cierre.
+
+El ADR sigue en estado **Propuesta** hasta completar la parte B (estudio de demostración).
 
 ## Alternativas consideradas
 
@@ -591,6 +707,16 @@ agrega:
 - **`id_fuente` como campo independiente de `doi`:** es simple, pero publica
   un DOI no habilitado cuando el identificador de la fuente es el DOI (ACS).
   Se eligió regirlo por el campo que repite.
+- **Una regla L-A06 que avise de una clave BibTeX repetida:** se descartó
+  (decidido el 2026-10-13). Añade una regla y pruebas para un caso que casi no
+  ocurre en las exportaciones de bases de datos. La entrada se recupera, se
+  cuenta y no genera hallazgo; sin la recuperación, los conteos serían
+  menores en silencio (punto 24).
+- **El DOI como identidad para el error de repetido** (cuando falta el
+  identificador de la fuente): detectaría tandas solapadas en el BibTeX de
+  Scopus, que no trae EID, pero marcaría como error dos registros distintos
+  que comparten un DOI, y la distinción es de la deduplicación (hito 4). Se
+  eligió la advertencia L-A05.
 - **Sin versión de la normalización:** si una regla cambia, la regeneración no
   coincide con el hash y no se distingue de un original alterado. Se eligió
   una versión explícita, registrada con la importación.

@@ -1,0 +1,71 @@
+# Qué datos de terceros versiona este estudio (agentresearch, ADR-0010).
+#
+# Todo se importa y se conserva COMPLETO en local (carpeta exportaciones_originales/, que
+# Git ignora). Lo que se versiona en importaciones/ lo decide este archivo: solo los
+# campos listados aquí cuya base esté COMPLETA. El resumen y las palabras clave nunca se
+# versionan. Un campo ausente o con la base incompleta se importa en local y no se publica.
+#
+# La BASE dice quién confirmó que ese campo puede publicarse:
+#   tipo: institucion | revista | licencia   (un término de contrato es una licencia)
+#   detalle: quién o qué lo confirmó (p. ej. la dependencia, la política citada o la cláusula)
+#   medio: cómo se obtuvo la confirmación; se pide solo con tipo "institucion"
+#   fecha: día de la confirmación, AAAA-MM-DD
+# Complete la base de cada campo cuando reciba la confirmación. Hasta entonces, el campo
+# queda solo en local. Este archivo es suyo: `estudio actualizar` lo crea si no existe y
+# nunca lo sobrescribe.
+
+fuentes:
+  scopus:
+    campos:
+      titulo:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      autores:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      doi:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      fuente_publicacion:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+  wos:
+    campos:
+      titulo:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      autores:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      doi:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      fuente_publicacion:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+  acs:
+    campos:
+      titulo:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      autores:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      doi:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      fuente_publicacion:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+  lens:
+    campos:
+      titulo:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      autores:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      doi:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+      fuente_publicacion:
+        base: {tipo: institucion, detalle: null, medio: null, fecha: null}
+
+# Cita breve de evidencia literal tomada de un campo no publicable (ADR-0010, punto 5).
+# "permitido" exige una base completa.
+evidencia_literal:
+  resumen: {estado: no_permitido, base: null}
+
+# Respaldo de los originales en la nube institucional, por fuente (ADR-0010, punto 9).
+# Lo ausente equivale a "sin_verificar": el respaldo se recomienda fuera de la nube.
+# Ejemplo, con su base completa:
+#
+# respaldo_nube:
+#   scopus:
+#     estado: permitido
+#     base: {tipo: licencia, detalle: "…", fecha: "AAAA-MM-DD"}

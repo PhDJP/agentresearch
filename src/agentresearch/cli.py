@@ -11,6 +11,10 @@ from typing import Any, Protocol
 
 from agentresearch.estudio.actualizacion import ResultadoActualizacion, actualizar_estudio
 from agentresearch.estudio.creacion import ErrorCreacion, ResultadoCreacion, crear_estudio
+from agentresearch.importacion.busqueda import ResultadoBusqueda, leer_busqueda
+from agentresearch.importacion.historial import construir_historial_importaciones
+from agentresearch.importacion.mapeo import ErrorDeMapeo, Mapeo
+from agentresearch.importacion.registrar import ResultadoRegistro, registrar_busqueda
 from agentresearch.protocolo import RutasProtocolo, validar_archivo
 from agentresearch.protocolo.aprobacion import (
     ErrorCicloDeVida,
@@ -34,9 +38,17 @@ from agentresearch.protocolo.ecuaciones.servicio import generar as generar_ecuac
 from agentresearch.protocolo.historial import construir_historial, texto_historial
 from agentresearch.protocolo.secciones import SECCIONES, ResultadoEscritura, escribir_seccion
 from agentresearch.protocolo.terminal import Terminal, TerminalDelSistema
+from agentresearch.registros import FormatoRegistro
 from agentresearch.trazabilidad import Anclaje, RegistroEncadenado
 
 RUTA_PROTOCOLO_POR_DEFECTO = Path("protocolo") / "protocolo.yaml"
+FORMATOS_DE_IMPORTACION: tuple[FormatoRegistro, ...] = (
+    "ris",
+    "bibtex",
+    "scopus_csv",
+    "wos_txt",
+    "csv",
+)
 
 
 def construir_analizador() -> argparse.ArgumentParser:
@@ -116,6 +128,51 @@ def construir_analizador() -> argparse.ArgumentParser:
         type=_anclaje_argumento,
         help="exige que el registro cumpla este anclaje (evt-NNNNNN@sha256:<hex>)",
     )
+
+    importar = subcomandos.add_parser(
+        "importar", help="Lectura de exportaciones de bases de datos (Scopus, WoS, ACS, etc.)"
+    )
+    subcomandos_importar = importar.add_subparsers(dest="subcomando", required=True)
+
+    leer_parser = subcomandos_importar.add_parser(
+        "leer",
+        help="Lee exportaciones de una búsqueda y las revisa, sin escribir nada",
+    )
+    leer_parser.add_argument("archivos", nargs="+", type=Path, metavar="ARCHIVO")
+    leer_parser.add_argument(
+        "--formato", required=True, choices=FORMATOS_DE_IMPORTACION, help="formato de los archivos"
+    )
+    leer_parser.add_argument(
+        "--fuente", required=True, help="identificador de la fuente (p. ej. scopus)"
+    )
+    leer_parser.add_argument(
+        "--mapeo",
+        type=Path,
+        help="archivo JSON de mapeo de columnas (obligatorio con --formato csv)",
+    )
+    _argumento_json(leer_parser)
+
+    registrar_parser = subcomandos_importar.add_parser(
+        "registrar",
+        help="Registra una búsqueda manual en el estudio (solo el investigador, en su terminal)",
+    )
+    registrar_parser.add_argument(
+        "--busqueda", required=True, type=Path, help="archivo JSON de la búsqueda (.borradores/)"
+    )
+    registrar_parser.add_argument(
+        "--registrado-por",
+        required=True,
+        dest="registrado_por",
+        help="ID del revisor humano declarado en el protocolo que registra la búsqueda",
+    )
+    _argumento_estudio(registrar_parser)
+    _argumento_json(registrar_parser)
+
+    historial_importar = subcomandos_importar.add_parser(
+        "historial", help="Lista las búsquedas registradas y comprueba importaciones/"
+    )
+    _argumento_estudio(historial_importar)
+    _argumento_json(historial_importar)
 
     protocolo = subcomandos.add_parser("protocolo", help="Operaciones sobre el protocolo")
     subcomandos_protocolo = protocolo.add_subparsers(dest="subcomando", required=True)
@@ -269,6 +326,16 @@ def _argumento_ruta(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _argumento_estudio(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--estudio",
+        type=Path,
+        default=Path("."),
+        metavar="RUTA",
+        help="raíz del estudio (por defecto, el directorio actual)",
+    )
+
+
 def _argumento_json(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--json",
@@ -378,6 +445,128 @@ def ejecutar_registro_verificar(archivo: Path, anclaje: Anclaje | None = None) -
     else:
         print(f"inválido: {resultado.mensaje}")
     return 1
+
+
+def ejecutar_importar_leer(
+    archivos: list[Path],
+    formato: FormatoRegistro,
+    fuente: str,
+    mapeo: Path | None = None,
+    como_json: bool = False,
+) -> int:
+    """Lee las exportaciones de una búsqueda e imprime un resumen sin registros.
+
+    No escribe nada. Devuelve 0 si solo hay advertencias (o ninguna) y 1 si algún
+    archivo tiene un error de lectura, no se pudo abrir o el mapeo no se pudo leer.
+    """
+    _tolerar_caracteres_no_representables()
+    comando = "importar leer"
+    try:
+        el_mapeo = Mapeo.cargar(mapeo) if mapeo is not None else None
+    except ErrorDeMapeo as error:
+        return _informar_fallo(comando, como_json, "no se pudo leer el mapeo", [str(error)])
+    resultado = leer_busqueda(archivos, formato, fuente, el_mapeo)
+    exito = not resultado.hay_errores
+    if como_json:
+        errores = [f"{n.archivo}: {n.motivo}" for n in resultado.no_leidos]
+        _imprimir_json(comando, exito, errores, resultado.resumen())
+    else:
+        for linea in _describir_lectura(resultado):
+            print(linea)
+    return 0 if exito else 1
+
+
+def _describir_lectura(resultado: ResultadoBusqueda) -> list[str]:
+    lineas: list[str] = []
+    for archivo in resultado.archivos:
+        lineas.append(f"archivo: {archivo.archivo} ({archivo.formato}, fuente {archivo.fuente})")
+        lineas.append(f"  hash: {archivo.hash_archivo}")
+        lineas.append(f"  registros: {archivo.numero_registros}")
+        if archivo.detenido_en_fila is not None:
+            lineas.append(f"  la lectura se detuvo en la fila {archivo.detenido_en_fila}")
+        for cabecera in archivo.lineas_cabecera:
+            lineas.append(f"  cabecera, línea {cabecera.linea}: {cabecera.texto}")
+        for hallazgo in archivo.hallazgos:
+            lineas.append(f"  {_texto_hallazgo(hallazgo.regla, hallazgo.linea, hallazgo.mensaje)}")
+        lineas.append(f"  cobertura: {_texto_cobertura(archivo.cobertura)}")
+    for no_leido in resultado.no_leidos:
+        lineas.append(f"no se pudo abrir: {no_leido.archivo}: {no_leido.motivo}")
+    for hallazgo in resultado.hallazgos_entre_archivos:
+        lineas.append(
+            f"entre archivos, {hallazgo.archivo}: "
+            f"{_texto_hallazgo(hallazgo.regla, hallazgo.linea, hallazgo.mensaje)}"
+        )
+    lineas.append(f"total de registros: {resultado.numero_registros}")
+    lineas.append(f"repetidos entre archivos: {len(resultado.repeticiones)}")
+    lineas.append(f"cobertura total: {_texto_cobertura(resultado.cobertura)}")
+    errores = sum(1 for a in resultado.archivos for h in a.hallazgos if h.severidad == "error")
+    errores += len(resultado.no_leidos) + sum(
+        1 for h in resultado.hallazgos_entre_archivos if h.severidad == "error"
+    )
+    advertencias = sum(
+        1 for a in resultado.archivos for h in a.hallazgos if h.severidad == "advertencia"
+    ) + sum(1 for h in resultado.hallazgos_entre_archivos if h.severidad == "advertencia")
+    lineas.append(f"resultado: {_resumen(errores, advertencias)}")
+    return lineas
+
+
+def _texto_hallazgo(regla: str, linea: int | None, mensaje: str) -> str:
+    donde = f"línea {linea}" if linea is not None else "archivo"
+    return f"[{regla}] {donde}: {mensaje}"
+
+
+def _texto_cobertura(cobertura: dict[str, int]) -> str:
+    return ", ".join(f"{campo} {cuenta}" for campo, cuenta in cobertura.items())
+
+
+def ejecutar_importar_registrar(
+    busqueda: Path,
+    registrado_por: str,
+    estudio: Path = Path("."),
+    como_json: bool = False,
+    terminal: Terminal | None = None,
+    reloj: Reloj | None = None,
+) -> int:
+    """Registra una búsqueda manual. Devuelve 0 si se registró y 1 si se rechazó o se canceló."""
+    return _ejecutar_operacion(
+        "importar registrar",
+        como_json,
+        lambda: registrar_busqueda(busqueda, registrado_por, estudio, _terminal(terminal), reloj),
+        _describir_registro,
+    )
+
+
+def _describir_registro(resultado: ResultadoRegistro) -> list[str]:
+    datos = resultado.como_dict()
+    return [
+        f"búsqueda registrada: {resultado.id_importacion} ({resultado.evento.id})",
+        f"  fuente: {datos['fuente']}",
+        f"  fecha y hora: {datos['fecha_hora_busqueda']} ({datos['fecha_hora_busqueda_utc']})",
+        f"  protocolo: {datos['version_protocolo']}; ecuación: {datos['relacion_ecuacion']}",
+        f"  registros leídos: {datos['registros_leidos']} "
+        f"(interfaz: {datos['resultados_interfaz']})",
+        f"  carpeta: {resultado.carpeta}",
+        *[f"aviso: {aviso}" for aviso in resultado.advertencias],
+        *_aviso_anclaje(resultado.anclaje_recreado),
+        f"anclaje: {resultado.anclaje}",
+        f'haga el commit con el anclaje en el mensaje, p. ej.: git commit -am "Registrar la '
+        f'búsqueda {resultado.id_importacion} (anclaje {resultado.anclaje})"',
+        "recuerde guardar los originales de exportaciones_originales/ en un respaldo fuera de "
+        "los servicios de nube compartidos: no se versionan",
+    ]
+
+
+def ejecutar_importar_historial(estudio: Path = Path("."), como_json: bool = False) -> int:
+    """Lista las búsquedas registradas. Devuelve 1 si las importaciones no son íntegras."""
+    _tolerar_caracteres_no_representables()
+    historial = construir_historial_importaciones(estudio)
+    if como_json:
+        errores = list(historial.problemas)
+        _imprimir_json("importar historial", historial.integro, errores, historial.como_dict())
+    else:
+        for linea in historial.lineas():
+            print(linea)
+    return 0 if historial.integro else 1
 
 
 def ejecutar_protocolo_validar(ruta: Path, como_json: bool = False) -> int:
@@ -789,6 +978,34 @@ def main() -> None:
 
     if argumentos.comando == "registro" and argumentos.subcomando == "verificar":
         sys.exit(ejecutar_registro_verificar(argumentos.archivo, argumentos.anclaje))
+
+    if argumentos.comando == "importar" and argumentos.subcomando == "leer":
+        if (argumentos.formato == "csv") != (argumentos.mapeo is not None):
+            analizador.error("--mapeo es obligatorio con --formato csv y no se admite con otro")
+        if not argumentos.fuente.strip():
+            analizador.error("--fuente no puede estar vacía")
+        sys.exit(
+            ejecutar_importar_leer(
+                argumentos.archivos,
+                argumentos.formato,
+                argumentos.fuente,
+                argumentos.mapeo,
+                argumentos.como_json,
+            )
+        )
+
+    if argumentos.comando == "importar" and argumentos.subcomando == "registrar":
+        sys.exit(
+            ejecutar_importar_registrar(
+                argumentos.busqueda,
+                argumentos.registrado_por,
+                argumentos.estudio,
+                argumentos.como_json,
+            )
+        )
+
+    if argumentos.comando == "importar" and argumentos.subcomando == "historial":
+        sys.exit(ejecutar_importar_historial(argumentos.estudio, argumentos.como_json))
 
     if argumentos.comando == "protocolo" and argumentos.subcomando == "validar":
         sys.exit(ejecutar_protocolo_validar(argumentos.ruta, argumentos.como_json))

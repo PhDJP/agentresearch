@@ -37,6 +37,7 @@ from ruamel.yaml.error import YAMLError
 
 from agentresearch.estudio.creacion import (
     ADMINISTRADOS,
+    SEMILLAS,
     renderizar,
     texto_de_plantilla,
     valores_de_plantilla,
@@ -310,9 +311,10 @@ def _completar_interrumpida(
     nuevo = estudio.model_copy(
         update={"agente": Agente(version=datos.version_nueva, fuente=datos.fuente_nueva)}
     )
-    cambios = _cambios(raiz, nuevo)
+    registrados = {archivo.ruta: archivo.hash_nuevo for archivo in datos.archivos}
+    cambios = _cambios(raiz, nuevo, registrados)
     generados = {cambio.ruta: hash_bytes(cambio.nuevo) for cambio in cambios}
-    if generados != {archivo.ruta: archivo.hash_nuevo for archivo in datos.archivos}:
+    if generados != registrados:
         raise ErrorCicloDeVida(
             [
                 f"la actualización registrada en {evento.id} se interrumpió, pero los archivos "
@@ -393,7 +395,15 @@ def _fuente_en_pyproject(raiz: Path, instalada: str, problemas: list[str]) -> st
     return fuentes[0]
 
 
-def _cambios(raiz: Path, nuevo: Estudio) -> list[CambioArchivo]:
+def _cambios(
+    raiz: Path, nuevo: Estudio, registrados: dict[str, str] | None = None
+) -> list[CambioArchivo]:
+    """Los archivos que escribe la actualización.
+
+    Los administrados se regeneran siempre. Las semillas (`SEMILLAS`) solo se crean si el estudio
+    no las tiene. Al completar una actualización interrumpida, `registrados` (ruta → hash que
+    registró el evento) permite reconocer una semilla que ya se escribió antes de la interrupción.
+    """
     valores = valores_de_plantilla(nuevo)
     cambios = [
         CambioArchivo(
@@ -403,6 +413,16 @@ def _cambios(raiz: Path, nuevo: Estudio) -> list[CambioArchivo]:
         )
         for origen, destino in ADMINISTRADOS.items()
     ]
+    for origen, destino in SEMILLAS.items():
+        actual = _leer(raiz, destino)
+        contenido = renderizar(texto_de_plantilla(origen), valores).encode("utf-8")
+        ya_escrita = (
+            actual is not None
+            and registrados is not None
+            and registrados.get(destino) == hash_bytes(actual)
+        )
+        if actual is None or ya_escrita:
+            cambios.append(CambioArchivo(destino, actual, contenido))
     cambios.append(
         CambioArchivo(
             NOMBRE_ARCHIVO, _leer(raiz, NOMBRE_ARCHIVO), texto_estudio(nuevo).encode("utf-8")
