@@ -38,3 +38,18 @@ JSON de un solo nivel, `{"columna": destino}`, donde `destino` es:
 - un campo del esquema: `"titulo"`, `"fuente_publicacion"`, `"volumen"`, `"numero"`, `"paginas"`, `"doi"`, `"pmid"`, `"tipo_documento"`, `"idioma"`, `"resumen"`, `"anio"`;
 - un objeto `{"campo": "autores", "separador": "; "}`, obligatorio para los campos de lista (`autores`, `palabras_clave_autor`, `palabras_clave_indexadas`);
 - `"id_fuente:TIPO"`, con `TIPO` en `eid`, `ut`, `doi`, `pmid` o `lens_id`.
+
+Ejemplo para la exportación de **patentes** de Lens en CSV (nombres de columna observados el 2026-10-20; el resto de las columnas va a `otros`):
+
+```json
+{
+  "Lens ID": "id_fuente:lens_id",
+  "Title": "titulo",
+  "Abstract": "resumen",
+  "Publication Year": "anio",
+  "Inventors": {"campo": "autores", "separador": "; "},
+  "Document Type": "tipo_documento"
+}
+```
+
+Una patente no tiene DOI, así que la lectura de ese CSV avisa L-A04 por el campo `doi`: es esperable y no impide registrar. Si el investigador exporta artículos de Lens, sus columnas son otras: revisa el encabezado del archivo antes de proponer el mapeo.

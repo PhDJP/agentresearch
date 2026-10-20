@@ -643,6 +643,42 @@ El detalle y la lista de lo que sigue sin poder verificarse están en la
     ej. el protocolo del caso piloto en el hito 11), se verifica antes en
     esas dos listas.
 
+## Aceptación
+
+### Parte A: exportaciones reales de prueba (2026-10-20)
+
+Todas se leyeron solo con `importar leer`: no se registraron ni se versionaron. Los archivos están en `exportaciones_prueba_local/`, que Git ignora. Esta sección no copia datos de los registros: solo formatos, conteos, límites y hallazgos.
+
+| Fuente | Formato | Archivos | Registros | Resultado de la lectura |
+|---|---|---|---|---|
+| Scopus | RIS, CSV, BibTeX | 1 de cada uno (2026-10-13) | 5 en cada uno | sin errores ni advertencias |
+| Web of Science | texto plano, registro completo | 3 (2026-10-20) | 5, 3 y 5 | sin errores ni advertencias por archivo |
+| Web of Science | texto plano, contenido reducido | 1 (2026-10-13) | 3 | L-A04 por `resumen` |
+| ACS | RIS | 2 (2026-10-13 y 2026-10-20) | 1 y 1 | L-A03 (3 líneas de cabecera) |
+| Lens (índice de patentes) | CSV con mapeo | 1 (2026-10-20) | 10 | L-A04 por `doi` |
+
+**Hallazgos**
+
+- **Web of Science, «Full Record».** Con el contenido del registro completo, las etiquetas `AB`, `DT`, `LA`, `DE`, `ID` y `PM` se leen: resumen y palabras clave de autor e indexadas en casi todos los registros (el PMID solo cuando el registro lo tiene). «Author, Title, Source» no trae el resumen; «Author, Title, Source, Abstract» trae el resumen pero no las palabras clave ni el tipo de documento. La opción que sirve para el cribado es «Full Record».
+- **Archivos repetidos entre tandas (L-E03).** Una tanda que repite tres registros de otra se detecta con el archivo y la línea de cada uno. Un archivo nombrado «6-10» trajo 3 registros en vez de 5 (el investigador no precisó el rango que escribió): la lectura no puede saberlo, así que el número de registros leído debe compararse con el rango pedido. Un archivo idéntico (I-E05) no se probó con exportaciones reales; sigue cubierto por las pruebas sintéticas.
+- **Scopus.** En la ventana de exportación, las casillas «Abstract», «Author keywords» e «Indexed keywords» vienen desmarcadas por defecto: explica que el RIS de la prueba traiga resumen y ninguna palabra clave. La `/importar` lo indica.
+- **ACS.** Las notas del investigador del 2026-10-13 y del 2026-10-20 cierran la comprobación pendiente del punto 28: ACS **no permite descargas masivas ni extraer metadatos, solo descarga individual**. Cada artículo es un archivo, y varios de una búsqueda complementaria se registran como tandas. Un RIS con volumen, número y páginas confirma las etiquetas `VL`, `IS`, `SP` y `EP`. Siguen sin verse `KW`, el PMID, el tipo de documento y el idioma. No se comprobó si ACS lematiza.
+- **Lens.** La exportación de prueba es del índice de **patentes**: 37 columnas (`Lens ID`, `Title`, `Abstract`, `Publication Year`, `Inventors`, `Document Type`, `Applicants`, `Jurisdiction`, `Kind`, `Application Number`…), UTF-8 con BOM, fin de línea CRLF, sin resúmenes de varias líneas, inventores separados por «; ». Se lee sin errores con el CSV genérico y un mapeo (el de `/importar`, `formatos.md`). Una patente no tiene DOI, así que L-A04 por `doi` es esperable y no impide registrar. Las columnas de las **publicaciones académicas** de Lens no se observaron: quedan por confirmar cuando el protocolo declare ese índice. La ventana de exportación pide iniciar sesión para más de 1 000 documentos y recuerda la política de atribución de Lens.
+- **Correcciones a los lectores:** ninguna. Todos los formatos observados se leyeron sin cambios en las tablas.
+
+**Máximos por exportación observados (punto 25)**
+
+| Base | Observado | Estado |
+|---|---|---|
+| Scopus | «up to 20,000 documents in Plain text format» (2026-10-20) | confirma la documentación para texto plano; CSV, RIS y BibTeX sin observar |
+| Web of Science | «No more than 1000 records at a time» (2026-10-20, exportación a texto plano) | confirma la documentación para el registro completo; el de 500 con referencias citadas no se observó |
+| ACS | solo descarga individual | no hay máximo por exportación |
+| Lens | 1 000 documentos sin iniciar sesión (2026-10-20) | observado |
+
+**Pendiente de la parte A:** `KW` y el PMID en ACS, las columnas de publicaciones académicas de Lens y, si la búsqueda las produce, un CSV de Scopus con celdas de varias líneas, un registro sin autores y una exportación con tildes de LaTeX. Ninguno bloquea el cierre.
+
+El ADR sigue en estado **Propuesta** hasta completar la parte B (estudio de demostración).
+
 ## Alternativas consideradas
 
 - **Versionar las exportaciones originales** (lo que decía

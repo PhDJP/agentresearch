@@ -223,7 +223,7 @@ JSON de un solo nivel `{"columna": destino}`, donde `destino` es:
 }
 ```
 
-Los nombres de columna son del ejemplo; los de Lens se confirman en el 2e. Las columnas sin destino van a `otros` con el nombre de la columna. Si la celda de una columna `id_fuente:TIPO` está vacía, el registro queda con `tipo_id_fuente: ninguno`. Es L-E02 (con el nombre del archivo de mapeo): una columna del mapeo que no está en el encabezado, un campo que no es del esquema, un campo de lista sin separador, un separador en un campo que no es de lista, o dos columnas con el mismo destino. Un archivo de mapeo que no se puede leer o no es JSON no es un error de lectura de una exportación: el comando lo informa en `errores` y sale con 1, sin leer el CSV (ver los códigos de salida).
+Los nombres de columna son del ejemplo. Los de la exportación de patentes de Lens se confirmaron el 2026-10-20 (ADR-0010, «Aceptación»); el mapeo real está en `formatos.md` de la *skill* `/importar`, y los de sus publicaciones académicas siguen por confirmar. Las columnas sin destino van a `otros` con el nombre de la columna. Si la celda de una columna `id_fuente:TIPO` está vacía, el registro queda con `tipo_id_fuente: ninguno`. Es L-E02 (con el nombre del archivo de mapeo): una columna del mapeo que no está en el encabezado, un campo que no es del esquema, un campo de lista sin separador, un separador en un campo que no es de lista, o dos columnas con el mismo destino. Un archivo de mapeo que no se puede leer o no es JSON no es un error de lectura de una exportación: el comando lo informa en `errores` y sale con 1, sin leer el CSV (ver los códigos de salida).
 
 ### Correspondencia de campos
 
