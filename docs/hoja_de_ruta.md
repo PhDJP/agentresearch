@@ -71,7 +71,7 @@ Especificación detallada, dividida en los sub-hitos 1a a 1e: [especificaciones/
 
 Especificación detallada, dividida en los sub-hitos 2a a 2e: [especificaciones/hito_2_registros_e_importacion.md](especificaciones/hito_2_registros_e_importacion.md). Decisiones: [ADR-0010](decisiones/0010-registros-importacion-y-datos-de-terceros.md) (propuesta).
 
-**Avance:** 2a ✅ completo (2026-10-12): módulo `agentresearch.registros` con el registro normalizado y su `hash_completo`, la normalización de texto y DOI, artículo y estudio provisionales, la política de datos de terceros (paquete y estudio), la regla de versionado y los archivos `registros.jsonl` y `registros.csv`. Quedan 2b a 2e.
+**Avance:** 2a ✅ completo (2026-10-12): módulo `agentresearch.registros` con el registro normalizado y su `hash_completo`, la normalización de texto y DOI, artículo y estudio provisionales, la política de datos de terceros (paquete y estudio), la regla de versionado y los archivos `registros.jsonl` y `registros.csv`. 2b ✅ completo (2026-10-20): lectores de RIS, BibTeX, CSV de Scopus, Web of Science y CSV genérico, y el comando `agentresearch importar leer` (sin escribir nada y sin mostrar registros). Quedan 2c a 2e.
 
 - Modelo normalizado de registro con procedencia y distinción entre artículo y estudio.
 - Lectores de RIS, BibTeX, CSV de Scopus, WoS (.txt) y CSV genérico, probados con archivos sintéticos.
